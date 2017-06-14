@@ -1,0 +1,3 @@
+[submodule "sneezymud"]
+	path = sneezymud
+	url = https://bitbucket.org/cizra/sneezymud
