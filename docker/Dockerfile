@@ -7,9 +7,12 @@ RUN apk add boost-dev
 RUN apk add mariadb mariadb-client mariadb-dev
 RUN apk add scons
 RUN apk add curl-dev
+RUN apk add gdb
+RUN apk add sudo
 RUN rm -f /var/cache/apk/*
 RUN adduser -D sneezy
 RUN mkdir -p /run/mysqld && chmod 1777 /run/mysqld
+RUN echo "sneezy ALL=NOPASSWD: ALL" >> /etc/sudoers
 
 COPY setup_mysql.sh /scripts/setup_mysql.sh
 COPY my.cnf /etc/mysql/my.cnf
