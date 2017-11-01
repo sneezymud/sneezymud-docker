@@ -32,17 +32,19 @@ UPDATE user SET password=PASSWORD("") WHERE user='root' AND host='localhost';
 CREATE USER 'sneezy'@'localhost' IDENTIFIED BY 'password';
 EOF
 
-for MYSQL_DATABASE in sneezy immortal; do
-	echo "[i] Creating database: $MYSQL_DATABASE"
-	echo "CREATE DATABASE IF NOT EXISTS \`$MYSQL_DATABASE\` CHARACTER SET utf8 COLLATE utf8_general_ci;" >> $tfile
-	echo "GRANT ALL ON \`$MYSQL_DATABASE\`.* to 'sneezy'@'localhost';" >> $tfile
-done
-
-/usr/bin/mysqld --bootstrap --verbose=0 < $tfile
-# rm -f $tfile
+	for MYSQL_DATABASE in sneezy immortal; do
+		echo "[i] Creating database: $MYSQL_DATABASE"
+		echo "CREATE DATABASE IF NOT EXISTS \`$MYSQL_DATABASE\` CHARACTER SET utf8 COLLATE utf8_general_ci;" >> $tfile
+		echo "GRANT ALL ON \`$MYSQL_DATABASE\`.* to 'sneezy'@'localhost';" >> $tfile
+	done
+	
+	/usr/bin/mysqld --bootstrap --verbose=0 < $tfile
+	# rm -f $tfile
 fi
 
 /usr/bin/mysqld &
+echo Started MySQL
+sleep 2
 
 if [ $NEW -eq 1 ]; then
 	sleep 1
