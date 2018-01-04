@@ -10,5 +10,12 @@ else
     GDB=""
 fi
 CMD="/scripts/setup_mysql.sh && $GDB ./sneezy; killall mysqld"
-docker rm sneezy || true  # nuke the previous run if needed
-docker run --name sneezy --cap-add=SYS_PTRACE -it -p 7900:7900 -v `pwd`:/home/sneezy/sneezymud-docker -v `pwd`/mysql:/var/lib/mysql -v /tmp/cores:/tmp/cores sneezy /bin/sh -c "$CMD"
+CONTAINER="sneezy-`whoami`"
+docker rm "$CONTAINER" || true  # nuke the previous run if needed
+
+PORT=7900
+while (netstat -lptn | grep -q $PORT); do
+  PORT=$(($PORT+1))
+done
+echo "Sneezy will listen on port $PORT"
+docker run --name "$CONTAINER" --cap-add=SYS_PTRACE -it -p $PORT:7900 -v `pwd`:/home/sneezy/sneezymud-docker -v `pwd`/mysql:/var/lib/mysql -v /tmp/cores:/tmp/cores sneezy /bin/sh -c "$CMD"
