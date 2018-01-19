@@ -9,13 +9,30 @@ if [ "x$1" = "x-g" ]; then
 else
     GDB=""
 fi
-CMD="/scripts/setup_mysql.sh && $GDB ./sneezy; killall mysqld"
-CONTAINER="sneezy-`whoami`"
+
+if [ "x$1" = "x-l" ]; then
+    SNEEZY="(while sleep 10; do ./sneezy; done)"
+else
+    SNEEZY="./sneezy"
+fi
+
+mkdir -p "log"
+SNEEZY="$SNEEZY" > "log/sneezy-`date -u +%Y-%m-%dT%H:%M:%SZ`"
+CMD="/scripts/setup_mysql.sh && $GDB $SNEEZY; killall mysqld"
+
+# support multiple Sneezies per box
+if [ "`whoami`" = "sneezy" ]; then
+  CONTAINER="sneezy"
+  PORT=7900
+else
+  CONTAINER="sneezy-`whoami`"
+  PORT=7900
+  while (netstat -lptn | grep -q $PORT); do
+    PORT=$(($PORT+1))
+  done
+fi
+
 docker rm "$CONTAINER" || true  # nuke the previous run if needed
 
-PORT=7900
-while (netstat -lptn | grep -q $PORT); do
-  PORT=$(($PORT+1))
-done
 echo "Sneezy will listen on port $PORT"
-docker run --name "$CONTAINER" --cap-add=SYS_PTRACE -it -p $PORT:7900 -v `pwd`:/home/sneezy/sneezymud-docker -v `pwd`/mysql:/var/lib/mysql -v /tmp/cores:/tmp/cores sneezy /bin/sh -c "$CMD"
+docker run --name "$CONTAINER" --cap-add=SYS_PTRACE -it -p $PORT:7900 -v `pwd`:/home/sneezy/sneezymud-docker -v `pwd`/mysql:/var/lib/mysql sneezy /bin/sh -c "$CMD"
