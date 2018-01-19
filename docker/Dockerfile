@@ -3,7 +3,8 @@ LABEL maintainer Elmo Todurov <elmo.todurov@eesti.ee>
 
 RUN apk update && apk add build-base boost-dev mariadb mariadb-client mariadb-dev scons curl-dev gdb sudo git musl-dbg
 RUN rm -f /var/cache/apk/*
-RUN adduser -D sneezy
+ARG UID=1000
+RUN adduser -D -u $UID sneezy
 RUN mkdir -p /run/mysqld && chmod 1777 /run/mysqld
 RUN echo "sneezy ALL=NOPASSWD: ALL" >> /etc/sudoers
 RUN mkdir /tmp/cores

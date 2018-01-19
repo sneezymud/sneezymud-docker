@@ -8,5 +8,5 @@ if [ ! -d sneezymud/code ]; then
 fi
 
 echo 'gitdir: ../.git/modules/sneezymud' > sneezymud/.git
-docker build -t sneezy docker
+docker build --build-arg UID=`id -u` -t sneezy docker
 docker run -it --rm -v `pwd`:/home/sneezy/sneezymud-docker sneezy
