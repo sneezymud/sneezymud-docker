@@ -11,13 +11,12 @@ else
 fi
 
 if [ "x$1" = "x-l" ]; then
-    SNEEZY="(while sleep 10; do ./sneezy; done)"
+    mkdir -p "log"
+    SNEEZY="(while sleep 10; do ./sneezy > ../../log/sneezy-\`date -u +%Y-%m-%dT%H:%M:%SZ\` 2>&1; done)"
 else
     SNEEZY="./sneezy"
 fi
 
-mkdir -p "log"
-SNEEZY="$SNEEZY" > "log/sneezy-`date -u +%Y-%m-%dT%H:%M:%SZ`"
 CMD="/scripts/setup_mysql.sh && $GDB $SNEEZY; killall mysqld"
 
 # support multiple Sneezies per box
