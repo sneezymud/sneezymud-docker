@@ -17,6 +17,11 @@ else
     SNEEZY="./sneezy"
 fi
 
+if [ "x$1" = "x-c" ]; then
+    shift
+    SNEEZY="$*"
+fi
+
 CMD="/scripts/setup_mysql.sh && $GDB $SNEEZY; killall mysqld"
 
 # support multiple Sneezies per box
