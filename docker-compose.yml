@@ -1,0 +1,29 @@
+version: '3.3'
+ 
+services:
+  db:
+    #build: 
+     # context: .
+    #  dockerfile: ./db/Dockerfile
+    image: mariadb
+    container_name: sneezydb
+    volumes:
+      - ./mysql:/var/lib/mysql
+      - ./db:/etc/mysql
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: "111111"
+    restart: always
+ 
+  sneezy:
+    depends_on:
+      - db
+    build: .
+    container_name: sneezy
+    ports:
+      - 7900:7900
+    volumes:
+      - .:/home/sneezy/sneezymud-docker
+      - ./mysql:/var/lib/mysql
+    restart: always
