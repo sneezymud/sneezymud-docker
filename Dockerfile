@@ -5,12 +5,10 @@ RUN apk update && apk add build-base boost-dev mariadb mariadb-client mariadb-de
 RUN rm -f /var/cache/apk/*
 ARG UID=1000
 RUN adduser -D -u $UID sneezy
-RUN mkdir -p /run/mysqld && chmod 1777 /run/mysqld
 RUN echo "sneezy ALL=NOPASSWD: ALL" >> /etc/sudoers
 RUN mkdir /tmp/cores
 
-COPY setup_mysql.sh /scripts/setup_mysql.sh
-COPY my.cnf /etc/mysql/my.cnf
+COPY /db/setup_mysql.sh /scripts/setup_mysql.sh
 
 EXPOSE 7900
 
