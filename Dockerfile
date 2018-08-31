@@ -8,8 +8,6 @@ RUN adduser -D -u $UID sneezy
 RUN echo "sneezy ALL=NOPASSWD: ALL" >> /etc/sudoers
 RUN mkdir /tmp/cores
 
-COPY /db/setup_mysql.sh /scripts/setup_mysql.sh
-
 EXPOSE 7900
 
 USER sneezy

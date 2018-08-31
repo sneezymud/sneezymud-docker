@@ -6,15 +6,20 @@ services:
      # context: .
     #  dockerfile: ./db/Dockerfile
     image: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: "111111"
+      MYSQL_USER: sneezy
+      MYSQL_PASSWORD: password
     container_name: sneezydb
     volumes:
       - ./mysql:/var/lib/mysql
       - ./db:/etc/mysql
+      - ./db:/docker-entrypoint-initdb.d
+      - .:/home/sneezy/sneezymud-docker
     ports:
       - 3306:3306
-    environment:
-      MYSQL_ROOT_PASSWORD: "111111"
     restart: always
+
  
   sneezy:
     depends_on:
