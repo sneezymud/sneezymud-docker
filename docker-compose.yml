@@ -20,7 +20,6 @@ services:
       - 3306:3306
     restart: always
 
- 
   sneezy:
     depends_on:
       - db
@@ -32,3 +31,14 @@ services:
       - .:/home/sneezy/sneezymud-docker
       - ./mysql:/var/lib/mysql
     restart: always
+
+  web:
+    build:
+      context: ./web
+      dockerfile: web_Dockerfile
+    ports:
+        - "5000:5000"
+    volumes:
+        - ./web:/code
+    depends_on:
+        - db
