@@ -31,7 +31,7 @@ if [ "`whoami`" = "sneezy" ]; then
 else
   CONTAINER="sneezy-`whoami`"
   PORT=7900
-  while (netstat -lptn | grep -q $PORT); do
+  while (ss -lptn | grep -q $PORT); do
     PORT=$(($PORT+1))
   done
 fi
