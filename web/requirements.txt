@@ -1,2 +1,5 @@
 flask
 mysql-connector-python-rf
+sqlalchemy 
+flask-sqlalchemy
+pymysql
