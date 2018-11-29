@@ -42,3 +42,4 @@ services:
         - ./web:/code
     depends_on:
         - db
+    restart: always
