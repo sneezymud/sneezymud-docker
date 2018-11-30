@@ -4,8 +4,29 @@
 
       ..under constructions
       <h1>Zones</h1>
-      {% for zone in zones %}
-        <p>{{zone.zone_name}}</p>
-      {% endfor %}
+      <table>
+        <TR>
+            <TD>Number</TD>
+            <TD>Name</TD>
+            <TD>Enabled</TD>
+            <TD>Vnums</TD>
+            <TD>Reset mode</TD>
+            <TD>Lifespan</TD>
+            <TD>Age</TD>
+            <TD>Util flag</TD>
+        </TR>
+        {% for zone in zones %}
+        <TR>
+           <TD>{{zone.zone_nr}}</TD>
+           <TD>{{zone.zone_name}}</TD>
+           <TD>{{zone.zone_enabled}}</TD>
+           <TD>{{zone.bottom}} - {{zone.top}}</TD>
+           <TD>{{zone.reset_mode}}</TD>
+           <TD>{{zone.lifespan}}</TD>
+           <TD>{{zone.age}}</TD>
+           <TD>{{zone.util}}</TD>
+        </TR>
+        {% endfor %}
+        </table>
     </body>
   </html>
