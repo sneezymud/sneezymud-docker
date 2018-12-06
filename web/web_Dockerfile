@@ -2,4 +2,6 @@ FROM python:3.6
 ADD . /code
 WORKDIR /code
 RUN pip install -r requirements.txt
+RUN useradd -ms /bin/bash sneezy
+USER sneezy
 CMD python app.py
