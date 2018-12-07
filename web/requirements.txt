@@ -3,3 +3,5 @@ mysql-connector-python-rf
 sqlalchemy 
 flask-sqlalchemy
 pymysql
+flask-login
+crypt

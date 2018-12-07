@@ -3,6 +3,13 @@
       SneezyCRUD
 
       ..under constructions
+
+      <H1>Accounts</H1>
+      <table>
+      {% for account in accounts %}
+      <Tr><Td>{{account.name}}</Td><Td>{{account.passwd}}</Td></Tr>
+      {% endfor %}
+      </table>
       <h1>Zones</h1>
       <table>
         <TR>
