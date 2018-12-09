@@ -4,4 +4,3 @@ sqlalchemy
 flask-sqlalchemy
 pymysql
 flask-login
-crypt
