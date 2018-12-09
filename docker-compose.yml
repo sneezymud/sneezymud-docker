@@ -1,4 +1,4 @@
-version: '3.3'
+version: '2'
  
 services:
   db:
@@ -24,9 +24,9 @@ services:
     depends_on:
       - db
     build: .
-    container_name: sneezy
+    container_name: sneezy-test
     ports:
-      - 7900:7900
+      - 7902:7900
     volumes:
       - .:/home/sneezy/sneezymud-docker
       - ./mysql:/var/lib/mysql
@@ -37,7 +37,7 @@ services:
       context: ./web
       dockerfile: web_Dockerfile
     ports:
-        - "5000:5000"
+        - "5001:5000"
     volumes:
         - ./web:/code
     depends_on:
