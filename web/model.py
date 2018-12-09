@@ -29,6 +29,56 @@ class Account(db.Model):
     flags = db.Column(db.Integer, nullable=True)
     last_logon = db.Column(db.Integer, nullable=True)
     multiplay_limit = db.Column(db.Integer)
+    # players = db.relationship('Player', backref='Account', lazy=True, foreign_keys='account_id')
+
+    def __repr__(self):
+        return "<Name: {}>".format(self.name)
+
+class Wizdata(db.Model):
+    player_id = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
+    setsev = db.Column(db.Integer, nullable=True)
+    office = db.Column(db.Integer, nullable=True)
+    blockastart = db.Column(db.Integer, nullable=True)
+    blockaend = db.Column(db.Integer, nullable=True)
+    blockbstart = db.Column(db.Integer, nullable=True)
+    blockbend = db.Column(db.Integer, nullable=True)
+
+    def __repr__(self):
+        return "<Id: {}>".format(self.player_id)
+
+class Room(db.Model):
+    vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
+    x = db.Column(db.Integer)
+    y = db.Column(db.Integer)
+    z = db.Column(db.Integer)
+    name = db.Column(db.String(127))
+    description = db.Column(db.String())
+    zone = db.Column(db.Integer)
+    room_flag = db.Column(db.Integer)
+    sector = db.Column(db.Integer)
+    teletime = db.Column(db.Integer)
+    teletarg = db.Column(db.Integer)
+    telelook = db.Column(db.Integer)
+    river_speed = db.Column(db.Integer)
+    river_dir = db.Column(db.Integer)
+    capacity = db.Column(db.Integer)
+    height = db.Column(db.Integer)
+    spec = db.Column(db.Integer)
+
+    def __repr__(self):
+        return "<Name: {}>".format(self.name)
+
+class Player(db.Model):
+    id = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
+    name = db.Column(db.String(80))
+    talens = db.Column(db.Integer)
+    title = db.Column(db.String())
+    account_id = db.Column(db.Integer)
+    guild_id = db.Column(db.Integer)
+    guildrank = db.Column(db.Integer)
+    load_room = db.Column(db.Integer)
+    last_logon = db.Column(db.Integer)
+    nutrition = db.Column(db.Integer)
 
     def __repr__(self):
         return "<Name: {}>".format(self.name)

@@ -1,0 +1,21 @@
+<html>
+    <body>
+      SneezyCRUD
+
+      ..under constructions
+
+      <h1>Your assigned rooms</h1>
+      <table>
+        <tr>
+            <th>Vnum</th>
+            <th>Name</th>
+        </tr>
+        {% for room in rooms %}
+        <tr>
+           <td>{{room.vnum}}</td>
+           <td>{{room.name}}</td>
+        </tr>
+        {% endfor %}
+        </table>
+    </body>
+  </html>
