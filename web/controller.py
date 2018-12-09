@@ -1,19 +1,24 @@
 import auth
-from model import Player, Wizdata, Account, Room
+from model import Player, Wizdata, Account, Room, Zone
 from main import app, db
 
 from flask import render_template, request
 from sqlalchemy.sql import text
 
 
-# @auth.requires_auth
-# def hello():
-#     #cursor.execute("SELECT zone_name FROM zone")
-#     #zones = list(cursor)
-#     zones = model.Zone.query.all()
-#     return render_template("home.html", zones=zones)
-
 @app.route("/")
+@auth.requires_auth
+def home():
+    return render_template("home.html")
+
+
+@app.route("/zones")
+@auth.requires_auth
+def zones():
+    zones = Zone.query.all()
+    return render_template("zones.html", zones=zones)
+
+
 @app.route("/rooms")
 @auth.requires_auth
 def rooms():
