@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM alpine:3.8.4
 LABEL maintainer Elmo Todurov <elmo.todurov@eesti.ee>
 
 RUN apk update && apk add build-base boost-dev mariadb mariadb-client mariadb-dev scons curl-dev gdb sudo git musl-dbg
