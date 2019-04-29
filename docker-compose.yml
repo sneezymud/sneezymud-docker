@@ -1,0 +1,26 @@
+version: '3'
+
+services:
+  db:
+    image: mariadb
+    restart: always
+    volumes:
+      - db:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=yadablarg
+
+  sneezy:
+    build: ./docker
+    restart: always
+    volumes:
+      - .:/home/sneezy/sneezymud-docker
+    depends_on:
+      - db
+    ports:
+      - 7900:7900
+
+volumes:
+  db:
+
+networks:
+  proxy-tier:
