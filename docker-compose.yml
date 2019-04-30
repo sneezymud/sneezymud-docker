@@ -2,9 +2,6 @@ version: '2'
  
 services:
   db:
-    #build: 
-     # context: .
-    #  dockerfile: ./db/Dockerfile
     image: mariadb
     environment:
       MYSQL_ROOT_PASSWORD: "111111"
@@ -12,10 +9,10 @@ services:
       MYSQL_PASSWORD: password
     container_name: sneezydb
     volumes:
-      - ./mysql:/var/lib/mysql
-      - ./db:/etc/mysql
+      - sneezydb:/var/lib/mysql
+      - ./db/my.cnf:/etc/mysql/my.cnf
       - ./db:/docker-entrypoint-initdb.d
-      - .:/home/sneezy/sneezymud-docker
+      - .:/home/sneezy/sneezymud-docker  # for initially populating the DB
     expose:
       - "3306"
     restart: always
@@ -25,21 +22,24 @@ services:
       - db
     build: .
     container_name: sneezy-test
+    cap_add:
+      - SYS_PTRACE
     ports:
-      - 7902:7900
+      - 7900:7900
     volumes:
       - .:/home/sneezy/sneezymud-docker
-      - ./mysql:/var/lib/mysql
     restart: always
 
-  web:
-    build:
-      context: ./web
-      dockerfile: web_Dockerfile
-    ports:
-        - "5001:5000"
-    volumes:
-        - ./web:/code
-    depends_on:
-        - db
-    restart: always
+    #  web:
+    #    build:
+    #      context: ./web
+    #      dockerfile: web_Dockerfile
+    #    ports:
+    #        - "5001:5000"
+    #    volumes:
+    #        - ./web:/code
+    #    depends_on:
+    #        - db
+    #    restart: always
+volumes:
+  sneezydb:
