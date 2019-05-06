@@ -20,8 +20,8 @@ services:
   sneezy:
     depends_on:
       - db
-    build: .
-    container_name: sneezy-test
+    build: ./docker
+    container_name: sneezy
     cap_add:
       - SYS_PTRACE
     ports:
