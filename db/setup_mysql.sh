@@ -12,3 +12,5 @@ for db in immortal sneezy; do
 		done
 	done
 done
+
+echo Db setup done
