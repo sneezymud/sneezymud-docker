@@ -1,0 +1,14 @@
+.grid {
+  display: grid;
+  grid-gap: 1em;
+  grid-template-columns: auto auto;
+  margin: 1em;
+}
+
+.ib {
+  display: inline-block;
+}
+
+button a {
+  text-decoration: none;
+}

@@ -4,3 +4,5 @@ sqlalchemy
 flask-sqlalchemy
 pymysql
 flask-login
+flask-wtf
+ipdb

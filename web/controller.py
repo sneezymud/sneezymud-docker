@@ -2,9 +2,13 @@ import auth
 from model import Player, Wizdata, Account, Room, Zone
 from main import app, db
 
-from flask import render_template, request
+from flask import render_template, request, flash
 from sqlalchemy.sql import text
 
+from flask_wtf import FlaskForm
+from wtforms import StringField
+from wtforms.validators import DataRequired
+from wtforms.ext.sqlalchemy.orm import model_form
 
 @app.route("/")
 @auth.requires_auth
@@ -38,7 +42,20 @@ def rooms():
         from account a
         inner join player p on p.account_id = a.account_id
         inner join wizdata w on w.player_id = p.id
-        inner join room r on (r.vnum between w.blockastart and w.blockaend or r.vnum between w.blockbstart and w.blockbend)
+        right join room r on (r.vnum between w.blockastart and w.blockaend or r.vnum between w.blockbstart and w.blockbend)
         where a.name = :name"""), name=request.authorization.username)
-    print(res)
     return render_template("rooms.html", rooms=res)
+
+@app.route('/room/<int:vnum>', methods=['GET', 'POST'])
+@auth.requires_auth
+def room(vnum):
+    room = Room.query.filter_by(vnum=vnum).first()
+    RoomForm = model_form(Room, base_class=FlaskForm, db_session=db.session)
+    form = RoomForm(obj=room)
+
+    if form.validate_on_submit():
+        form.populate_obj(room)
+        db.session.commit()
+        flash("Saved!")
+
+    return render_template("room.html", form=form, room=room)
