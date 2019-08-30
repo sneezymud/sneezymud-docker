@@ -14,6 +14,9 @@ from controller import *
 print("Routes:")
 print(app.url_map)
 
+import setup
+setup.setup(app)
+
 if __name__ == "__main__":
     print("Starting")
     app.run(host="0.0.0.0", debug=True)

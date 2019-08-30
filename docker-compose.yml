@@ -13,33 +13,32 @@ services:
       - ./db/my.cnf:/etc/mysql/my.cnf
       - ./db:/docker-entrypoint-initdb.d
       - .:/home/sneezy/sneezymud-docker  # for initially populating the DB
-    expose:
-      - "3306"
     restart: always
 
-  sneezy:
-    depends_on:
-      - db
-    build: ./docker
-    container_name: sneezy
-    cap_add:
-      - SYS_PTRACE
+    #sneezy:
+    #  depends_on:
+    #    - db
+    #  build: ./docker
+    #  container_name: sneezy
+    #  cap_add:
+    #    - SYS_PTRACE
+    #  ports:
+    #      - "7900:7900"
+    #  volumes:
+    #    - .:/home/sneezy/sneezymud-docker
+    #  restart: always
+
+  web:
+    container_name: sneezy-web
+    build:
+      context: ./web
+      dockerfile: web_Dockerfile
     ports:
-      - 7900:7900
+        - "5001:5000"
     volumes:
-      - .:/home/sneezy/sneezymud-docker
+        - ./web:/code
+    depends_on:
+        - db
     restart: always
-
-    #  web:
-    #    build:
-    #      context: ./web
-    #      dockerfile: web_Dockerfile
-    #    ports:
-    #        - "5001:5000"
-    #    volumes:
-    #        - ./web:/code
-    #    depends_on:
-    #        - db
-    #    restart: always
 volumes:
   sneezydb:
