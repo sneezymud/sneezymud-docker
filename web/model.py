@@ -68,6 +68,36 @@ class Room(db.Model):
     def __repr__(self):
         return "<Name: {}>".format(self.name)
 
+    def getRoomsOf(name):
+        wizdata = (Wizdata.query
+                .join(Player, Wizdata.player_id == Player.id)
+                .join(Account, Account.account_id == Player.account_id)
+                .filter(Account.name == name)
+                ).first()
+
+        blockaExisting = (Room.query
+                .filter(wizdata.blockastart <= Room.vnum)
+                .filter(Room.vnum <= wizdata.blockaend)).all()
+
+        blockbExisting = (Room.query
+                .filter(wizdata.blockbstart <= Room.vnum)
+                .filter(Room.vnum <= wizdata.blockbend)).all()
+
+        # It's possible that somebody has been assigned rooms that don't exist in Db
+        # so let's generate them
+        rooms = blockaExisting + blockbExisting
+        existingVnums = set(map(lambda r: r.vnum, rooms))
+        desiredVnums = set(list(range(wizdata.blockastart, wizdata.blockaend+1))
+                + list(range(wizdata.blockbstart, wizdata.blockbend+1)))
+        newVnums = desiredVnums.difference(existingVnums)
+        for v in newVnums:
+            r = Room(vnum=v, x=0, y=0, z=0, name="", description="", zone=1, room_flag=0, sector=0, teletime=0, teletarg=0, telelook=0, river_speed=0, river_dir=0, capacity=0, height=0, spec=0)
+            rooms.append(r)
+            db.session.add(r)
+        db.session.commit()
+
+        return rooms
+
 class Player(db.Model):
     id = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     name = db.Column(db.String(80))
