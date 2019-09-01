@@ -177,7 +177,7 @@ class Mob(db.Model):
         return getThingsOf(Mob, name)
 
     def create(vnum):
-        return Mob(vnum=vnum, name="", short_desc="", long_desc="", description="", actions=0, affects=0, faction=0, fact_perc=0, letter="", attacks=0, klass=0, level=0, tohit=0, ac=0, hpbonus=0, damage_level=0, damage_precision=0, gold=0, race=0, weight=0, height=0, str=0, bra=0, con=0, dex=0, agi=0, intel=0, wis=0, foc=0, per=0, cha=0, kar=0, spe=0, pos=0, def_position=0, sex=0, spec_proc=0, skin=0, vision=0, can_be_seen=0, max_exist=0, local_sound="", adjacent_sound="")
+        return Mob(vnum=vnum, name="", short_desc="", long_desc="", description="", actions=0, affects=0, faction=0, fact_perc=0, letter="", attacks=0, mob_class=0, level=0, tohit=0, ac=0, hpbonus=0, damage_level=0, damage_precision=0, gold=0, race=0, weight=0, height=0, str=0, bra=0, con=0, dex=0, agi=0, intel=0, wis=0, foc=0, per=0, cha=0, kar=0, spe=0, pos=0, def_position=0, sex=0, spec_proc=0, skin=0, vision=0, can_be_seen=0, max_exist=0, local_sound="", adjacent_sound="")
 
     vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     name = db.Column(db.String(127))
