@@ -1,5 +1,5 @@
 import auth
-from model import Player, Wizdata, Account, Room, Zone
+from model import Player, Wizdata, Account, Room, Zone, Obj
 from main import app, db
 
 from flask import render_template, request, flash
@@ -50,3 +50,22 @@ def room(vnum):
         flash("Saved!")
 
     return render_template("room.html", form=form, room=room)
+
+@app.route("/objs")
+@auth.requires_auth
+def objects():
+    return render_template("objs.html", objs=Obj.getObjsOf(request.authorization.username))
+
+@app.route('/obj/<int:vnum>', methods=['GET', 'POST'])
+@auth.requires_auth
+def obj(vnum):
+    obj = Obj.query.filter_by(vnum=vnum).first()
+    ObjForm = model_form(Obj, base_class=FlaskForm, db_session=db.session)
+    form = ObjForm(obj=obj)
+
+    if form.validate_on_submit():
+        form.populate_obj(obj)
+        db.session.commit()
+        flash("Saved!")
+
+    return render_template("obj.html", form=form, obj=obj)
