@@ -15,18 +15,18 @@ services:
       - .:/home/sneezy/sneezymud-docker  # for initially populating the DB
     restart: always
 
-    #sneezy:
-    #  depends_on:
-    #    - db
-    #  build: ./docker
-    #  container_name: sneezy
-    #  cap_add:
-    #    - SYS_PTRACE
-    #  ports:
-    #      - "7900:7900"
-    #  volumes:
-    #    - .:/home/sneezy/sneezymud-docker
-    #  restart: always
+  sneezy:
+    depends_on:
+      - db
+    build: ./docker
+    container_name: sneezy
+    cap_add:
+      - SYS_PTRACE
+    ports:
+        - "7900:7900"
+    volumes:
+      - .:/home/sneezy/sneezymud-docker
+    restart: always
 
   web:
     container_name: sneezy-web
