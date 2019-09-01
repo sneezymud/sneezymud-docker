@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h1>Object {{obj.vnum}}</h1>
+<h1>Object {{thing.vnum}}</h1>
 
-<form action="{{obj.vnum}}" method="post">
+<form action="{{thing.vnum}}" method="post">
   <div class="ib">
     <fieldset>
       {{ form.hidden_tag() }}
