@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Your assigned {{type}}s</h1>
+<table>
+  <tr>
+    <th>Vnum</th>
+    <th>Name</th>
+  </tr>
+  {% for thing in things %}
+  <tr>
+    <td><a href="{{type}}/{{thing.vnum}}">{{thing.vnum}}</a></td>
+    <td><a href="{{type}}/{{thing.vnum}}">{{thing.name}}</a></td>
+  </tr>
+  {% endfor %}
+</table>
+
+{% endblock %}
