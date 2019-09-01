@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h1>Room {{room.vnum}}</h1>
+<h1>Object {{obj.vnum}}</h1>
 
-<form action="/room/{{room.vnum}}" method="post">
+<form action="/room/{{obj.vnum}}" method="post">
   <div class="ib">
     <fieldset>
       {{ form.hidden_tag() }}
@@ -16,7 +16,7 @@
         {% endfor %}
       </div>
       <input type="submit" value="Save" />
-      <button type="button" ><a href="/rooms">Back</a></button>
+      <button type="button" ><a href="/objs">Back</a></button>
     </fieldset>
   </div>
 </form>
