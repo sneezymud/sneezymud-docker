@@ -41,21 +41,24 @@ def mobs():
 @app.route('/room/<int:vnum>', methods=['GET', 'POST'])
 @auth.requires_auth
 def room(vnum):
-    return edit(vnum, Room, 'room.html')
+    return edit(vnum, Room, 'room.html', request.authorization.username)
 
 @app.route('/obj/<int:vnum>', methods=['GET', 'POST'])
 @auth.requires_auth
 def obj(vnum):
-    return edit(vnum, Obj, 'obj.html')
+    return edit(vnum, Obj, 'obj.html', request.authorization.username)
 
 
 @app.route('/mob/<int:vnum>', methods=['GET', 'POST'])
 @auth.requires_auth
 def mob(vnum):
-    return edit(vnum, Mob, 'mob.html')
+    return edit(vnum, Mob, 'mob.html', request.authorization.username)
 
 
-def edit(vnum, Thing, template):
+def edit(vnum, Thing, template, name):
+    if not Thing.canAccess(vnum, name):
+        return render_template("badaccess.html")
+
     thing = Thing.query.filter_by(vnum=vnum).first()
     Form = model_form(Thing, base_class=FlaskForm, db_session=db.session)
     form = Form(obj=thing)
