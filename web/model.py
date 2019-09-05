@@ -40,6 +40,19 @@ def getThingsOf(type, name):
 
     return things
 
+def checkVnum(vnum, name):
+    wizdata = (Wizdata.query
+            .join(Player, Wizdata.player_id == Player.id)
+            .join(Account, Account.account_id == Player.account_id)
+            .filter(Account.name == name)
+            ).first()
+    
+    inBlockA = wizdata.blockastart <= vnum and wizdata.blockaend >= vnum
+    inBlockB = wizdata.blockbstart <= vnum and wizdata.blockbend >= vnum
+
+    return inBlockA or inBlockB
+        
+
 class Zone(ImmortalModel):
     zone_nr = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     zone_name = db.Column(db.String(255), unique=True, nullable=False)
@@ -111,6 +124,9 @@ class Room(ImmortalModel):
     def getMy(name):
         return getThingsOf(Room, name)
 
+    def canAccess(vnum, name):
+        return checkVnum(vnum, name)
+
 class Player(ImmortalModel):
     id = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     name = db.Column(db.String(80))
@@ -160,6 +176,9 @@ class Obj(ImmortalModel):
 
     def getMy(name):
         return getThingsOf(Obj, name)
+
+    def canAccess(vnum, name):
+        return checkVnum(vnum, name)
 
 
 # class Objextra(db.Model):
@@ -229,6 +248,9 @@ class Mob(ImmortalModel):
     max_exist = db.Column(db.Integer)
     local_sound = db.Column(db.String(255))
     adjacent_sound = db.Column(db.String(255))
+
+    def canAccess(vnum, name):
+        return checkVnum(vnum, name)
 
 
 class Mob_extra(ImmortalModel):
