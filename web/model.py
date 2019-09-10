@@ -34,6 +34,7 @@ def getThingsOf(type, name):
     return things
 
 class Zone(db.Model):
+    __bind_key__ = 'immortal'
     zone_nr = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     zone_name = db.Column(db.String(255), unique=True, nullable=False)
     zone_enabled = db.Column(db.Integer)
@@ -49,6 +50,7 @@ class Zone(db.Model):
 
 
 class Account(db.Model):
+    __bind_key__ = 'sneezy'
     account_id = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     email = db.Column(db.String(80), nullable=True)
     passwd = db.Column(db.String(13), nullable=True)
@@ -65,6 +67,7 @@ class Account(db.Model):
         return "<Name: {}>".format(self.name)
 
 class Wizdata(db.Model):
+    __bind_key__ = 'sneezy'
     player_id = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     setsev = db.Column(db.Integer, nullable=True)
     office = db.Column(db.Integer, nullable=True)
@@ -77,6 +80,7 @@ class Wizdata(db.Model):
         return "<Id: {}>".format(self.player_id)
 
 class Room(db.Model):
+    __bind_key__ = 'immortal'
     vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     x = db.Column(db.Integer)
     y = db.Column(db.Integer)
@@ -105,6 +109,7 @@ class Room(db.Model):
         return getThingsOf(Room, name)
 
 class Player(db.Model):
+    __bind_key__ = 'immortal'
     id = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     name = db.Column(db.String(80))
     talens = db.Column(db.Integer)
@@ -121,6 +126,7 @@ class Player(db.Model):
 
 
 class Obj(db.Model):
+    __bind_key__ = 'immortal'
     vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     name = db.Column(db.String(127))
     short_desc = db.Column(db.String(127))
@@ -170,6 +176,7 @@ class Obj(db.Model):
 
 
 class Mob(db.Model):
+    __bind_key__ = 'immortal'
     def __repr__(self):
         return "<Name: {}>".format(self.name)
 
@@ -226,18 +233,21 @@ class Mob(db.Model):
 
 
 class Mob_extra(db.Model):
+    __bind_key__ = 'immortal'
     vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     keyword = db.Column(db.String(32))
     description = db.Column(db.String(255))
 
 
 class Mob_imm(db.Model):
+    __bind_key__ = 'immortal'
     vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     type = db.Column(db.Integer)
     amt = db.Column(db.Integer)
 
 
 class Mobresponses(db.Model):
+    __bind_key__ = 'immortal'
     vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     response = db.Column(db.Text)
 
