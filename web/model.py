@@ -2,6 +2,13 @@ from main import db
 
 from flask_sqlalchemy import SQLAlchemy
 
+class ImmortalModel(db.Model):
+    __abstract__ = True
+    __bind_key__ = 'immortal'
+
+class SneezyModel(db.Model):
+    __abstract__ = True
+    __bind_key__ = 'sneezy'
 
 def getThingsOf(type, name):
     wizdata = (Wizdata.query
@@ -33,8 +40,7 @@ def getThingsOf(type, name):
 
     return things
 
-class Zone(db.Model):
-    __bind_key__ = 'immortal'
+class Zone(ImmortalModel):
     zone_nr = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     zone_name = db.Column(db.String(255), unique=True, nullable=False)
     zone_enabled = db.Column(db.Integer)
@@ -49,8 +55,7 @@ class Zone(db.Model):
         return "<Name: {}>".format(self.zone_name)
 
 
-class Account(db.Model):
-    __bind_key__ = 'sneezy'
+class Account(SneezyModel):
     account_id = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     email = db.Column(db.String(80), nullable=True)
     passwd = db.Column(db.String(13), nullable=True)
@@ -66,8 +71,7 @@ class Account(db.Model):
     def __repr__(self):
         return "<Name: {}>".format(self.name)
 
-class Wizdata(db.Model):
-    __bind_key__ = 'sneezy'
+class Wizdata(SneezyModel):
     player_id = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     setsev = db.Column(db.Integer, nullable=True)
     office = db.Column(db.Integer, nullable=True)
@@ -79,8 +83,7 @@ class Wizdata(db.Model):
     def __repr__(self):
         return "<Id: {}>".format(self.player_id)
 
-class Room(db.Model):
-    __bind_key__ = 'immortal'
+class Room(ImmortalModel):
     vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     x = db.Column(db.Integer)
     y = db.Column(db.Integer)
@@ -108,8 +111,7 @@ class Room(db.Model):
     def getMy(name):
         return getThingsOf(Room, name)
 
-class Player(db.Model):
-    __bind_key__ = 'immortal'
+class Player(ImmortalModel):
     id = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     name = db.Column(db.String(80))
     talens = db.Column(db.Integer)
@@ -124,9 +126,7 @@ class Player(db.Model):
     def __repr__(self):
         return "<Name: {}>".format(self.name)
 
-
-class Obj(db.Model):
-    __bind_key__ = 'immortal'
+class Obj(ImmortalModel):
     vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     name = db.Column(db.String(127))
     short_desc = db.Column(db.String(127))
@@ -175,8 +175,7 @@ class Obj(db.Model):
 #     mod2 = db.Column(db.Integer)
 
 
-class Mob(db.Model):
-    __bind_key__ = 'immortal'
+class Mob(ImmortalModel):
     def __repr__(self):
         return "<Name: {}>".format(self.name)
 
@@ -232,22 +231,19 @@ class Mob(db.Model):
     adjacent_sound = db.Column(db.String(255))
 
 
-class Mob_extra(db.Model):
-    __bind_key__ = 'immortal'
+class Mob_extra(ImmortalModel):
     vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     keyword = db.Column(db.String(32))
     description = db.Column(db.String(255))
 
 
-class Mob_imm(db.Model):
-    __bind_key__ = 'immortal'
+class Mob_imm(ImmortalModel):
     vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     type = db.Column(db.Integer)
     amt = db.Column(db.Integer)
 
 
-class Mobresponses(db.Model):
-    __bind_key__ = 'immortal'
+class Mobresponses(ImmortalModel):
     vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     response = db.Column(db.Text)
 
