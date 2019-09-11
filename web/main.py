@@ -5,6 +5,10 @@ app = Flask(__name__)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = 'mysql+pymysql://{usr}:{passwd}@{host}/{db}'.format(
     usr='sneezy', passwd='password', host='db', db='immortal')
+app.config["SQLALCHEMY_BINDS"] = {
+    'immortal': 'mysql+pymysql://{usr}:{passwd}@{host}/{db}'.format(usr='sneezy', passwd='password', host='db', db='immortal'),
+    'sneezy': 'mysql+pymysql://{usr}:{passwd}@{host}/{db}'.format(usr='sneezy', passwd='password', host='db', db='sneezy')
+}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ECHO'] = True
 
