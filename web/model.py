@@ -124,12 +124,13 @@ class Room(ImmortalModel):
     capacity = db.Column(db.Integer)
     height = db.Column(db.Integer)
     spec = db.Column(db.Integer)
+    owner = db.Column(db.String(127))
 
     def __repr__(self):
         return "<Name: {}>".format(self.name)
 
-    def create(vnum):
-        return Room(vnum=vnum, x=0, y=0, z=0, name="", description="", zone=1, room_flag=0, sector=0, teletime=0, teletarg=0, telelook=0, river_speed=0, river_dir=0, capacity=0, height=0, spec=0)
+    def create(vnum, owner):
+        return Room(vnum=vnum, x=0, y=0, z=0, name="", description="", zone=1, room_flag=0, sector=0, teletime=0, teletarg=0, telelook=0, river_speed=0, river_dir=0, capacity=0, height=0, spec=0, owner=owner)
 
     def getMy(name):
         return getThingsOf(Room, name)
