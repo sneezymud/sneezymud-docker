@@ -1,0 +1,4469 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg version="1.1"
+     baseProfile="full"
+     xmlns="http://www.w3.org/2000/svg"
+     xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:xlink="http://www.w3.org/1999/xlink">
+  <desc>Gridmapper, a simple tool to create dungeon maps</desc>
+
+  <style><![CDATA[
+svg { overflow: visible }
+text { font: 14px 'Courier New', Courier, monospace }
+textarea { font: 10px 'Courier New', Courier, monospace }
+p { margin: 0 0 10px 0; padding: 0; }
+.line {  }
+.line svg { display: inline; vertical-align: middle }
+.labels text, #levels text, #label { text-anchor: middle; font: 10px 'Arial Narrow', sans-serif; font-weight: bold; }
+.labels text.left, #levels text.left { text-anchor: start; font-size: 14px; }
+a { color: black; text-decoration: none; }
+.blue { fill: blue; }
+/* http://paletton.com/palette.php?uid=30f0u0kk8qbaaFtfwuQo4mgswhv */
+.background { fill: inherit; }
+use.red { fill: #F6A17F; }
+use.green { fill: #A1DB71; }
+use.blue { fill: #88A9C2; }
+use.colorQ { fill: #A9A9A9; }
+use.colorE { fill: #FF5733; }
+use.colorA { fill: #FFD700; }
+use.colorS { fill: #FF8C00; }
+use.colorS { fill: #A0522D; }
+use.colorD { fill: #1E90FF; }
+use.colorF { fill: #008000; }
+use { fill: white; }
+.key { color: forestgreen; fill: forestgreen; font-weight: bold; }
+.invisible { display: none; }
+.center:hover .dot { opacity: 1; }
+#ui { -webkit-tap-highlight-color: rgba(0,0,0,0); }
+#background { transition: fill 500ms linear; }
+#help { transition: fill 500ms linear; }
+text { fill: black; }
+
+#help { fill: #fffff0; } /* ivory and light grey */
+#background { fill: #d3d3d3; }
+
+svg.black #background { fill: black; }
+
+svg.white #background { fill: white; }
+
+svg.grid  #background { fill: url(#grid); }
+
+/* http://www.color-hex.com/color/01b0f1
+   https://de.wikipedia.org/wiki/Non-Photo_Blue */
+svg.blue * { stroke: #005878; }
+svg.blue *[fill=black],
+svg.blue a,
+svg.blue text,
+svg.blue tspan { stroke: none; fill: #005878; }
+svg.blue .key { fill: white; }
+svg.blue .blue { text-decoration: underline; fill: inherit; }
+svg.blue #background,
+svg.blue #help { fill: #01b0f1; }
+
+.menu div {
+    background: white;
+    padding: 10px;
+    overflow: scroll;
+    font: 14px 'Courier New', Courier, monospace
+}
+.menu span { display: inline-block; width: 32ex }
+.menu a { color: blue }
+  ]]></style>
+
+  <script type="application/javascript"><![CDATA[
+
+/* The original author (Alex Schroeder) has dedicated Gridmapper to
+ * the public domain by waiving all of his rights to the work
+ * worldwide under copyright law, including all related and
+ * neighboring rights, to the extent allowed by law.
+ *
+ * More information: http://creativecommons.org/publicdomain/zero/1.0/
+ *
+ * Code style:
+ * https://google-styleguide.googlecode.com/svn/trunk/javascriptguide.xml */
+
+/* These two constants are used when creating new SVG elements and the
+ * href attribute linking them to each other.
+ */
+
+var svgNs      = 'http://www.w3.org/2000/svg';
+var xlinkNs    = 'http://www.w3.org/1999/xlink';
+var inkscapeNs = 'http://www.inkscape.org/namespaces/inkscape';
+var xhtmlNs    = 'http://www.w3.org/1999/xhtml';
+var wikiUrl    = 'https://campaignwiki.org/wiki/Gridmapper';
+var wsUrl      = 'wss://campaignwiki.org/gridmapper-server';
+
+/**
+ * Stores everything about the map. The element members point to the
+ * SVG elements where we'll be adding stuff. We need multiple elements
+ * because that's how we make sure that they are painted in the
+ * correct order -- a sort of primitive z-axis. The ui Element is a
+ * transparent overlay where we'll register the mouse event handlers.
+ *
+ * If you want to change the size of the map, simply change width and
+ * height. 30x30 was the template for the first One Page Dungeon
+ * Contest. The tileWidth is the size of one square, in pixels. You
+ * can change that as well.
+ */
+var Map = {
+  width: 30, // how many columns
+  height: 30, // how many rows
+  tileWidth: 30, // tile size in pixels (change pattern #grid, too!)
+  ui: null, // the SVG element with the event handlers
+  pointer: null, // the SVG element for the current position
+  region: null, // the SVG element to mark the region currently selected
+  levelsElement: null, // the SVG element for levels
+  levels: [], // data array of level data (Tiles)
+  level: 0, // the current level
+  data: null, // the current level data (Tiles)
+  arcsElement: null, // the SVG element for the arcs of the current level
+  floorElement: null, // the SVG element for the floor of the current level
+  wallsElement: null, // the SVG element for the walls of the current level
+  labelsElement: null, // the SVG element for the labels of the current level
+  backgroundMode: 'lightgrey', // are the other levels hidden?
+  lastUrl: null, // last URL loaded
+  lastEtag: null, // last etag received
+  username: null, // the name of the user (after saving to the wiki)
+  websocket: null, // the websocket used to host or listen
+  leaving: false, // used to supress multiple messages
+  freeRoomNrs: [],
+  nextRoomNr: 0,
+  coordToNr: {},
+
+  /**
+   * Initializes the datastructures if necessary. We only need to run
+   * this at the very beginning. This does not reset the map in case
+   * we're loading an existing file.
+   *
+   * Mouse and touch events: When we move the mouse (mousemove,
+   * touchmove), we call Pen.update to move the pointer. When we click
+   * the mouse (mousedown, touchstart), we call penDown. This changes
+   * what happens when we move the mouse. Moving the mouse now calls
+   * drawTo. When we end our move, we change back: Moving the mouse
+   * now calls Pen.update again.
+   *
+   * When we run the demo, all four event handlers are set to null.
+   * When the demo ends, we listen for mousedown and touchstart again.
+   */
+  initialize: function() {
+    Map.pointer = document.getElementById('pointer');
+    Map.region = document.getElementById('region').firstElementChild;
+    Map.levelsElement = document.getElementById('levels');
+    // http://javascript.info/tutorial/mouse-events#drag-n-drop
+    Map.ui = document.getElementById('ui'); // will be moved, too
+    Map.ui.ondragstart = function() { return false };
+    Map.enable();
+    // cannot load or save unless sharing the domain!
+    if (window.location.hostname !== 'campaignwiki.org') {
+      remove(document.getElementById('load'));
+      remove(document.getElementById('save'));
+    }
+    // http://javascript.info/tutorial/keyboard-events
+    Map.exportarea = document.getElementById('exportarea');
+    Map.labelfield = document.getElementById('label');
+    Map.symbolInit();
+    loadFromMud();
+  },
+
+  /**
+   * Enable editing on the map.
+   */
+  enable: function() {
+    Map.ui.onmousemove = Pen.update;
+    Map.ui.ontouchend = Pen.update;
+    Map.ui.onmousedown = penDown;
+    Map.ui.ontouchstart = penDown;
+    document.onkeydown = keyPressed; // capture arrow keys
+    document.onkeypress = keyPressed; // capture character keys
+  },
+
+  /**
+   * Disable editing on the map.
+   */
+  disable: function() {
+    Map.ui.onmousemove = null;
+    Map.ui.ontouchend = null;
+    Map.ui.onmousedown = null;
+    Map.ui.ontouchstart = null;
+    document.onkeydown = null; // capture arrow keys
+    document.onkeypress = null; // capture character keys
+  },
+
+  /**
+   * Reset the map. This collects the minimum we need to clean
+   * everything up. We run this code before starting the demo, for
+   * example. There is no undo.
+   */
+  reset: function() {
+    Commands.reset();
+    Pen.reset();
+    while (Map.levelsElement.lastChild)
+      Map.levelsElement.removeChild(Map.levelsElement.lastChild);
+    Map.levels = [];
+    createLevel(0);
+    Map.setLevel(0);
+    Map.showLevelAnimation();
+    moveElements();
+  },
+
+  /**
+   * Grows the data structures, if necessary. Animate the process.
+   */
+  growWithAnimation: function(to_x, to_y) {
+    if (to_x >= Map.width) {
+      Map.width = to_x + 1;
+      moveElements();
+    }
+    if (to_y >= Map.height) {
+      Map.height = to_y + 1;
+      moveElements();
+    }
+  },
+
+  /**
+   * Sets the current level. Use this when interpreting code.
+   */
+  setLevel: function(z) {
+    if (!Map.levels[z]) {
+      createLevel(z);
+    }
+    Map.level = z;
+    Map.arcsElement = document.getElementById('arcs' + z);
+    Map.floorElement = document.getElementById('floor' + z);
+    Map.wallsElement = document.getElementById('walls' + z);
+    Map.labelsElement = document.getElementById('labels' + z);
+    Map.data = Map.levels[z];
+    document.getElementById('level').textContent = z < 665 ? z + 1: 'The End';
+    document.getElementById("maxlevel").textContent = Map.levels.length;
+    resizeSVG ();
+  },
+
+  /**
+   * Switch to the indicated level, slowly. This is what we call when
+   * the user wants to change level. Usually to_z only differs from
+   * Map.level by 1.
+   */
+  show: function(to_z) {
+    var from_z = Map.level;
+    if (to_z !== from_z) {
+      if (to_z > Map.level) {
+        Map.level++;
+      } else {
+        Map.level--;
+      }
+      Commands.do(
+        function() {
+          Map.setLevel(from_z);
+          Map.showLevelAnimation();
+        },
+        function() {
+          Map.setLevel(Map.level);
+          Map.showLevelAnimation();
+        });
+      // continue if we haven't reached the target
+      if (Map.level !== to_z) {
+        Map.show(to_z);
+      }
+    }
+  },
+
+  /**
+   * Switch to the indicated level, quickly. This is what we call when
+   * setting the level from code and when jumping back to 0. But
+   * here's the special case: when doing and undoing this, we want to
+   * skip the animation. Then call Map.showLevelAnimation, once.
+   */
+  jump: function(to_z) {
+    var from_z = Map.level;
+    if (to_z !== from_z) {
+      // push without doing
+      Commands.push(
+        function() {
+          Map.setLevel(from_z);
+          Map.showLevelAnimation();
+        },
+        function() {
+          Map.setLevel(to_z);
+          Map.showLevelAnimation();
+        });
+      // just do this
+      Map.setLevel(to_z);
+    }
+  },
+
+  /**
+   * Shows all the levels as appropriate, with animation.
+   */
+  showLevelsTs: null,
+  showLevelAnimation: function() {
+    // animate it, smoothing it out
+    var now = Date.now();
+    var duration = 500;
+    if (Map.showLevelsTs !== null && Map.showLevelsTs > now) {
+      setTimeout(Map.showLevelAnimation, Map.showLevelsTs - now);
+    } else {
+      Map.showLevelsTs = now - (- duration);
+      for (var z = 0, map = null; map = document.getElementById('level'+z); z++) {
+        if (z === Map.level + 2) {
+          fadeElementTo(map, 0.1, linear, duration);
+        } else if (z === Map.level + 1) {
+          fadeElementTo(map, 0.2, linear, duration);
+        } else if (z === Map.level) {
+          fadeElementTo(map, 1, linear, duration);
+        } else if (z === Map.level - 1) {
+          fadeElementTo(map, 0.1, linear, duration);
+        } else {
+          var opacity = map.hasAttribute('opacity') ? Number(map.getAttribute('opacity')) : 1;
+          if (opacity !== 0) {
+            fadeElementTo(map, 0, linear, duration);
+          }
+        }
+      }
+    }
+  },
+
+  /**
+   * Hide all the other levels.
+   */
+  hideOtherLevels: function() {
+    // animate it
+    var duration = 500;
+    for (var z = 0, map = null; map = document.getElementById('level'+z); z++) {
+      if (z === Map.level) {
+        fadeElementTo(map, 1, linear, duration);
+      } else {
+        var opacity = Number(map.getAttribute('opacity'));
+        if (opacity !== 0) {
+          fadeElementTo(map, 0, linear, duration);
+        }
+      }
+    }
+  },
+
+  setBackground: function(color) {
+    Map.backgroundMode = color;
+    document.firstChild.setAttribute('class', color);
+  },
+
+  setHelp: function(color) {
+    // default is ivory #fffff0
+    var bg = document.getElementById('help').firstElementChild;
+    elementTo(bg, 'fill', color, linear, 500);
+  },
+
+  /**
+   * Lists the replacement for a particular tile type.
+   * This mapping must match the functionality of Map.code.
+   */
+  variants: {
+    'stair': 'stair-small',
+    'stair-small': 'stair-spiral',
+    'stair-spiral': 'stair-big-spiral',
+    'stair-big-spiral': 'stair-big',
+    'stair-big': 'stair',
+    'door': 'secret',
+    'secret': 'concealed',
+    'concealed': 'gate',
+    'gate': 'archway',
+    'archway': 'door',
+    'diagonal': 'walled-diagonal',
+    'walled-diagonal': 'diagonal-wall',
+    "diagonal-wall": "diagonal-line",
+    "diagonal-line": "diagonal-door",
+    "diagonal-door": "diagonal",
+    'arc': 'arc2',
+    'arc2': 'arc3',
+    'arc3': 'arc',
+    arcw: "arcw2",
+    arcw2: "arcw3",
+    arcw3: "arcw",
+    'trap': 'pit',
+    'pit': 'trap-door-ceiling',
+    'trap-door-ceiling': 'trap-door-floor',
+    'trap-door-floor': 'trap-door-secret',
+    'trap-door-secret': 'trap',
+    'statue': 'well',
+    'well': 'fountain',
+    'fountain': 'statue',
+    'pillar': 'altar',
+    'altar': 'dais',
+    'dais': 'dais-round',
+    'dais-round': 'rubble',
+    'rubble': 'pillar',
+    'wall': 'curtain',
+    'curtain': 'portcullis',
+    'portcullis': 'window',
+    'window': 'gap',
+    'gap': 'corner-pillar',
+    'corner-pillar': 'wall',
+    'chest': 'bed',
+    'bed': 'table',
+    'table': 'chair',
+    'chair': 'screen',
+    'screen': 'chest',
+    'empty': 'void',
+    'void': 'water',
+    'water': 'empty',
+  },
+
+  symbols: null,
+
+  symbolInit: function(){
+    var map = {
+      door: 'd', wall: 'w', stair: 's', chest: 'c',
+      trap: 't', empty: 'f', pillar: 'p', statue: 'b',
+      diagonal: 'n', arc: 'a', arcw: 'q', rock1: 'g', rockd: 'g',
+      rock2a: 'g', rock2b: 'g', rock3: 'g', rock4: 'g', red: 'R',
+      green: 'G', blue: 'B', colorQ: 'Q', colorE: 'E', colorA: 'A',
+      colorS: 'S', colorD: 'D', colorF: 'F'
+    };
+    var keys = Object.keys(map);
+    for (var i = 0; i < keys.length; i++) {
+      var first = keys[i];
+      var sym = map[first];
+      for (var next = Map.variants[first];
+           next !== undefined && next !== first;
+           next = Map.variants[next]) {
+        sym += 'v';
+        map[next] = sym;
+      }
+    }
+    Map.symbols = map;
+  },
+
+  /**
+   * Produces the code necessary to reproduce the entire map. The
+   * characters must be handled by interpretMap.
+   */
+  code: function() {
+    var rooms = {};
+    var exits = {};
+
+    function visitExit(x, y, direction) {
+      function changeCoordsByDir(x, y, direction) {
+        switch (direction) {
+          case 0: return [x, y-1];
+          case 1: return [x+1, y];
+          case 7: return [x-1, y-1];
+          case 6: return [x+1, y-1];
+          case 4: return [x, y];
+          case 5: return [x, y];
+          default: throw `Bad dir in changeCoordsByDir(${x},${y},${direction})`;
+        }
+      }
+
+      function dirToNumeric(direction) {
+        switch (direction) {
+          case 'exN': return 0;
+          case 'exE': return 1;
+          case 'exNE': return 6;
+          case 'exNW': return 7;
+          case 'exU': return 4;
+          case 'exD': return 5;
+          default: throw `Bad dir in dirToNumeric(${direction})`;
+        }
+      }
+
+      function reverseDir(numericDir) {
+        switch (numericDir) {
+          case 0: return 2;
+          case 1: return 3;
+          case 2: return 0;
+          case 3: return 1;
+          case 3: return 1;
+          case 4: return 5;
+          case 5: return 4;
+          case 6: return 9;
+          case 7: return 8;
+          case 8: return 7;
+          case 9: return 6;
+          default: throw `Bad dir in reverseDir(${numericDir})`;
+        }
+      }
+
+      var dir = dirToNumeric(direction);
+      var exXY = changeCoordsByDir(x, y, dir); // Assume all rooms exist already, for simplicity. This means running 2 passes over rooms, first serializing the rooms and afterwards their exits.
+      var exNr = Map.coordToNr[[exXY[0], exXY[1]]];
+      if (exNr === undefined || !Map.data.has(exXY[0], exXY[1]))
+        return; // exit to unmapped room. Helpful to visualise stuff, but not serializable.
+
+      var roomNr = Map.coordToNr[[x, y]];
+      exits[roomNr] = {direction: dir, destination: exNr};
+      exits[exNr] = {direction: reverseDir(dir), destination: roomNr};
+    }
+
+    function exists(x, y) {
+      if (Map.data.has(x, y)) {
+        var room = Map.data.get(x, y);
+        if (room.floor !== null && room.floor.type !== null)
+          return true;
+      }
+      return false
+    }
+
+    for (var y = 0; y < Map.height; y++) {
+      for (var x = 0; x < Map.width; x++) {
+        if (exists(x, y)) {
+          rooms[Map.coordToNr[[x, y]]] = {x: x, y: y};
+        }
+      }
+    }
+
+    for (var y = 0; y < Map.height; y++) {
+      for (var x = 0; x < Map.width; x++) {
+        if (exists(x, y)) {
+          var room = Map.data.get(x, y);
+          for (var i in room.walls) {
+            visitExit(x, y, room.walls[i].type);
+          }
+        }
+      }
+    }
+
+    return JSON.stringify({rooms: rooms, exits: exits});
+  },
+
+  /**
+   * Produces the code necessary to reproduce the map. The characters
+   * must be handled by interpretMap.
+   */
+  codeFor: function(x, y) {
+    var source = '';
+    if (Map.data.has(x, y)) {
+      var walls = Map.data.get(x, y).walls;
+      if (walls) {
+        walls = walls.sort(function(a,b){
+          return parseInt(a.getAttribute('rotate')) - parseInt(b.getAttribute('rotate'));
+        });
+        for (var i = 0; i < walls.length; i++) {
+          var tile = walls[i];
+          var type = Map.symbols[tile.type];
+          if (type) {
+            source += type[0].repeat(1 + tile.getAttribute('rotate') / 90 - i) + type.substr(1);
+          }
+          if (tile.hasAttribute('class')
+              && tile.getAttribute('class') !== 'white') {
+            source += Map.symbols[tile.getAttribute('class')] + '.';
+          } else if (i < walls.length - 1) {
+            source += '.';
+          }
+        }
+      }
+      // label must precede floor tiles which advance the position
+      var label = Map.data.get(x, y).label;
+      if (label !== null) {
+	if (label.textContent.search(/^[0-9]*$/) === 0) {
+          source += label.textContent;
+        } else if (label.getAttribute('class') === 'left') {
+          source += "'" + label.textContent + "'";
+        } else {
+          source += '"' + label.textContent + '"';
+        }
+      }
+      var tile = Map.data.get(x, y).arcs;
+      if (tile !== null) {
+        if (tile.hasAttribute('rotate')) {
+          var rotate = tile.getAttribute('rotate') / 90;
+          var type = Map.symbols[tile.type];
+          source += type[0].repeat(1 + rotate) + type.substr(1);
+        } else {
+          source += Map.symbols[tile.type];
+        }
+        if (tile.hasAttribute('class') && tile.getAttribute('class') !== 'white') {
+          // append RGB and advance
+          source += Map.symbols[tile.getAttribute('class')];
+          if (tile.type == 'empty')
+            source += ' ';
+        }
+      }
+      tile = Map.data.get(x, y).floor;
+      if (tile !== null) {
+        if (tile.hasAttribute('rotate') && !tile.type.startsWith('rock')) {
+          var rotate = tile.getAttribute('rotate') / 90;
+          var type = Map.symbols[tile.type];
+          source += type[0].repeat(1 + rotate) + type.substr(1);
+        } else {
+          source += Map.symbols[tile.type];
+        }
+        if (tile.hasAttribute('class') && tile.getAttribute('class') !== 'white') {
+          // append RGB and advance
+          source += Map.symbols[tile.getAttribute('class')];
+          if (tile.type == 'empty' || tile.type.startsWith('rock'))
+            source += ' ';
+        }
+        // the only floor tile that auto-advances is the empty floor
+        if (tile.type !== 'empty' && !tile.type.startsWith('rock'))
+          source += ' ';
+      } else {
+        source += ' ';
+      }
+    } else {
+      source += ' ';
+    }
+    return source;
+  },
+
+};
+
+/**
+ * Provides a matrix of Tiles. If you use the get method on
+ * coordinates where no Tile exists, a new one will be created.
+ */
+function Tiles () {
+  this.data = [];
+};
+
+Tiles.prototype.get = function(x, y) {
+  if (!this.data[x]) {
+    this.data[x] = [];
+  }
+  if (!this.data[x][y]) {
+    this.data[x][y] = new Tile();
+  }
+  return this.data[x][y];
+}
+
+Tiles.prototype.has = function(x, y) {
+  return this.data[x] && this.data[x][y];
+}
+
+/**
+ * Stores everything about a single square and its surrounding walls.
+ */
+function Tile () {
+  this.arcs = null;
+  this.floor = null;
+  this.walls = [];
+  this.label = null;
+};
+
+/**
+ * Holds information about the mouse. We're trying to keep as much of
+ * the coordinate messing to ourselves, here. Remember: there is an
+ * empty column to the left and an empty row at the top.
+ */
+var Pen = {
+  x: 0,
+  y: 0,
+  lastMove: null, // when was the pen last moved
+  lastWall: null, // when was the pen last used to draw a wall or door
+  type: null, // type of tile we last used
+  dir: null, // last movement
+
+  pen: 0, // the pen we switched to when collaborating
+  pens: [], // other pens for collaboration with others (0 is ours)
+
+  /**
+   * Determines the grid position based on a mouse event and returns
+   * it. Remember that Wall Mode has one coordinate + 0.5. Also
+   * consider that in Wall mode, we need to find a point where the
+   * axis changes, "jump a corner".
+   */
+  position: function(evt) {
+    var x = evt.pageX / Map.tileWidth - 1; // empty column on the left
+    var y = evt.pageY / Map.tileWidth - 1; // empty row at the top
+    if (Pen.type === 'wallMode') {
+      var dx = x % 1;
+      var dy = y % 1;
+      if (Pen.x % 1 !== 0) {
+        // on a vertical wall
+        if (dx > 0.3 && dx < 0.7 && (dy > 0.8 || dy < 0.2)) {
+          return { x: Math.floor(x + 0.5), y: Math.floor(y) + 0.5 };
+        }
+        // no jumping
+        return { x: Math.floor(x + 0.5) - 0.5, y: Math.floor(y) };
+      }
+      // on a horizontal wall
+      if ((dx > 0.8 || dx < 0.2) && dy > 0.3 && dy < 0.7) {
+        // jump to a vertical wall
+        return { x: Math.floor(x) + 0.5, y: Math.floor(y + 0.5) };
+      }
+      // no jumping
+      return { x: Math.floor(x), y: Math.floor(y + 0.5) - 0.5 };
+    }
+    // in a square
+    return { x: Math.floor(x), y: Math.floor(y) };
+  },
+
+  /**
+   * Moves the pointer to the current Pen position. If passed a
+   * non-null mouse event, determine the new position, first. We call
+   * this onmousemove even if we're not drawing because of possible
+   * keypress events (which don't come with a position). Exception:
+   * When pressing the Alt key while moving the mouse, don't update
+   * our position.
+   */
+  update: function(evt) {
+    if (evt) {
+      evt.preventDefault(); /* for touch events: no scrolling */
+      if (evt.altKey)
+        return; // Alt key: don't move the pointer
+      if (evt.shiftKey)
+        regionOn(); // Shift key: select region
+      else
+        regionOff();
+      var pos = Pen.position(evt);
+      if (Pen.x !== pos.x || Pen.y !== pos.y) {
+        Pen.lastMove = Date.now();
+        Pen.lastWall = null;
+        Pen.x = pos.x;
+        Pen.y = pos.y;
+        record('(' + Pen.x + ',' + Pen.y + ')');
+      }
+    }
+    Map.pointer.setAttribute('x', (Pen.x + 1) * Map.tileWidth);
+    Map.pointer.setAttribute('y', (Pen.y + 1) * Map.tileWidth);
+    if (Map.region.getAttribute('opacity') > 0) {
+      var startX = Map.region.getAttribute('startX');
+      var startY = Map.region.getAttribute('startY');
+      Map.region.setAttribute('x', (Math.min(Pen.x, startX) + 1) * Map.tileWidth);
+      Map.region.setAttribute('y', (Math.min(Pen.y, startY) + 1) * Map.tileWidth);
+      Map.region.setAttribute('width', (1 + Math.abs(Pen.x - startX)) * Map.tileWidth);
+      Map.region.setAttribute('height', (1 + Math.abs(Pen.y - startY)) * Map.tileWidth);
+    }
+  },
+
+  /**
+   * Moves the Pen one step closer to the target position. Returns
+   * true if the Pen moved, returns false if the Pen is already at
+   * the target. As Wall Mode means that one of the coordinates is
+   * off by half, this needs special consideration.
+   */
+  moveTo: function(target) {
+    // jump a corner, if necessary
+    if (Pen.type === 'wallMode'
+        && (Math.abs(Pen.x - target.x) == 0.5
+           || Math.abs(Pen.y - target.y) == 0.5)) {
+      Pen.x += target.x > Pen.x ? 0.5 : -0.5;
+      Pen.y += target.y > Pen.y ? 0.5 : -0.5;
+      return true;
+    } else if (Pen.x !== target.x) {
+      Pen.x += target.x > Pen.x ? 1 : -1;
+      return true;
+    } else if (Pen.y !== target.y) {
+      Pen.y += target.y > Pen.y ? 1 : -1;
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Resets the pen coordinates so that a file can be loaded safely.
+   */
+  reset: function() {
+    Pen.x = 0;
+    Pen.y = 0;
+    Pen.lastWall = null;
+    Pen.lastMove = null;
+    Pen.type = null;
+    Pen.dir = null;
+  },
+
+  /**
+   * Save the current pen to its position (the first pen has the
+   * number 0) and set the current pen to the saved pen in position n.
+   * Remember position n. In order to switch back to the original pen,
+   * call Pen.switchTo(0).
+   *
+   * Currently old pens aren't reaped.
+   */
+  switchTo: function(n) {
+    Pen.pens[Pen.pen] = [Pen.x, Pen.y, Pen.lastMove, Pen.lastWall, Pen.type, Pen.dir];
+    if (Pen.pens[n]) {
+      Pen.x = Pen.pens[n][0];
+      Pen.y = Pen.pens[n][1];
+      Pen.lastMove = Pen.pens[n][2];
+      Pen.lastWall = Pen.pens[n][3];
+      Pen.type = Pen.pens[n][4];
+      Pen.dir = Pen.pens[n][5];
+    } else {
+      Pen.reset();
+      Pen.addPointer(n);
+    }
+    Pen.pen = n;
+    if (n > 0) {
+      Map.pointer = document.getElementById('pointer'+n); // the other pen
+    } else {
+      Map.pointer = document.getElementById('pointer'); // my pen
+    }
+  },
+
+  /**
+   * Remove the pen again, if it was inactive for 10s.
+   */
+  addPointer: function(n) {
+    var cursor = document.getElementById('cursor'); // invisible def
+    pointer = document.createElementNS(svgNs, 'use');
+    pointer.setAttribute('id', 'pointer' + n);
+    pointer.setAttributeNS(xlinkNs, 'href', '#others');
+    pointer.setAttribute('fill', 'black');
+    var p = document.getElementById('pointer'); // visible element
+    p.parentNode.insertBefore(pointer, p.nextSibling); // after
+    setTimeout(function(){Pen.checkPointer(n, pointer);}, 10000); // 10s
+  },
+
+  /**
+   * Remove the pen again, if it was inactive for 10s.
+   */
+  checkPointer: function(n, pointer) {
+    if (Pen.pens[n]) {
+      if (Date.now() - Pen.pens[n][2] < 10000) { // Pen.lastMove
+        setTimeout(function(){Pen.checkPointer(n, pointer);}, 10000); // 10s
+      } else {
+        // this also happens if ts is undefined
+        var ms = 1000; // 1s
+        fadeElementTo(pointer, 0, linear, ms);
+        setTimeout(function(){document.rootElement.removeChild(pointer);}, ms);
+        Pen.pens[n] = null;
+      }
+    } else {
+      // this should not happen because if the pen data is removed
+      // when the element is removed
+      console.log('checkPointer: trying to check nonexisting pen ' + n);
+    }
+  },
+};
+
+/**
+ * Maintains an undo and a redo list. Whenever you do something that
+ * the user can undo, you need to call Commands.do with two
+ * functions, the how-to-undo-it step and the how-to-do-it step.
+ * how-to-do-it will be called once on order to do it. When the user
+ * undoes something, our index is decremented and we execute the
+ * appropriate undo step. When the user redoes something, our index is
+ * incremented and we execute the appropriate redo step. If the user
+ * has undone some steps and then pushes new commands, we discard the
+ * steps we have undone.
+ */
+var Commands = {
+  i: -1, // where are we in the undo/redo chain
+  undoSteps: [],
+  redoSteps: [],
+
+  /**
+   * Add two closures to the lists. The first one is how to undo a
+   * change, the second one is how to do a change.
+   */
+  push: function(undoStep, redoStep) {
+    // once we're pushing new steps, discard the undone steps
+    while (this.undoSteps.length - 1 > this.i) {
+      this.undoSteps.pop();
+      this.redoSteps.pop();
+    }
+    this.undoSteps.push(undoStep);
+    this.redoSteps.push(redoStep);
+    this.i++;
+  },
+
+  /**
+   * Add two closures to the lists. The first one is how to undo a
+   * change, the second one is how to do a change. This automatically
+   * does the change, too.
+   */
+  do: function(undoStep, redoStep) {
+    Commands.push(undoStep, redoStep);
+    redoStep();
+  },
+
+  undo: function() {
+    if (this.i >= 0) {
+      this.undoSteps[this.i--]();
+    }
+  },
+
+  redo: function() {
+    if (this.i < this.redoSteps.length - 1) {
+      this.redoSteps[++this.i]();
+    }
+  },
+
+  reset: function() {
+    undoSteps = [];
+    redoSteps = [];
+  },
+
+  /**
+   * Make sure we can merge multiple steps on the stack into a single
+   * undo/redo step.
+   */
+  merge: function (boundary) {
+    if (this.i - boundary > 1) {
+      var undoSteps = [];
+      var redoSteps = [];
+      for (var i = boundary; i < this.i; i++) {
+        undoSteps.push(this.undoSteps.pop());
+        redoSteps.unshift(this.redoSteps.pop());
+      }
+      this.i = boundary;
+      Commands.push(
+        function() { for(var i = 0; i < undoSteps.length; i++) { undoSteps[i]() }},
+        function() { for(var i = 0; i < redoSteps.length; i++) { redoSteps[i]() }});
+    }
+  }
+};
+
+/**
+ * The user interface code for running a demo. The actual demo is
+ * scripted in SVG element with the 'messages' id. Each step of the
+ * element makes the tspan elements with matching class visible. If
+ * there is a code element with a matching class, its text content is
+ * interpreted as a script.
+ */
+var Demo = {
+
+  /**
+   * Stores the code to be run on a timer.
+   */
+  running: null,
+
+  /**
+   * Stores the element containing all the steps.
+   */
+  element: null,
+
+  /**
+   * Allows the user to run the demo.
+   */
+  start: function () {
+    Demo.link('Reset map and run demo', 'Demo.run()', true);
+  },
+
+  /**
+   * Changes the demo link to something else.
+   */
+  link: function (text, js, revert) {
+    var link = document.getElementById('demo');
+    var oldText = link.firstChild.nodeValue;
+    link.firstChild.nodeValue = text;
+    var href = link.getAttributeNS(xlinkNs, 'href');
+    link.setAttributeNS(xlinkNs, 'href', 'javascript:' + js);
+    // reset after 2s
+    if (revert)
+      var t = setInterval(function() {
+        if (!Demo.running) {
+          link.setAttributeNS(xlinkNs, 'href', href);
+          link.firstChild.nodeValue = oldText;
+          clearInterval(t);
+        }
+      }, 2000);
+  },
+
+  /**
+   * Demo the application.
+   */
+  run: function () {
+    Map.reset();
+    Demo.running = true;
+    Demo.link('Click to stop demo', 'Demo.stop()', false);
+    Map.disable();
+    Demo.element = document.getElementById('messages');
+    Demo.element.setAttribute('visibility', 'visible');
+    moveElement(Demo.element,
+                Demo.element.getBBox().x,
+                Demo.element.getBBox().y,
+                3 * Map.tileWidth,
+                3 * Map.tileWidth,
+                bounceEaseOut);
+    Demo.step(1);
+  },
+
+  /**
+   * Let the demo know that we want to abort.
+   */
+  stop: function () {
+    clearInterval(Demo.running);
+    Demo.running = null;
+    Demo.clean(null);
+    wallModeOff();
+    Map.enable();
+    Demo.link('Abort! Abort!', 'void', false);
+  },
+
+  /**
+   * Hides elements from a particular step. Usually called for the previous step.
+   */
+  clean: function(step) {
+    var elements = step
+        ? Demo.element.getElementsByClassName('step' + step)
+        : Demo.element.childNodes;
+    for (var i = 0; i < elements.length; i++) {
+      if (elements[i].nodeType === Node.ELEMENT_NODE) // IE 11 has no children
+        elements[i].setAttribute('visibility', 'collapse');
+    }
+  },
+
+  /**
+   * Demo one step and timeout. Note that it's confusing to have more
+   * than one code element per step. These are started in order, but
+   * if one of them starts delaying using ';', later code will
+   * continue executing.
+   */
+  step: function (step) {
+    Demo.clean(step - 1);
+    var wait = 5000;
+    // show elements for this step and run its code
+    var elements = Demo.element.getElementsByClassName('step' + step);
+    for (var i = 0; i < elements.length; i++) {
+      if (elements[i].nodeName === 'tspan') {
+        elements[i].setAttribute('visibility', 'visible');
+      } else if (elements[i].nodeName === 'code') {
+        var code = elements[i].textContent;
+        if (code) {
+          // Add a delay for every ';' in the code.
+          var z = code.match(/;/g);
+          if (z)
+            wait += 500 * z.length;
+          interpretMap(code);
+        }
+      }
+    }
+    // if there was a step, schedule the next step; else quit
+    if (elements.length > 0) {
+      Demo.running = setTimeout(function() {
+        Demo.step(step + 1);
+      }, wait);
+    } else {
+      Demo.stop();
+    }
+  },
+}
+
+/**
+ * Defining repeat for Strings, for Chrome/Mac Version 40.0.2214.111
+ * (64-bit) as suggested on
+ * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/repeat
+ */
+if (!String.prototype.repeat) {
+  String.prototype.repeat = function(count) {
+    'use strict';
+    if (this == null) {
+      throw new TypeError('can\'t convert ' + this + ' to object');
+    }
+    var str = '' + this;
+    count = +count;
+    if (count != count) {
+      count = 0;
+    }
+    if (count < 0) {
+      throw new RangeError('repeat count must be non-negative');
+    }
+    if (count == Infinity) {
+      throw new RangeError('repeat count must be less than infinity');
+    }
+    count = Math.floor(count);
+    if (str.length == 0 || count == 0) {
+      return '';
+    }
+    // Ensuring count is a 31-bit integer allows us to heavily optimize the
+    // main part. But anyway, most current (august 2014) browsers can't handle
+    // strings 1 << 28 chars or longer, so:
+    if (str.length * count >= 1 << 28) {
+      throw new RangeError('repeat count must not overflow maximum string size');
+    }
+    var rpt = '';
+    for (;;) {
+      if ((count & 1) == 1) {
+        rpt += str;
+      }
+      count >>>= 1;
+      if (count == 0) {
+        break;
+      }
+      str += str;
+    }
+    return rpt;
+  }
+}
+
+/**
+ * Defining startsWith for strings.
+ * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/startsWith
+ */
+if (!String.prototype.startsWith) {
+    String.prototype.startsWith = function(searchString, position){
+      position = position || 0;
+      return this.substr(position, searchString.length) === searchString;
+  };
+}
+
+/* The animation code is taken from these examples:
+ * http://javascript.info/tutorial/animation
+ */
+function animate (opts) {
+  var start = Date.now();
+  var id = setInterval(function() {
+    var timePassed = Date.now() - start;
+    var progress = timePassed / opts.duration;
+    if (progress > 1) progress = 1;
+    var delta = opts.delta(progress);
+    opts.step(delta);
+    if (progress === 1) {
+      clearInterval(id);
+    }
+  }, opts.delay || 10);
+}
+
+function linear (progress) {
+  return progress;
+}
+
+function approach (progress) {
+  return 1 - Math.pow(progress, 2)
+}
+
+function bounce (progress) {
+  for(var a = 0, b = 1; 1; a += b, b /= 2) {
+    if (progress >= (7 - 4 * a) / 11) {
+      return -Math.pow((11 - 6 * a - 11 * progress) / 4, 2) + Math.pow(b, 2)
+    }
+  }
+}
+
+function makeEaseOut (delta) {
+  return function(progress) {
+    return 1 - delta(1 - progress);
+  }
+}
+
+var bounceEaseOut = makeEaseOut(bounce);
+
+function resizeElement (element, toWidth, toHeight, delta, duration) {
+  var fromWidth  = element.getBBox().width;  // assuming px
+  var fromHeight = element.getBBox().height; // assuming px
+  animate({
+    delay: 10,
+    duration: duration || 1000, // 1 sec by default
+    delta: delta,
+    step: function(delta) {
+      element.setAttribute('width',  fromWidth  + (toWidth  - fromWidth)  * delta);
+      element.setAttribute('height', fromHeight + (toHeight - fromHeight) * delta);
+    }
+  })
+}
+
+function moveElement (element, x1, y1, x2, y2, delta, duration) {
+  var re = /translate\(.*?\)/;
+  var currentX = element.currentX || x1;
+  var currentY = element.currentY || y1;
+  var oldDx = currentX - x1;
+  var oldDy = currentY - y1;
+  var newDx = x2 - currentX;
+  var newDy = y2 - currentY;
+  element.currentX = x2;
+  element.currentY = y2;
+  if (newDx !== 0 || newDy !== 0)
+    animate({
+      delay: 10,
+      duration: duration || 1000, // 1 sec by default
+      delta: delta,
+      step: function(delta) {
+        var transform = 'translate(' + (oldDx + newDx * delta) + ',' + (oldDy + newDy * delta) + ')';
+        if (!element.hasAttribute('transform'))
+          element.setAttribute('transform', transform);
+        else if (element.getAttribute('transform').match(re))
+          element.setAttribute('transform', element.getAttribute('transform').replace(re, transform));
+        else
+          element.setAttribute('transform', element.getAttribute('transform') + ',' + transform);
+      }
+    })
+}
+
+function fadeElementTo (element, opacity, delta, duration) {
+  var from = element.hasAttribute('opacity') ? Number(element.getAttribute('opacity')) : 1;
+  animate({
+    delay: 10,
+    duration: duration || 1000, // 1 sec by default
+    delta: delta,
+    step: function(delta) {
+      var value = from + (opacity - from) * delta;
+      if (value > 0.99) {
+        element.removeAttribute('opacity');
+      } else {
+        element.setAttribute('opacity', value);
+      }
+    }
+  });
+};
+
+function elementTo (element, attribute, fill, delta, duration) {
+  var str = element.getAttribute(attribute);
+  var from = [211, 211, 211]; // default is light grey
+  var rgb;
+  if (rgb = /^rgb\((\d+), ?(\d+), ?(\d+)\)$/i.exec(str)) {
+    from = [parseInt(rgb[1]), parseInt(rgb[2]), parseInt(rgb[3])];
+  } else if (rgb = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(str)) {
+    from = [parseInt(rgb[1], 16), parseInt(rgb[2], 16), parseInt(rgb[3], 16)];
+  }
+  if (!isNaN(fill)) {
+    fill = [fill, fill, fill];
+  } else if (rgb = /^rgb\((\d+), ?(\d+), ?(\d+)\)$/i.exec(fill)) {
+    fill = [parseInt(rgb[1]), parseInt(rgb[2]), parseInt(rgb[3])];
+  } else if (rgb = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(fill)) {
+    fill = [parseInt(rgb[1], 16), parseInt(rgb[2], 16), parseInt(rgb[3], 16)];
+  }
+  animate({
+    delay: 10,
+    duration: duration || 1000, // 1 sec by default
+    delta: delta,
+    step: function(delta) {
+      // ~~ is for Math.floor: http://rocha.la/JavaScript-bitwise-operators-in-practice
+      var value = [];
+      for (var i = 0; i < 3; i++) {
+        value[i] = ~~ (from[i] + (fill[i] - from[i]) * delta);
+      }
+      element.setAttribute(attribute, 'rgb(' + value[0] + ',' + value[1] + ',' + value[2] + ')');
+    }
+  });
+};
+
+/**
+ * Updates the SVG width and height.
+ * This allows browsers to scroll the image.
+ */
+function resizeSVG () {
+  var help = document.getElementById('help').firstElementChild;
+  var level = document.getElementById('level');
+  document.rootElement.setAttribute(
+    'width', (Map.width + 3) * Map.tileWidth // map with + 3 empty columns
+      + Number(help.getAttribute('width')) // width of help
+      - Number(help.getAttribute('x'))     // rectangle and level
+      + level.getBBox().width // width of level indicator
+  );
+  document.rootElement.setAttribute(
+    'height', Math.max((Map.height + 2) * Map.tileWidth,
+                       2 * Map.tileWidth
+                       + Number(help.getAttribute('height'))));
+}
+
+/**
+ * Moves the elements around if the map dimensions change.
+ * Makes sure the UI element covers it all.
+ * Moves and resizes the grey background.
+ * This should work for a different Map.tileWidth as well!
+ * We keep a timout around so that we can cancel future runs.
+ */
+var moveElementsTs = 0;
+var moveElementsTimer = null;
+function moveElements () {
+  var duration = 500;
+  var now = Date.now();
+  if (moveElementsTs > now) { // we still running an animation
+    if (moveElementsTimer === null)
+      clearTimeout(moveElementsTimer); // cancel any other planned animations
+    moveElementsTimer = setTimeout(moveElements, moveElementsTs - now); // plan new anim.
+    return;
+  } else {
+    moveElementsTs = now + duration; // record for how long we'll be running
+  }
+  resizeSVG();
+  Map.ui.setAttribute('x', Map.tileWidth);
+  Map.ui.setAttribute('y', Map.tileWidth);
+  Map.ui.setAttribute('width',  Map.width * Map.tileWidth);
+  Map.ui.setAttribute('height', Map.height * Map.tileWidth);
+  for (var child = document.getElementById('background').firstElementChild;
+       child; child = child.nextElementSibling) {
+    resizeElement(child,
+                  Map.width * Map.tileWidth,
+                  Map.height * Map.tileWidth,
+                  linear, duration);
+    moveElement(child,
+                parseInt(child.getAttribute('x')),
+                parseInt(child.getAttribute('y')),
+                Map.tileWidth, // an empty column to the left
+                Map.tileWidth, // an empty column at the top
+                linear, duration);
+  }
+  var help = document.getElementById('help');
+  moveElement(help,
+              help.getBBox().x,
+              help.getBBox().y,
+              // an empty column, the background, and another empty column to the left
+              (Map.width + 2) * Map.tileWidth,
+              // an empty column at the top
+              Map.tileWidth,
+              linear, duration);
+}
+
+/**
+ * Offer the current document for download. We store the entire
+ * document in a data URI and offer it for downlod using the HTML5
+ * download attribute. Chrome 40 will still load that file instead of
+ * downloading it. Perhaps a namespace issue? After all, there is no
+ * such download attribute for SVG or XHTML.
+ */
+function download () {
+  if (document.documentMode > 0) {
+    // Internet Explorer just downloads the SVG immediately, no UI changes
+  } else {
+    // hide Prepare Download link and show formats
+    document.getElementById('download').setAttribute('display', 'none');
+    document.getElementById('format').setAttribute('display', 'inline');
+
+    // revert this change after 10s
+    var t = setInterval(function() {
+      document.getElementById('download').setAttribute('display', 'inline');
+      document.getElementById('format').setAttribute('display', 'none');
+      clearInterval(t);
+    }, 10000);
+  }
+
+  // create a clone but don't append it anywhere
+  var clone = document.firstChild.cloneNode(false); // shallow
+  var background = document.getElementById('background');
+  clone.setAttribute('width', background.getBBox().width + 2 * Map.tileWidth);
+  clone.setAttribute('height', background.getBBox().height + 2 * Map.tileWidth);
+  clone.appendChild(document.querySelector('defs').cloneNode(true));
+  clone.appendChild(document.querySelector('style').cloneNode(true));
+  clone.appendChild(background.cloneNode(true));
+  clone.appendChild(document.getElementById('levels').cloneNode(true));
+
+  // serialize
+  var str = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n'
+      + new XMLSerializer().serializeToString(clone);
+
+  // Internet Explorer: download immediately
+  if (window.navigator.msSaveBlob != null) {
+    window.navigator.msSaveBlob(new Blob([str]), 'gridmapper.svg');
+    // IE also raises security exception for canvas, so skip the PNG part
+    return;
+  }
+
+  // Other browsers use data URI
+  var link  = document.getElementById('download_txt');
+  link.setAttributeNS(xlinkNs, 'href', 'javascript:downloadImmediately("gridmapper-map.txt", "text/plain;base64", "' + btoa(unescape(encodeURIComponent(getSource()))) + '")');
+
+  // base64 encoding
+  var source = btoa(unescape(encodeURIComponent(str)));
+
+  // using image/svg+xml makes Chrome open the file instead of saving it
+  link = document.getElementById('download_svg');
+  link.setAttributeNS(xlinkNs, 'href', 'javascript:downloadImmediately("gridmapper-map.svg", "application/octet-stream;base64", "' + source + '")');
+
+  // PNG download hides user interface. We must actually *remove* all
+  // the foreignObject elements because it causes a security exception
+  // in Safari.
+  // http://stackoverflow.com/questions/33972254/svgpng-from-canvas-todataurl-throws-dom-exception-18-security-error-in-safari-9
+  source = btoa(unescape(encodeURIComponent(str)));
+  link  = document.getElementById('download_png');
+
+  // SVG to PNG using canvas https://gist.github.com/gustavohenke/9073132
+  var canvas = document.createElementNS(xhtmlNs, 'canvas');
+  var rect = Map.ui.getBoundingClientRect();
+  canvas.width = (Map.width + 2) * Map.tileWidth; // see resizeSVG
+  canvas.height = (Map.width + 2) * Map.tileWidth;
+  var ctx = canvas.getContext('2d');
+  var img = document.createElementNS(xhtmlNs, 'img');
+  img.setAttribute('src', 'data:image/svg+xml;base64,' + source);
+
+  // when the image arrived in the canvas, set the link
+  img.onload = function() {
+    ctx.drawImage(img, 0, 0);
+    link.setAttributeNS(xlinkNs, 'href', 'javascript:downloadDataUri("gridmapper-map.png", "' + canvas.toDataURL('') + '")');
+  };
+}
+
+/**
+ * Download stuff
+ */
+function downloadImmediately (fileName, type, data) {
+  // Internet Explorer: download immediately
+  if (window.navigator.msSaveBlob != null) {
+      window.navigator.msSaveBlob(new Blob([data]), fileName);
+  } else {
+    downloadDataUri(fileName, 'data:' + type + ',' + encodeURIComponent(data));
+  }
+}
+
+/**
+ * Download stuff but probably not for Internet Explorer. This is
+ * useful if you already have a data URI, e.g. canvas.toDataURL.
+ */
+function downloadDataUri (fileName, dataUri) {
+  var e = document.createElementNS(xhtmlNs, 'a');
+  e.setAttribute('href', dataUri);
+  e.setAttribute('download', fileName);
+  document.firstElementChild.appendChild(e); // Firefox requires this
+  e.click();
+  document.firstElementChild.removeChild(e);
+}
+
+function textSave () {
+  downloadImmediately('gridmapper-map.txt',
+                      'text/plain;charset=utf-8',
+                      Map.exportarea.value);
+}
+
+/**
+ * Support for dropping a file into the textarea.
+ */
+function handleFileSelect(evt) {
+  evt.stopPropagation();
+  evt.preventDefault();
+  let files = evt.dataTransfer.files; // FileList object.
+  let file = files[0]; // we can only handle one file
+  let reader = new FileReader();
+  reader.onload = function(e) {
+    Map.exportarea.value = e.target.result;
+  }
+  reader.readAsText(file); // UTF-8 is the default
+}
+
+/**
+ * Indicate a dropzone for the textarea.
+ */
+function handleDragOver(evt) {
+  evt.stopPropagation();
+  evt.preventDefault();
+  evt.dataTransfer.dropEffect = 'copy'; // Explicitly show this is a copy.
+}
+
+/**
+ * Stores the entire document in a link and clicks it.
+ */
+function link () {
+  var location = window.location.href.substr(
+    0, window.location.href.length - window.location.search.length);
+  var url  = location + '?' + encodeURIComponent(getSource());
+  window.open(url, '_blank');
+}
+
+/**
+ * Exports the entire document in the text area.
+ */
+function textExport () {
+  Map.exportarea.value = getSource();
+}
+
+async function loadFromMud () {
+  let resp = await fetch('/rooms', {
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+
+  Map.exportarea.value = await resp.text();
+}
+
+/**
+ * Exports the code in the text area.
+ */
+function textImport () {
+  interpretMap(Map.exportarea.value);
+  Map.showLevelAnimation();
+  Pen.update(null);
+}
+
+/**
+ * Stores the entire document in a sequence of keystrokes with which
+ * to recreate it.
+ */
+function getSource () {
+  // do we need to export the map below
+  var source = '';
+  var level = Map.level;
+  for (var z = 0, map = null; map = document.getElementById('level'+z); z++) {
+    if (z > 0)
+      source += 'z';
+    Map.setLevel(z);
+    source += Map.code();
+  }
+  Map.setLevel(level); // reset
+  source = source.replace(/zz+/,'z');
+  source = source.replace(/^z+/,'');
+  source = source.replace(/z+\w*$/,'');
+  // source += '(' + Pen.x + ',' + Pen.y + ',' + Map.level + ')\n'; // end with newline
+  return source;
+}
+
+function message (str) {
+  var element = document.createElementNS(svgNs, 'g');
+  element.setAttribute('data-content', str);
+  var rect = document.createElementNS(svgNs, 'rect');
+  rect.setAttribute('fill', 'white');
+  rect.setAttribute('stroke', 'black');
+  rect.setAttribute('stroke-width', '1px');
+  rect.setAttribute('x', 2 * Map.tileWidth);
+  rect.setAttribute('y', 2 * Map.tileWidth);
+  element.appendChild(rect);
+  var text = document.createElementNS(svgNs, 'text');
+  element.appendChild(text);
+  var lines = str.split('\n');
+  var len = 0;
+  for (var i = 0; i < lines.length; i++) {
+    var tspan = document.createElementNS(svgNs, 'tspan');
+    len = Math.max(len, lines[i].length);
+    tspan.textContent = lines[i];
+    tspan.setAttribute('x',  2.5 * Map.tileWidth);
+    if (i === 0) {
+      tspan.setAttribute('y', 3 * Map.tileWidth);
+    } else {
+      tspan.setAttribute('dy', Map.tileWidth);
+    }
+    text.appendChild(tspan);
+  }
+  rect.setAttribute('width', (2 + len / 2.5) * Map.tileWidth);
+  rect.setAttribute('height', (0.5 + lines.length) * Map.tileWidth);
+  document.rootElement.appendChild(element);
+  var ms = 2000 + 700 * lines.length;
+  fadeElementTo(element, 0, linear, ms);
+  setTimeout(function(){document.rootElement.removeChild(element);}, ms);
+}
+
+/**
+ * Saves the map to Campaign Wiki. This is the interactive entry
+ * point. It reads title, username and summary from the exportarea
+ * multiline text field.
+ */
+function save () {
+  var input = Map.exportarea.value;
+  if (input === undefined || input === '') {
+    message('Please provide a name for your wiki in this text area!\n'
+            + 'Use the first line for the wiki name,\n'
+            + 'the second line for your name,\n'
+            + 'and the third line for a summary.');
+    return;
+  }
+  var inputs = input.trim().split('\n');
+  if (inputs.length > 3) {
+    message('Please use text area to provide some information.\n'
+            + 'Use the first line for the wiki name,\n'
+            + 'the second line for your name,\n'
+            + 'and the third line for a summary.');
+    return;
+  }
+  if (inputs[0].search(/^([-,.()'%&?;<> _1-9A-Za-z\u0080-\ufffd]|[-,.()'%&?;<> _0-9A-Za-z\u0080-\ufffd][-,.()'%&?;<> _0-9A-Za-z\u0080-\ufffd]+)$/) !== 0) {
+    message('Unfortunately, this name is not a valid wiki page name');
+    return;
+  }
+  saveIt(inputs[0],
+         inputs[1] || 'Anonymous',
+         inputs[2] || 'Map saved');
+}
+
+/**
+ * Saves the current dungeon to the wiki. The wiki replies with a
+ * redirect. Unfortunately, we cannot prevent XMLHttpRequest from
+ * following this redirect. The AJAX stuff is based on
+ * https://developer.mozilla.org/en-US/docs/Web/Guide/HTML/Forms/Sending_forms_through_JavaScript#Building_an_XMLHttpRequest_manually
+ */
+function saveIt (title, username, summary) {
+  var data = {
+    title: title,
+    text: '[[Gridmapper:' + title + ']]: '
+      + (summary || '') + '\n{{{\n' + getSource() + '}}}\n',
+    username: username,
+    summary: summary,
+    frodo: 1,
+  };
+  var XHR = new XMLHttpRequest();
+  var urlEncodedData = '';
+  var urlEncodedDataPairs = [];
+  var name;
+  for(name in data) {
+    urlEncodedDataPairs.push(encodeURIComponent(name) + '=' + encodeURIComponent(data[name]));
+  }
+  urlEncodedData = urlEncodedDataPairs.join('&').replace(/%20/g, '+');
+  XHR.addEventListener('load', function(event) {
+    message('Saved');
+  });
+  XHR.addEventListener('error', function(event) {
+    message('Unfortunately the map could not be saved.');
+  });
+  XHR.open('POST', wikiUrl);
+  XHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+  XHR.send(urlEncodedData);
+}
+
+/**
+ * Shows a drop down box where the user can pick a map from the wiki.
+ */
+function load () {
+  message('Loading maps...');
+  var XHR = new XMLHttpRequest();
+  XHR.addEventListener('load', loadHtmlMenu);
+  XHR.addEventListener('error', function(event) {
+    message('Unfortunately the maps could not be loaded.');
+  });
+  XHR.open('GET', wikiUrl + '?search=\{\{\{;context=0');
+  XHR.responseType = 'document';
+  XHR.send();
+}
+
+/**
+ * Shows a menu of all the maps available.
+ */
+function loadHtmlMenu (event) {
+  var doc = event.target.responseXML;
+  var unfilteredLinks = doc.getElementsByClassName('content')[0].getElementsByClassName('local');
+  var links = [];
+  for (var i = unfilteredLinks.length - 1; i >= 0; i--) {
+    if (unfilteredLinks[i].textContent !== 'HomePage'
+        && unfilteredLinks[i].textContent.indexOf('Comments on ') !== 0) {
+      links.push(unfilteredLinks[i]);
+    }
+  }
+  links.sort(function(a, b) {
+    // localeCompare does not support locales and options arguments in Safari
+    return a.textContent.toLowerCase().localeCompare(b.textContent.toLowerCase());
+  });
+  var g = document.createElementNS(svgNs, 'foreignObject');
+  g.setAttribute('class', 'menu');
+  g.setAttribute('x', 2 * Map.tileWidth);
+  g.setAttribute('y', 2 * Map.tileWidth);
+  g.setAttribute('z', 10);
+  g.setAttribute('width', Map.tileWidth * (Map.width - 2));
+  g.setAttribute('height', Map.tileWidth * (Map.height - 2));
+  var d = document.createElementNS(xhtmlNs, 'div');
+  g.appendChild(d);
+  d.setAttribute('style', 'height:' + Map.tileWidth * (Map.height - 3) + 'px');
+  for (var i = 0; i < links.length; i++) {
+    var s = document.createElementNS(xhtmlNs, 'span');
+    d.appendChild(s);
+    var a = document.createElementNS(xhtmlNs, 'a');
+    s.appendChild(a);
+    var href = links[i].getAttribute('href');
+    a.setAttribute('href', 'javascript:loadMap("' + href + '")');
+    a.textContent = links[i].textContent.substr(0,20);
+    if (links[i].textContent.length > 20) {
+      a.textContent += '…';
+      a.setAttribute('title', links[i].textContent);
+    }
+  }
+  document.rootElement.appendChild(g);
+  // clicking anywhere will remove it
+  var oldclick = document.onclick;
+  document.onclick = function(evt) {
+    document.rootElement.removeChild(g);
+    document.onclick = oldclick; // probably null anyway
+  }
+}
+
+/**
+ * Loads map from the wiki page.
+ */
+function loadMap (url) {
+  var XHR = new XMLHttpRequest();
+  XHR.addEventListener('load', loadIt);
+  XHR.addEventListener('error', function(event) {
+    message('Unfortunately the map could not be loaded.');
+  });
+  XHR.open('GET', url);
+  XHR.responseType = 'document';
+  if (Map.lastUrl === url) {
+    XHR.setRequestHeader('if-none-match', Map.lastEtag);
+  }
+  XHR.send();
+}
+
+/**
+ * Extract map from the wiki content.
+ */
+function loadIt (event) {
+  if (event.target.status === 304) {
+    message('Map unchanged...');
+    return;
+  }
+  var doc = event.target.responseXML;
+  var pre = doc.getElementsByTagNameNS(xhtmlNs, 'pre')[0];
+  if (pre === undefined) {
+    message('Unfortunately this link\n'
+            + 'contains no map.');
+  } else {
+    message('Loading');
+    Map.reset();
+    record('\02');
+    Map.lastEtag = event.target.getResponseHeader('etag');
+    Map.lastUrl = doc.URL;
+    var map = pre.textContent.replace('✎', '');
+    interpretMap(map);
+    Map.showLevelAnimation();
+    Pen.update(null);
+    var username = '';
+    var cookie = event.target.responseXML.cookie;
+    var match = decodeURIComponent(decodeURIComponent(cookie)).match(/\bWiki=([^;]*)/);
+    if (match !== null) {
+      var array = match[1].split('\x1e');
+      var i = array.indexOf('username');
+      if (i >= 0) {
+        username = array[i + 1];
+      }
+    }
+    var h1 = doc.getElementsByTagNameNS(xhtmlNs, 'h1')[0];
+    Map.exportarea.value = h1.textContent + '\n' + username + '\n';
+  }
+}
+
+/**
+ * Join a map on Campaign Wiki. It reads the map name from the
+ * exportarea multiline text field.
+ */
+
+function join () {
+  var inputs = Map.exportarea.value.trim().split('\n');
+  var map = inputs[0];
+  if (map === undefined || map === '') {
+    message('Please provide the name of the map in the text area!');
+    return;
+  }
+  var pwd = inputs[1];
+  if (inputs.length > 2) {
+    message('Please provide the following in the text area\n'
+            + '• the name of the map\n'
+            + '• an optional password');
+    return;
+  }
+  if (Map.websocket !== null) {
+    Map.websocket.close();
+  }
+  Map.websocket = new WebSocket(wsUrl + '/join/' + encodeURIComponent(map));
+  Map.websocket.onopen = function(evt) {
+    joinMap(map, pwd);
+  }
+  Map.websocket.onclose = function(evt) {
+    leave();
+  }
+  Map.websocket.onmessage = function(evt) {
+    if (evt.data === '\05') {
+      // Requesting a new map using Ctrl-E sends the map with a Ctrl-B
+      // prefix. This will get redistributed to all the clients.
+      Map.websocket.send('\02' + getSource());
+    } else {
+      interpretRemote(evt.data); // don't use interpretMap because it's interactive
+    }
+  };
+  Map.websocket.onerror = function(evt) {
+    if (Map.websocket.readyState === WebSocket.OPEN) {
+      message('Network error: ' + evt.data);
+    }
+  };
+}
+
+function joinMap (map, pwd) {
+  Map.websocket.send('\05' + pwd); // request a map reset using Ctrl-E
+  message('Joined ' + (pwd ? 'protected' : 'public') + ' map ' + map);
+  var link = document.getElementById('join');
+  link.firstChild.nodeValue = 'Leave Map';
+  link.setAttributeNS(xlinkNs, 'href', 'javascript:leave()');
+};
+
+function leave () {
+  if (Map.websocket.readyState === WebSocket.OPEN) {
+    Map.leaving = true;
+    setTimeout(function(){ Map.leaving = false }, 100);
+    Map.websocket.close(); // this will call leave again!
+    message('Left map');
+  } else if (!Map.leaving) {
+    // if we didn't want to leave, this must be an error
+    message('Cannot connect to ' + wsUrl);
+  }
+  // this code might run twice in a row
+  var link = document.getElementById('join');
+  link.firstChild.nodeValue = 'Join';
+  link.setAttributeNS(xlinkNs, 'href', 'javascript:join()');
+}
+
+/**
+ * Record all commands for hosting. This is not the same as the
+ * command undo/redo history! Recorded commands are sent to the
+ * websocket if were're connected.
+ */
+function record (key) {
+  if (Map.websocket !== null
+      && Map.websocket.readyState === WebSocket.OPEN) {
+    Map.websocket.send(key);
+  }
+}
+
+/**
+ * Scales all the tiles in the defs element of the SVG. You can add
+ * more tiles at whatever scale you want and this code will determine
+ * the scale by comparing your tile's width with the tile width in use
+ * by the map. The original tiles are all based on a 10x10 grid and
+ * are scaled up to 20x20, for example. The easiest way to do this is
+ * to use a <g> element and give it an appropriate width attribute.
+ * For some user agents such as the iPad Pro, we might want to adjust
+ * the tile size to get a better user experience. I wonder...
+ */
+function scaleTiles () {
+  if (navigator.userAgent.match(/iPad/i)) {
+    Map.tileWidth = 14; // instead of 20
+  }
+  var tiles = document.getElementsByTagName('defs')[0].childNodes;
+  for (var i = 0; i < tiles.length; ++i) {
+    if (tiles[i].nodeType === Node.ELEMENT_NODE
+        && tiles[i].hasAttribute('width')) {
+      var scale = 2/3 * Map.tileWidth / tiles[i].getAttribute('width');
+      var translate = (Map.tileWidth - tiles[i].getAttribute('width')) / 2;
+      if (scale !== 1) {
+        tiles[i].setAttribute('transform', `translate(${translate},${translate}) scale(${scale},${scale})`);
+      }
+    }
+  }
+}
+
+/**
+ * Creates a new tile. These tiles are use elements in the SVG
+ * referring to an existing definition of the given type. An
+ * appropriate id attribute is also generated.
+ */
+function createTile (x, y, type) {
+  var tile = document.createElementNS(svgNs, 'use');
+  tile.setAttribute('id', type + '_' + x + '_' + y);
+  tile.setAttribute('x', (x + 1) * Map.tileWidth); // empty column to the left
+  tile.setAttribute('y', (y + 1) * Map.tileWidth); // empty row at the top
+  tile.type = type;
+  tile.setAttributeNS(xlinkNs, 'href', '#' + type);
+  return tile;
+}
+
+/**
+ * Add s to the label at (x,y).
+ */
+function addToLabel (x, y, s) {
+  setLabel(x, y, s, true, null); // append, middle
+}
+
+/**
+ * Sets the label at (x, y) to s, or appends to the existing label.
+ */
+function setLabel (x, y, s, append, type) {
+  var tile = Map.data.get(x, y).label;
+  var text = null;
+  var old = null;
+  if (tile === null) {
+    tile = document.createElementNS(svgNs, 'text');
+    tile.setAttribute('id', 'label' + '_' + x + '_' + y);
+    text = tile.textContent;
+    if (type === null) {
+      tile.setAttribute('x', (x + 1.5) * Map.tileWidth); // empty column to the left
+      tile.setAttribute('y', (y + 1.7) * Map.tileWidth); // empty row at the top, + lineheight
+    } else if (type === 'left') {
+      tile.setAttribute('class', type);
+      tile.setAttribute('x', (x + 1.1) * Map.tileWidth); // empty column to the left
+      tile.setAttribute('y', (y + 1.8) * Map.tileWidth); // empty row at the top, + lineheight
+    }
+  } else {
+    old = tile.textContent;
+  }
+  Commands.do(
+    function(){
+      tile.textContent = old;
+      if (old === null) {
+        Map.labelsElement.removeChild(tile);
+        Map.data.get(x, y).label = null;
+      }
+    },
+    function(){
+      if (text === '') {
+        Map.labelsElement.appendChild(tile);
+        Map.data.get(x, y).label = tile;
+      }
+      if (append) {
+        tile.textContent += s;
+      } else {
+        tile.textContent = s;
+      }
+    });
+}
+
+/**
+ * Shows the input field at (x,y).
+ */
+function showLabelField (x, y, type) {
+  fadeElementTo(Map.labelfield, 1, linear, 500);
+  Map.labelfield.setAttribute('x', (x + 1) * Map.tileWidth);
+  Map.labelfield.setAttribute('y', (y + 1) * Map.tileWidth);
+  if (type !== null)
+    Map.labelfield.setAttribute('class', type);
+  var tile = Map.data.get(x, y).label;
+  setTimeout(function(){
+    // on Chrome, the text field will start with " or l from the second event
+    Map.labelfield.firstElementChild.value = tile ? tile.textContent : '';
+  }, 1);
+  Map.labelfield.firstElementChild.focus();
+}
+
+function hideLabelField () {
+  fadeElementTo(Map.labelfield, 0, linear, 500);
+  Map.labelfield.firstElementChild.blur();
+  // move it out of the way after waiting for it to fade
+  setTimeout(function(){
+    Map.labelfield.setAttribute('x', 0);
+    Map.labelfield.setAttribute('y', 0);
+  }, 500);
+}
+
+/**
+ * Saves the text in the input field at (x, y).
+ */
+function saveLabel () {
+  hideLabelField();
+  setLabel(Pen.x, Pen.y,
+           Map.labelfield.firstElementChild.value,
+           false,
+           Map.labelfield.getAttribute('class'));
+}
+
+/**
+ * Remove the last character from the label at (x,y).
+ * Returns true if there was text to delete.
+ */
+function deleteFromLabel (x, y) {
+  var tile = Map.data.get(x, y).label;
+  if (tile !== null) {
+    // https://mathiasbynens.be/notes/javascript-unicode
+    var endsWithAstralSymbol = /[\uD800-\uDBFF][\uDC00-\uDFFF]$/;
+    var text = tile.textContent;
+    if (text !== '') {
+      Commands.do(
+        function(){
+          if (text.length === 1
+              || text.length === 2 && text.match(endsWithAstralSymbol)) {
+            Map.labelsElement.appendChild(tile);
+            Map.data.get(x, y).label = tile;
+          }
+          tile.textContent = text;
+        },
+        function(){
+          if (text.match(endsWithAstralSymbol))
+            tile.textContent = text.substr(0, text.length - 2);
+          else
+            tile.textContent = text.substr(0, text.length - 1);
+          if (tile.textContent === '') {
+            Map.labelsElement.removeChild(tile);
+            Map.data.get(x, y).label = null;
+          }
+        });
+      return true;
+    }
+  }
+}
+
+/**
+ * Pick rocks matching the surrounding floor and wall tiles.
+ * Return an approriately rotated tile.
+ */
+function getRocks (x, y) {
+  var tile;
+  var rockface = [true, true, true, true]; // W N E S
+  // remove directions with a wall or door
+  var walls = Map.data.get(x, y).walls;
+  for (var i = 0; i < walls.length; i++) {
+    tile = walls[i];
+    var rotate = tile.getAttribute('rotate') / 90;
+    rockface[rotate] = false;
+  }
+  // remove directions without adjacent tile
+  for (var i = 0; i < 4; i++) {
+    if (rockface[i] && getFloorInDirection(x, y, i) !== null) {
+      rockface[i] = false;
+    }
+  }
+  // special cases: no walls, or two opposing sides only
+  if ([false, false, false, false]
+      .every(function(v,i) { return v === rockface[i]})) {
+    // don't
+    return createTile(x, y, "empty");
+  } else if ([false, true, false, true]
+             .every(function(v,i) { return v === rockface[i]})) {
+    tile = createTile(x, y, "rockd");
+    return rotateTile(tile, x, y, 90 + 180 * (x%2));
+  } else if ([true, false, true, false]
+             .every(function(v,i) { return v === rockface[i]})) {
+    tile = createTile(x, y, "rockd");
+    if (y % 2 === 1)
+      rotateTile(tile, x, y, 180);
+    return tile;
+  } else {
+    // check for rock<r>, biggest first
+    for (var r = 4; r > 0; r--) {
+      // check all four directions
+      for (var i = 0; i < 4; i++) {
+        var ok = true;
+        // check for r rockfaces
+        for (var j = 0; j < r; j++) {
+          if (!rockface[(i+j) % 4]) {
+            ok = false;
+            break;
+          }
+        }
+        if (ok) {
+          if (document.getElementById("rock" + r)) {
+            tile = createTile(x, y, "rock" + r);
+          } else {
+            tile = createTile(x, y, "rock" + r + (x % 2 === 1 ? "a" : "b"));
+          }
+          return rotateTile(tile, x, y, i * 90);
+        }
+      }
+    }
+  }
+  return tile;
+}
+
+function getFloorInDirection(x, y, direction) {
+  if (direction === 0) {
+    return Map.data.get(x-1, y).floor;
+  } else if (direction === 1) {
+    return Map.data.get(x, y-1).floor;
+  } else if (direction === 2) {
+    return Map.data.get(x+1, y).floor;
+  } else if (direction === 3) {
+    return Map.data.get(x, y+1).floor;
+  }
+}
+
+/**
+ * Draw rocks. If we already have rocks, draw a floor instead. This is
+ * very similar to the draw function except we create a special kind
+ * of tile.
+ */
+function rock (x, y) {
+  var old = Map.data.get(x, y).floor;
+  if (old !== null && old.type.startsWith('rock')) {
+    replaceFloor(x, y, old, null);
+  } else {
+    replaceFloor(x, y, old, getRocks(x, y));
+  }
+  checkRockyNeighbors(x, y);
+}
+
+/**
+ * Check whether any of the neighbors need adjustments. This happens
+ * when adding a rock tile or when removing a normal tile surrounded
+ * by rock tiles. When adjusting neighbors in this way, make sure we
+ * keep their background color.
+ */
+function checkRockyNeighbors(x, y) {
+  // check neighbors for adjustment
+  var undoBoundary = Commands.i - 1;
+  old = Map.data.get(x-1, y).floor;
+  if (old !== null && old.type.startsWith('rock'))
+    replaceColoredFloor(x-1, y, old, getRocks(x-1, y), true);
+  old = Map.data.get(x, y-1).floor;
+  if (old !== null && old.type.startsWith('rock'))
+    replaceColoredFloor(x, y-1, old, getRocks(x, y-1), true);
+  old = Map.data.get(x+1, y).floor;
+  if (old !== null && old.type.startsWith('rock'))
+    replaceColoredFloor(x+1, y, old, getRocks(x+1, y), true);
+  old = Map.data.get(x, y+1).floor;
+  if (old !== null && old.type.startsWith('rock'))
+    replaceColoredFloor(x, y+1, old, getRocks(x, y+1), true);
+  // make sure this is a single undo/redo command
+  Commands.merge(undoBoundary);
+}
+
+/**
+ * Returns an unused angle for wall tiles. Provide a preferred angle.
+ * Possible values are 0, 90, 180, 270.
+ */
+function getUnusedAngle (x, y, rotate) {
+  var candidate = [rotate,
+                   (rotate + 90) % 360,
+                   (rotate + 180) % 360,
+                   (rotate + 270) % 360];
+  var existingWalls = [];
+  var walls = Map.data.get(x, y).walls;
+  for (var i = 0; i < walls.length; i++) {
+    existingWalls.push(walls[i].getAttribute('rotate'));
+  }
+  search: for (var c = 0; c < 4; c++) {
+    for (var i = 0; i < existingWalls.length; i++) {
+      if (candidate[c]==existingWalls[i]) {
+        continue search;
+      }
+    }
+    return candidate[c];
+  }
+}
+
+/* Drawing on the walls */
+
+/**
+ * Modifies the given tile such that it is rotated by the given
+ * angle. The tile is also returned for convenience.
+ */
+function rotateTile (tile, x, y, angle) {
+  tile.setAttribute('rotate', angle);
+  if (angle > 0) {
+    var cx = (x + 1.5) * Map.tileWidth; // empty column to the left
+    var cy = (y + 1.5) * Map.tileWidth; // empty row at the top
+    tile.setAttribute('transform', 'rotate('+angle+','+cx+','+cy+')');
+  } else {
+    tile.removeAttribute('transform');
+  }
+  return tile;
+}
+
+/**
+ * Places a tile of the given type on a free section of the wall
+ * around the given square. Wall placement sets Pen.lastWall, because
+ * walls require timing. If you're quick, the wall is rotate. If
+ * you're slow, another wall is created.
+ */
+function wallPlacement (x, y, type) {
+  var now = Date.now();
+  var walls = Map.data.get(x, y).walls;
+  if (Pen.type === type
+      && walls  && walls.length > 0
+      && Pen.lastWall && now - Pen.lastWall <= 2000) {
+    // we just placed a door: take the last one and rotate it
+    var tile = walls[walls.length - 1];
+    var old = tile.getAttribute('transform');
+    var angle = parseInt(tile.getAttribute('rotate'));
+    var rotate = getUnusedAngle(x, y, (angle + 90) % 360);
+    if (rotate !== null) {
+      type = tile.type; // use 'concealed' instead of 'door' for example
+      Commands.do(
+        function(){
+          rotateTile(tile, x, y, angle);
+        },
+        function(){
+          rotateTile(tile, x, y, rotate);
+        });
+    }
+  } else {
+    var rotate = getUnusedAngle(x, y, 0);
+    if (rotate !== null) {
+      var tile = createTile(x, y, type);
+      rotateTile(tile, x, y, rotate);
+      Commands.do(
+        function(){
+          walls.pop();
+          Map.wallsElement.removeChild(tile);
+        },
+        function(){
+          walls.push(tile);
+          Map.wallsElement.appendChild(tile);
+        });
+    }
+  }
+  Pen.lastWall = now;
+}
+
+/**
+ * Draws a wall tile of the given type on the current wall. The
+ * current wall only makes sense in Wall Mode. In Wall Mode, one of
+ * the two coordinates is +0.5. We determine the angle (0 or 90) and
+ * put a tile there.
+ */
+function wallDraw (x, y, type) {
+  var angle = 0;
+  if (y % 1 === 0) {
+    x = Math.ceil(x);
+  } else {
+    angle = 90;
+    y = Math.ceil(y);
+  }
+  var i, old;
+  var tile = createTile(x, y, type);
+  var walls = Map.data.get(x, y).walls;
+  rotateTile(tile, x, y, angle);
+  for (i = 0; i < walls.length; i++) {
+    if (parseInt(walls[i].getAttribute('rotate')) == angle) {
+      old = walls[i];
+      break;
+    }
+  }
+  Commands.do(
+    function(){
+      Map.wallsElement.removeChild(tile);
+      if (old) {
+        Map.wallsElement.appendChild(old);
+        walls[i] = old;
+      } else {
+        walls.pop();
+      }
+    },
+    function(){
+      if (old) {
+        Map.wallsElement.removeChild(old);
+        walls[i] = tile;
+      } else {
+        walls.push(tile);
+      }
+      Map.wallsElement.appendChild(tile);
+    });
+}
+
+/**
+  * Toggles Wall Mode.
+  */
+function wallMode (x, y) {
+  if (Pen.type === 'wallMode') {
+    wallModeOff();
+  } else {
+    regionOff();
+    Pen.type = 'wallMode';
+    if (Pen.x > 0) {
+      Pen.x -= 0.5;
+    } else {
+      Pen.x += 0.5;
+    }
+  }
+  Pen.update(null);
+}
+
+/**
+ * Places a tile of the given type in the given square. If in Wall
+ * Mode, use the given wall. Otherwise, find a free section around the
+ * given square.
+ */
+function wall (x, y, type) {
+  if (Pen.type === 'wallMode') {
+    wallDraw(x, y, type);
+  } else {
+    wallPlacement(x, y, type);
+    Pen.type = type;
+  }
+}
+
+/**
+ * Finds a wall tile for the current position of a given angle in wall
+ * mode and return its index in the wall array. You're meant to call
+ * this multiple times: Once for (x, y) where the angle could be 0° or
+ * 90°, once for (x-1, y) where the angle could be 180° and once for
+ * (x, y-1) where the angle could be 270°.
+ */
+function findWall (walls, angle) {
+  for (var i = 0; i < walls.length; i++) {
+    if (parseInt(walls[i].getAttribute('rotate')) == angle) {
+      return i;
+    }
+  }
+  return null;
+}
+
+/**
+ * Removes a tile from the surrounding walls of the give tile.
+ * Returns true if there was a wall.
+ */
+function removeWall (x, y) {
+  var angle = 0;
+  if (Pen.type === 'wallMode') {
+    if (y % 1 === 0) {
+      x = Math.ceil(x);
+    } else {
+      angle = 90;
+      y = Math.ceil(y);
+    }
+  }
+  var walls = Map.data.get(x, y).walls;
+  var i;
+  if (Pen.type === 'wallMode') {
+    i = findWall(walls, angle);
+    if (i === null && angle === 0 && x > 0) {
+      walls = Map.data.get(x - 1, y).walls;
+      i = findWall(walls, 180);
+    }
+    if (i === null && angle === 90 && y > 0) {
+      walls = Map.data.get(x , y - 1).walls;
+      i = findWall(y - 1, y, 270);
+    }
+  } else {
+    i = walls.length - 1;
+  }
+  if (i !== null && i >= 0) {
+    var old = walls[i];
+    Commands.do(
+      function(){
+        Map.wallsElement.appendChild(old);
+        walls.push(old);
+      },
+      function(){
+        Map.wallsElement.removeChild(old);
+        walls.splice(i,1);
+      });
+    return true;
+  }
+}
+
+/**
+ * Draws an exit. If the exit is present, removes it.
+ */
+function toggleExit (x, y, type) {
+  var walls = Map.data.get(x, y).walls;
+  var tile = createTile(x, y, type);
+  var exists = false;
+  var old = null;
+  for (var i = 0; i < walls.length; i++) {
+    old = walls[i];
+    if (old !== null && old.type === type) {
+      exists = true;
+      break;
+    }
+  }
+
+  if (!exists) {
+    // add
+    Commands.do(
+      function(){
+        walls.pop();
+        Map.wallsElement.removeChild(tile);
+      },
+      function(){
+        walls.push(tile);
+        Map.wallsElement.appendChild(tile);
+      });
+  } else {
+    // remove
+    Commands.do(
+      function(){
+        Map.wallsElement.appendChild(old);
+        walls.push(tile);
+      },
+      function(){
+        Map.wallsElement.removeChild(old);
+        walls.splice(i,1);
+      });
+  }
+}
+
+/**
+ * Draws a tile on the floor. If the tile it already there, draws
+ * floor instead. Stairs are taken care of---they are on a different
+ * layer!
+ */
+function draw (x, y, type) {
+  var old = Map.data.get(x, y).floor;
+  if (old !== null && old.type === type) {
+    floor(x, y);
+  } else {
+    replaceFloor(x, y, old, createTile(x, y, type));
+  }
+}
+
+/**
+ * Replaces the old tile on the floor with a new tile. The code
+ * handles both the old tile and the new tile being null. If both are
+ * null, nothing needs to be done. If something was done, return true.
+ * This is used when hitting DEL to remove a wall, or a floor tile, or
+ * an arc. This is the main function at the end of all floor drawing.
+ */
+function replace (data, element, x, y, old, tile, recursive) {
+  if (old !== null || tile !== null) {
+    Commands.do(
+      function(){
+        if (tile)
+          element.removeChild(tile);
+        if (old)
+          element.appendChild(old);
+        Map.data.get(x,y)[data] = old;
+      },
+      function(){
+        if (old)
+          element.removeChild(old);
+        if (tile)
+          element.appendChild(tile);
+        Map.data.get(x,y)[data] = tile;
+      });
+    Pen.lastWall = null;
+    if (!recursive)
+      checkRockyNeighbors(x, y);
+    return true;
+  }
+}
+
+function replaceFloor (x, y, old, tile) {
+  return replace('floor', Map.floorElement, x, y, old, tile, false);
+}
+
+/**
+ * When automatically adjusting a tile such as grottos, we do not want
+ * to change their background color. In this case, we're also calling
+ * replace recursively and thus we need to prevent it from processing
+ * further grottos.
+ */
+function replaceColoredFloor (x, y, old, tile, recursive) {
+  if (old.hasAttribute('class'))
+    tile.setAttribute('class', old.getAttribute('class'));
+  return replace('floor', Map.floorElement, x, y, old, tile, recursive);
+}
+
+function replaceArc (x, y, old, tile) {
+  return replace('arcs', Map.arcsElement, x, y, old, tile, false);
+}
+
+function background (x, y, color) {
+  var tile;
+  if (Pen.type === 'wallMode') {
+    var angle = 0;
+    if (y % 1 === 0) {
+      x = Math.ceil(x);
+    } else {
+      angle = 90;
+      y = Math.ceil(y);
+    }
+    var walls = Map.data.get(x, y).walls;
+    for (var i = 0; i < walls.length; i++) {
+      if (parseInt(walls[i].getAttribute('rotate')) == angle) {
+        tile = walls[i];
+        break;
+      }
+    }
+  } else {
+    var now = Date.now();
+    var walls = Map.data.get(x, y).walls;
+    if (walls && walls.length > 0
+        && Pen.lastWall && now - Pen.lastWall <= 2000) {
+      tile = walls[walls.length - 1];
+    } else {
+      tile = Map.data.get(x, y).floor || Map.data.get(x, y).arcs;
+    }
+  }
+  var undoBoundary = Commands.i;
+  if (tile == null) {
+    wallModeOff();
+    floor(x, y);
+    tile = Map.data.get(x, y).floor;
+  }
+  var old = tile.getAttribute('class');
+  Commands.do(
+    function(){
+      tile.setAttribute('class', old);
+    },
+    function(){
+      tile.setAttribute('class', color);
+    });
+  // make sure this is a single undo/redo command
+  Commands.merge(undoBoundary);
+}
+
+function regionOff (x, y) {
+  if (Map.region.getAttribute('opacity') > 0) {
+    Map.region.setAttribute('opacity', 0);
+  }
+}
+
+/**
+ * Turn the region on if it was off. This also marks the starting
+ * position of the region. Since this is only set when the region was
+ * off, you can call it any number of times after that.
+ */
+function regionOn (x, y) {
+  if (Map.region.getAttribute('opacity') == 0) {
+    wallModeOff();
+    Map.region.setAttribute('x', (Pen.x + 1) * Map.tileWidth);
+    Map.region.setAttribute('y', (Pen.y + 1) * Map.tileWidth);
+    Map.region.setAttribute('startX', Pen.x);
+    Map.region.setAttribute('startY', Pen.y);
+    Map.region.setAttribute('height', Map.tileWidth);
+    Map.region.setAttribute('width', Map.tileWidth);
+    Map.region.setAttribute('opacity', 0.2);
+  }
+}
+
+/**
+ * Delete everything at every position for the rectangle specified.
+ */
+function rectangleDelete (x1, y1, x2, y2) {
+  for (var y = y1; y <= y2; y++) {
+    for (var x = x1; x <= x2; x++) {
+      deleteFromLabel(x, y);
+      while (removeWall(x, y));
+      removeFloor(x, y);
+      removeArc(x, y);
+    }
+  }
+}
+
+/**
+ * Loop over the entire region, if it is active, and delete everything
+ * at every position. FIXME: merge undo boundaries?
+ */
+function regionDelete () {
+  if (Map.region.getAttribute('opacity') > 0) {
+    var startX = Map.region.getAttribute('startX');
+    var startY = Map.region.getAttribute('startY');
+    rectangleDelete(Math.min(Pen.x, startX), Math.min(Pen.y, startY),
+                    Math.max(Pen.x, startX), Math.max(Pen.y, startY));
+  }
+}
+
+function regionCut () {
+  let undoBoundary = Commands.i;
+  regionCopy();
+  regionDelete();
+  Commands.merge(undoBoundary);
+}
+
+function regionPaste () {
+  let undoBoundary = Commands.i;
+  textImport();
+  Commands.merge(undoBoundary);
+}
+
+/**
+ * Loop over the entire region, if it is active, and create a string
+ * containing all the commands necessary to recreate it, and put it
+ * into the text area. If the region is inactive, enable it.
+ */
+function regionCopy () {
+  regionOn();
+  // start with a deletion of the target region
+  let startX = Map.region.getAttribute('startX');
+  let startY = Map.region.getAttribute('startY');
+  let source = 'X[' + (1 + Math.abs(Pen.x - startX))
+      + ',' + (1 + Math.abs(Pen.y - startY)) + ']';
+  // now generate the code for the region
+  for (let y = Math.min(Pen.y, startY); y <= Math.max(Pen.y, startY); y++) {
+    for (let x = Math.min(Pen.x, startX); x <= Math.max(Pen.x, startX); x++) {
+      source += Map.codeFor(x, y);
+    }
+    if (y < Math.max(Pen.y, startY)) {
+      source += '[-' + (1 + Math.abs(Pen.x - startX)) + ',1]';
+    } else {
+      source += '-';
+    }
+  }
+  Map.exportarea.value = source;
+}
+
+/**
+ * Returns the number of steps required to turn b into variant a. If a
+ * is not a variant of b, returns undefined. From stairs to stairs is
+ * 0, so this is not truthy! Use isVariantOf if you need that.
+ */
+function variantOf (a, b) {
+  if (a === b)
+    return 0;
+  var matches = {};
+  for (var next = b, i = 1;
+       next !== undefined && Map.variants[next] !== b;
+       next = Map.variants[next], i++) {
+    matches[next] = i;
+  }
+  return matches[a];
+}
+
+/**
+ * Returns whether a is a variant of b.
+ */
+function isVariantOf (a, b) {
+  if (a === b)
+    return true;
+  return variantOf(a, b) !== undefined;
+}
+
+/**
+ * Replaces the last tile placed with a variant thereof.
+ */
+function variant (x, y) {
+  var tile;
+  if (Pen.type === 'wallMode') {
+    if (y % 1 === 0) {
+      x = Math.ceil(x);
+    } else {
+      y = Math.ceil(y);
+    }
+  }
+  tile = Map.data.get(x, y).floor || Map.data.get(x, y).arcs;
+  if (Pen.type === 'wallMode'
+      || isVariantOf(Pen.type, 'door')
+      || isVariantOf(Pen.type, 'wall')
+      || tile !== null && Map.variants[tile.type] === undefined) {
+    var walls = Map.data.get(x, y).walls;
+    tile = walls[walls.length - 1];
+  }
+  if (tile) {
+    var old = tile.type;
+    var type = Map.variants[tile.type];
+    if (type) {
+      Commands.do(
+        function(){
+          tile.type = old;
+          tile.setAttribute('id', old + '_' + x + '_' + y);
+          tile.setAttributeNS(xlinkNs, 'href', '#' + old);
+        },
+        function(){
+          tile.type = type;
+          tile.setAttribute('id', type + '_' + x + '_' + y);
+          tile.setAttributeNS(xlinkNs, 'href', '#' + type);
+        });
+    }
+  }
+}
+
+/**
+ * Draws stairs, arcs and diagonals on the floor. 'data' is the key
+ * into Tile, ie. one of 'arcs', 'floor' or 'walls'. Set Pen.lastWall
+ * to null when calling rotateTile. We can't do it there because
+ * rotateTile is also called by wallPlacement. We don't need to do it
+ * when calling replace because we'll do it there.
+ */
+function rotate (data, x, y, type) {
+  var old = Map.data.get(x, y)[data];
+  if (old && isVariantOf(old.type, type) !== null && old.hasAttribute('rotate')) {
+    var angle = parseInt(old.getAttribute('rotate'));
+    Commands.do(
+      function(){
+        rotateTile(old, x, y, angle);
+      },
+      function() {
+        rotateTile(old, x, y, (angle + 90) % 360);
+      });
+    Pen.lastWall = null;
+  } else {
+    var tile = createTile(x, y, type);
+    tile.setAttribute('rotate', 0);
+    if (type === 'arc' || type === 'arcw')
+      replace(data, Map.arcsElement, x, y, old, tile);
+    else
+      replace(data, Map.floorElement, x, y, old, tile);
+  }
+}
+
+/**
+ * Draws or erases a floor tile.
+ */
+function floor (x, y) {
+  var old   = Map.data.get(x, y).floor;
+  if (!old || old.type !== 'empty') {
+    replaceFloor(x, y, old, createTile(x, y, 'empty'));
+  } else {
+    replaceFloor(x, y, old, null);
+  }
+}
+
+/**
+ * Erase floor tile, if any.
+ */
+function removeFloor (x, y) {
+  var old = Map.data.get(x, y).floor;
+  if (old) {
+    replaceFloor(x, y, old, null);
+    checkRockyNeighbors(x, y);
+    return old;
+  }
+}
+
+/**
+ * Erase arc tile, if any.
+ */
+function removeArc (x, y) {
+  var old = Map.data.get(x, y).arcs;
+  if (old)
+    return replaceArc(x, y, old, null);
+}
+
+/* This is where we draw (or erase) floor tiles. The key point to
+ * remember is that we might not get a mouse event for every
+ * coordinate. That's why we need to store where we want to draw to
+ * (our target) and start drawing at our current position (the pen).
+ * We do this at least once in order to support clicks without mouse
+ * movement. Then we start a loop: as long as the pen hasn't reached
+ * the target, we change x or y by 1 and draw another tile. As we're
+ * creating closures for Commands, we need to do this in a factory.
+ * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Closures#Creating_closures_in_loops.3A_A_common_mistake
+ */
+function drawToCommand (x, y, tile, type) {
+  record('('+x+','+y+')f');
+  var remove = function(){
+    Map.floorElement.removeChild(tile);
+    Map.data.get(x, y).floor = null;
+    Map.freeRoomNrs.push(Map.coordToNr[[x, y]]);
+    delete Map.coordToNr[[x, y]];
+    checkRockyNeighbors(x, y);
+  };
+  var add = function(){
+    var roomNr = Map.freeRoomNrs.pop();
+    if (roomNr === undefined) {
+      roomNr = Map.nextRoomNr;
+      Map.nextRoomNr++;
+    }
+    Map.coordToNr[[x, y]] = roomNr;
+    Map.data.get(x, y).floor = tile;
+    Map.floorElement.appendChild(tile);
+    checkRockyNeighbors(x, y);
+  };
+  if (type === 'add') {
+    Commands.do(remove, add); // add new tile
+  } else {
+    Commands.do(add, remove); // remove existing tile
+  }
+}
+
+/**
+ * Call drawToCommand based on the position data in the event.
+ */
+function drawTo (evt) {
+  var target = Pen.position(evt);
+  // draw up to the current position (at least once if we just started)
+  do {
+    if (!Map.data.get(Pen.x, Pen.y).floor && Pen.type === 'empty') {
+      drawToCommand(Pen.x, Pen.y, createTile(Pen.x, Pen.y, 'empty'), 'add');
+    } else if (Map.data.get(Pen.x, Pen.y).floor && Pen.type === 'null') {
+      drawToCommand(Pen.x, Pen.y, Map.data.get(Pen.x, Pen.y).floor, 'remove');
+    }
+  } while (Pen.moveTo(target));
+  Pen.update(evt);
+  if (Pen.type === 'empty')
+    Map.growWithAnimation(Pen.x, Pen.y);
+}
+
+/**
+ * Sets the Pen down, ready for drawing. When setting down the pen
+ * (onmousedown, penDown), we look at the current tile. If it's the
+ * empty floor tile, we'll want to erase it. If there is no floor tile
+ * (null), we'll want to draw an empty floor tile. We store this
+ * information in the Pen type and as we keep on drawing (onmousemove,
+ * drawTo), we don't change it.
+ *
+ * As for touch screens: If we are just touching the screen, don't
+ * draw a tile. If we keep touching the screen, however, draw a tile.
+ */
+function penDown (evt) {
+  wallModeOff();
+  Pen.update(evt);
+  if (Map.data.get(Pen.x, Pen.y).floor) {
+    Pen.type = 'null';
+  } else {
+    Pen.type = 'empty';
+  }
+  // Draw a tile unless we just touched the screen. These variables
+  // are used in ontouchend below.
+  if (evt.type === 'touchstart') {
+    var ts = Date.now();
+    var pos = Pen.x + "," + Pen.y;
+  } else {
+    drawTo(evt);
+  }
+  // install new handler
+  Map.ui.onmousemove = drawTo;
+  Map.ui.ontouchmove = drawTo;
+  // revert to pen tracking on mouse up *anywhere*
+  document.onmouseup = function() {
+    Map.ui.onmousemove = Pen.update;
+  }
+  document.ontouchend = function() {
+    // if this was a long touch and we haven't moved, draw a tile anyway
+    if (Date.now() > ts + 300 && pos === Pen.x + "," + Pen.y) {
+      drawTo(evt);
+    }
+    Map.ui.ontouchmove = Pen.update;
+  }
+}
+
+/**
+ * Puts the pointer back into a square and ends Wall Mode.
+ * Call this whenever you're acting on squares.
+ */
+function wallModeOff () {
+  Pen.x = Math.ceil(Pen.x);
+  Pen.y = Math.ceil(Pen.y);
+  Pen.update(null);
+  Pen.type = null;
+}
+
+/**
+ * Moves the pointer around. It handles both moving from square to
+ * sqare as well as moving from wall to wall (where one of the
+ * coordinates is off by 0.5). Moving from horizontal to vertical
+ * walls and back in wall mode is timing sensitive. That's why we need
+ * Pen.lastMove. We also set Pen.lastWall to null, so timing sensitive
+ * wall placement also works as intended.
+ */
+function move (dir) {
+  switch (dir) {
+  case 'left':
+    if (Pen.x > 0)
+      Pen.x--;
+    break;
+  case 'right':
+    Map.growWithAnimation(Pen.x + 1, Pen.y);
+    Pen.x++;
+    break;
+  case 'up':
+    if (Pen.y > 0)
+      Pen.y--;
+    break;
+  case 'down':
+    Map.growWithAnimation(Pen.x, Pen.y + 1);
+    Pen.y++;
+    break;
+  }
+  // Example: when moving down from 1 to 2 and right to 3, we want to
+  // switch position on the grid and end up on 4. So we need to adjust
+  // the position by (-0.5,-0.5):
+  //
+  //  x→
+  // y  |   |
+  // ↓--+---+---
+  //    1   |
+  //  --+-4-+---
+  //    2   3
+  //  --+---+---
+  //    |   |
+  //
+  // If we moved first right and then down, we would end up in the same
+  // position.
+  var now = Date.now();
+  if (Pen.type === 'wallMode') {
+    if (Pen.dir && Pen.lastMove && now - Pen.lastMove <= 500) {
+      if (Pen.dir=='left' && dir=='down'
+          || Pen.dir=='down' && dir=='left') {
+        Pen.x += 0.5;
+        Pen.y -= 0.5;
+      } else if (Pen.dir=='left' && dir=='up'
+                 || Pen.dir=='up' && dir=='left') {
+        Pen.x += 0.5;
+        Pen.y += 0.5;
+      } else if (Pen.dir=='right' && dir=='down'
+                 || Pen.dir=='down' && dir=='right') {
+        Pen.x -= 0.5;
+        Pen.y -= 0.5;
+      } else if (Pen.dir=='right' && dir=='up'
+                 || Pen.dir=='up' && dir=='right') {
+        Pen.x -= 0.5;
+        Pen.y += 0.5;
+      }
+    }
+  }
+  Pen.update(null);
+  Pen.dir = dir;
+  Pen.lastMove = now; // must come after Pen.update
+  Pen.lastWall = null; // reset the wall counter
+}
+
+/**
+ * Extract key from KeyboardEvent Basic source from
+ * http://javascript.info/tutorial/keyboard-events#processing-the-character-keypress
+ */
+function getChar (event) {
+  if (event.which == null) {
+    return String.fromCharCode(event.keyCode) // IE character keys
+  } else if (event.which!=0 && event.charCode!=0) {
+    return String.fromCharCode(event.which) // the rest character keys
+  } else if (event.type == 'keydown') { // special key
+    if(event.key && event.key.length !== 1) return event.key; // Firefox
+    if(event.keyIdentifier && event.keyIdentifier.substring(0,2) !== 'U+') return event.keyIdentifier; // Chrome
+    if(event.keyCode === 8) return 'Backspace'; // Chrome Backspace
+  }
+  return null; // ignore second key event
+}
+
+/**
+ * Handle key presses, recording them all.
+ */
+function keyPressed (evt) {
+  keyHandling (evt, true);
+}
+
+/**
+ * Processes key press events and single character strings (in case
+ * the interpreter is feeding us some). Many of the key commands need
+ * a 'current' position. We determine it by looking at the Pen. It's
+ * position is always tracked (onmousemove, Pen.update). When
+ * interpreting code we received from a remote host, we don't want to
+ * be recording, which is why we need a flag.
+ */
+function keyHandling (evt, recording) {
+  // We don't handly any meta keys.
+  if (evt.metaKey)
+    return;
+
+  // Could be a string when running interpreted code.
+  var key = evt;
+
+  // When running the demo, ignore key events from the browser.
+  if (!Demo.running && evt instanceof KeyboardEvent) {
+    key = getChar(evt);
+    if(key === null) return; // ignore one of onkeydown or onkeypress event
+  }
+
+  var target = evt.originalTarget || evt.srcElement; // Chrome
+  if (target === Map.exportarea) {
+    if (key === 'Enter' && evt.ctrlKey) {
+      textImport();
+    }
+    return;
+  }
+
+  // upcase control keys and use them instead
+  if (evt.ctrlKey) {
+    if (evt.keyCode) { // Chrome
+      key = String.fromCharCode(64 + evt.keyCode); // 3 is 67 is 'C'
+    } else if (key !== 'Control') {
+      key = String.toUpperCase(key);
+    }
+  }
+
+  if (target !== undefined && target.parentNode === Map.labelfield) {
+    if (key === 'Enter') {
+      var type = Map.labelfield.getAttribute('class');
+      saveLabel();
+      if (type === null) {
+        record('"' + Map.data.get(Pen.x, Pen.y).label.textContent + '"');
+      } else if (type === 'left') {
+        record("'" + Map.data.get(Pen.x, Pen.y).label.textContent + "'");
+      }
+    } else if (key === 'Esc' || key ==='Escape') {
+      hideLabelField();
+    }
+    return;
+  }
+
+  if (key === 'Backspace') {
+    evt.preventDefault();
+  }
+
+  var keepRegion = false;
+
+  switch (key) {
+
+  case '?':
+    var help = document.getElementById('help');
+    if (help.getAttribute('visibility') === 'hidden') {
+      help.setAttribute('visibility', 'visible');
+    } else {
+      help.setAttribute('visibility', 'hidden');
+    }
+    break;
+
+  case '.':
+    Pen.lastWall = null;
+    break;
+
+  case 'u':
+    Commands.undo();
+    break;
+
+  case 'r':
+    Commands.redo();
+    break;
+
+  case 'ArrowDown':
+  case 'Down':
+  case 'j':
+  case 'J':
+  if (evt.altKey) {
+      evt.preventDefault();
+      wallModeOff();
+      floor(Pen.x, Pen.y);
+    }
+    if (evt.shiftKey || key === 'J') {
+      regionOn();
+      keepRegion = true;
+    }
+    move('down');
+    key = '(' + Pen.x + ',' + Pen.y + ')';
+    break;
+
+  case 'ArrowUp':
+  case 'Up':
+  case 'k':
+  case 'K':
+    if (evt.altKey) {
+      evt.preventDefault();
+      wallModeOff();
+      floor(Pen.x, Pen.y);
+    }
+    if (evt.shiftKey || key === 'K') {
+      regionOn();
+      keepRegion = true;
+    }
+    move('up');
+    key = '(' + Pen.x + ',' + Pen.y + ')';
+    break;
+
+  case 'ArrowLeft':
+  case 'Left':
+  case 'h':
+  case 'H':
+    if (evt.altKey) {
+      evt.preventDefault();
+      wallModeOff();
+      floor(Pen.x, Pen.y);
+    }
+    if (evt.shiftKey || key === 'H') {
+      regionOn();
+      keepRegion = true;
+    }
+    move('left');
+    key = '(' + Pen.x + ',' + Pen.y + ')';
+    break;
+
+  case 'ArrowRight':
+  case 'Right':
+  case 'l':
+  case 'L':
+  case ' ':
+    if (evt.altKey) {
+      evt.preventDefault();
+      wallModeOff();
+      floor(Pen.x, Pen.y);
+    }
+    if (evt.shiftKey || key === 'L') {
+      regionOn();
+      keepRegion = true;
+    }
+    move('right');
+    key = '(' + Pen.x + ',' + Pen.y + ')';
+    break;
+
+  case '1':
+    toggleExit(Pen.x-1, Pen.y+1, 'exNE');
+    break;
+  case '2':
+    toggleExit(Pen.x, Pen.y+1, 'exN');
+    break;
+  case '3':
+    toggleExit(Pen.x+1, Pen.y+1, 'exNW');
+    break;
+  case '4':
+    toggleExit(Pen.x-1, Pen.y, 'exE');
+    break;
+  case '6':
+    toggleExit(Pen.x, Pen.y, 'exE');
+    break;
+  case '7':
+    toggleExit(Pen.x, Pen.y, 'exNW');
+    break;
+  case '8':
+    toggleExit(Pen.x, Pen.y, 'exN');
+    break;
+  case '9':
+    toggleExit(Pen.x, Pen.y, 'exNE');
+    break;
+  case '+':
+    toggleExit(Pen.x, Pen.y, 'exU');
+    break;
+  case '-':
+    toggleExit(Pen.x, Pen.y, 'exD');
+    break;
+  case '5':
+  case '0':
+    addToLabel(Pen.x, Pen.y, key);
+    break;
+
+  case 'x':
+  case 'Backspace':
+  case 'Del':
+    if (Pen.type === 'wallMode') {
+      if (!removeWall(Pen.x, Pen.y)) {
+        wallModeOff();
+        deleteFromLabel(Pen.x, Pen.y)
+          || removeFloor(Pen.x, Pen.y)
+          || removeArc(Pen.x, Pen.y);
+      }
+    } else {
+      deleteFromLabel(Pen.x, Pen.y)
+        || removeWall(Pen.x, Pen.y)
+        || removeFloor(Pen.x, Pen.y)
+        || removeArc(Pen.x, Pen.y);
+    }
+    key = 'x'; // record x
+    break;
+
+  case 'f':
+    wallModeOff();
+    floor(Pen.x, Pen.y);
+    break;
+
+  case 'g':
+    wallModeOff();
+    rock(Pen.x, Pen.y);
+    break;
+
+  case '\n':
+  case 'Enter':
+    if (evt.ctrlKey) {
+      textImport();
+      recording = false; // don't record this one
+    } else {
+      wallModeOff();
+      Pen.x = 0;
+      move('down');
+      key = '\n'; // record a newline
+    }
+    break;
+
+  case 'd':
+    wall(Pen.x, Pen.y, 'door');
+    break;
+
+  case 'w':
+    wall(Pen.x, Pen.y, 'wall');
+    break;
+
+  case 'm':
+    wallMode(Pen.x, Pen.y);
+    break;
+
+  case 'p':
+    wallModeOff();
+    draw(Pen.x, Pen.y, 'pillar');
+    break;
+
+  case 't':
+    wallModeOff();
+    draw(Pen.x, Pen.y, 'trap');
+    break;
+
+  case 'b':
+    wallModeOff();
+    draw(Pen.x, Pen.y, 'statue');
+    break;
+
+  case 'c':
+    wallModeOff();
+    rotate('floor', Pen.x, Pen.y, 'chest');
+    break;
+
+  case 's':
+    wallModeOff();
+    rotate('floor', Pen.x, Pen.y, 'stair');
+    break;
+
+  case 'v':
+    variant(Pen.x, Pen.y);
+    break;
+
+  case 'n':
+    wallModeOff();
+    rotate('floor', Pen.x, Pen.y, 'diagonal');
+    break;
+
+  case 'a':
+    wallModeOff();
+    rotate('arcs', Pen.x, Pen.y, 'arc');
+    break;
+
+  case "q":
+      wallModeOff();
+      rotate('arcs', Pen.x, Pen.y, 'arcw');
+      break;
+
+  case 'z':
+    if (Map.level < 665) {
+      Map.show(Map.level + 1);
+    }
+    break;
+
+  case 'y':
+    if (Map.level > 0) {
+      Map.show(Map.level - 1);
+    }
+    break;
+
+  case 'W':
+    background(Pen.x, Pen.y, 'white');
+    break;
+
+  case 'R':
+    background(Pen.x, Pen.y, 'red');
+    break;
+
+  case 'G':
+    background(Pen.x, Pen.y, 'green');
+    break;
+
+  case 'B':
+    background(Pen.x, Pen.y, 'blue');
+    break;
+
+  case 'Q':
+  case 'E':
+  case 'A':
+  case 'S':
+  case 'D':
+  case 'F':
+    background(Pen.x, Pen.y, 'color' + key);
+    break;
+
+  case 'Escape':
+    if (Map.region.getAttribute('opacity') > 0) {
+      Map.region.setAttribute('opacity', 0);
+    }
+    break;
+
+  case 'Z':
+    if (Map.backgroundMode === 'lightgrey' && Map.levels.length > 1) {
+      Map.hideOtherLevels();
+      Map.setBackground('hidden');
+      message("Hiding other levels");
+    } else if (Map.backgroundMode === 'lightgrey' // but just one level
+               || Map.backgroundMode === 'hidden') {
+      Map.setBackground('black');
+      message("Black background");
+    } else if (Map.backgroundMode === 'black') {
+      Map.setBackground('white');
+      message("White background");
+    } else if (Map.backgroundMode === 'white') {
+      Map.setBackground('grid');
+      message("White background and a visible grid");
+    } else if (Map.backgroundMode === 'grid') {
+      Map.setBackground('blue');
+      message("Blue everything");
+    } else {
+      // show other levels
+      Map.showLevelAnimation();
+      Map.setBackground('lightgrey');
+      message("Default background");
+    }
+    break;
+
+  case 'X':
+    regionCut();
+    recording = false; // don't record this one
+    break;
+
+  case 'C':
+    regionCopy();
+    recording = false; // don't record this one
+    break;
+
+  case 'V':
+    regionPaste();
+    recording = false; // don't record this one
+    break;
+
+  case '"':
+    showLabelField(Pen.x, Pen.y, null);
+    recording = false;
+    break;
+
+  case "'":
+    showLabelField(Pen.x, Pen.y, 'left');
+    recording = false;
+    break;
+
+  default:
+    console.log('Gridmapper does not know how to handle "'+ key
+                + '" (keyIdentifier: '+evt.keyIdentifier+', keyCode: '+ evt.keyCode+')');
+    recording = false;
+    break;
+  }
+
+  // just pressing shift or ctrl doesn't deactivate the region
+  if (!keepRegion && !evt.ctrlKey && !evt.shiftKey) {
+    regionOff();
+  }
+
+  if (recording) {
+    record(key);
+  }
+}
+
+/**
+ * Interprets a sequence of characters as a script: when loading a map
+ * or executing the demo instructions. Most of the job will be handled
+ * by keyPressed. The interpreter adds a few extra characters which
+ * are only useful non-interactively.
+ *
+ * '.' will reset the Pen's timestamp, simulating a pause (to prevent
+ * rotating the last tile)
+ *
+ * ';' will cause a pause (using a timeout). This is used for the
+ * demo. This is why the real code runs as interpretCont – it has a
+ * pointer into the code.
+ *
+ * '(1,2)' will move the pointer to this position.
+ *
+ * '[0,-1]' will move the pointer by this vector.
+ *
+ * '"abc"' will insert the label abc (instead of showing an input
+ * field). This is why the link in the help area sends a single quote
+ * instead of a double quote. The double quote is already taken for
+ * strings.
+ *
+ * 'z' has an alternate implementation: when loading a map, going down
+ * should not animate anything, unless we're looking at the demo.
+ *
+ * '-' moves point to the left (a shorthand for '[-1,0]') and the next
+ * character is neither 'v' (a variation) nor a newline.
+ *
+ * 'f' and 'g' place floor tile and 'advance' to the right.
+ *
+ * '\01' introduces an edit made by another pen; it is followed by the
+ * pen number (Ctrl-A is Start Of Heading), followed by '\02' and the
+ * rest of the message (Ctrl-B is Start Of Text).
+ *
+ * '\02' causes a map reset; it is usually followed by a new map
+ * (Ctrl-B is Start Of Text).
+ */
+function interpretMap (code) {
+  interpretCont(code, 0, true, true);
+}
+
+/**
+ * The same as interpretMap, but for remote commands. That is, floor
+ * tiles do not advance, and we are not recording.
+ */
+function interpretRemote (code) {
+  interpretCont(code, 0, false, false);
+}
+
+/**
+ * The same as interpretMap, but for help keys. That is, floor tiles
+ * do not advance, but we are recording.
+ */
+function interpret (code) {
+  interpretCont(code, 0, false, true);
+}
+
+/**
+ * Continues the interpretation where we left oft. The variables are
+ * not initialized so that we can simply pick up where we left off.
+ * This is because we want to interrupt the computation using timeouts
+ * (when running the demo, for example). 'advance' means we are
+ * advancing after floor tiles. 'recording' means we will send it the
+ * server when interpreting the code.
+ */
+function interpretCont (code, i, advance, record) {
+  var showLevels = false;
+  for (; i < code.length; i++) {
+    var direction = null;
+    switch(code[i]) { // needs charAt?
+    case ';':
+      setTimeout(function() {
+        interpretCont(code, i + 1, advance, record);
+      }, 500);
+      return; // end!
+    case '(':
+      var match = code.substr(i).match(/^\((\d+(?:\.\d+)?),(\d+(?:\.\d+)?)(?:,(\d+))?\)/);
+      if (match) {
+        // no longer ints!
+        var x = Number(match[1]);
+        var y = Number(match[2]);
+        var z = Number(match[3]);
+        if (Demo.running) {
+          if (Pen.moveTo({x: x, y: y})) {
+            Pen.update(null);
+            setTimeout(function() {
+              interpretCont(code, i, advance, record);
+            }, 100);
+            return; // end!
+          }
+        } else {
+          Pen.x = x;
+          Pen.y = y;
+          if (z >= 0)
+            Map.jump(z);
+          // update the pen position if we're not reading from a map
+          if (!advance)
+            Pen.update(null);
+        }
+        i += match[0].length - 1; // will get incremented above
+      }
+      break;
+    case '[':
+      var match = code.substr(i).match(/^\[(-?\d+),(-?\d+)\]/);
+      if (match) {
+        Pen.x += Number(match[1]);
+        Pen.y += Number(match[2]);
+        i += match[0].length - 1; // will get incremented above
+      }
+      break;
+    case 'X':
+      var match = code.substr(i).match(/^X\[(\d+),(\d+)\]/);
+      if (match) {
+        rectangleDelete(Pen.x, Pen.y, Pen.x + Number(match[1]) - 1, Pen.y + Number(match[2]) - 1);
+        i += match[0].length - 1; // will get incremented above
+      }
+      break;
+    case '"':
+      var match = code.substr(i).match(/^"(.*?[^\\])"/);
+      if (match) {
+        setLabel(Pen.x, Pen.y, match[1], false, null); // replace label
+        i += match[0].length - 1; // will get incremented above
+      }
+      break;
+    case "'":
+      var match = code.substr(i).match(/^'(.*?[^\\])'/);
+      if (match) {
+        setLabel(Pen.x, Pen.y, match[1], false, 'left'); // replace label
+        i += match[0].length - 1; // will get incremented above
+      }
+      break;
+    case '-':
+      direction = 'left';
+      break;
+    case 'z':
+      // When loading from an URL, we need to reposition the Pen, and
+      // we want to be quick. When running the Demo, we do not.
+      if (Demo.running) {
+        Map.show(Map.level + 1);
+      } else {
+        Pen.x = 0;
+        Pen.y = 0;
+        Pen.type = null;
+        Map.jump(Map.level + 1);
+      }
+      break;
+    case '\01':
+      // Ctrl-A: interpret the rest of the message using a different
+      // Pen.
+      var match = code.substr(i).match(/^\01(\d+)\02/);
+      if (match) {
+        Pen.switchTo(Number(match[1]));
+        i += match[0].length - 1; // will get incremented in for loop
+      }
+      break;
+    case '\02': // a simple Ctrl-B means reset the map
+      Map.reset();
+      advance = true; // change mode for the rest of the code
+      showLevels = true; // animate the levels at the end of this message
+      break;
+    case '\03': // a simple Ctrl-C ends the use of a separate pen
+      Pen.switchTo(0);
+      break;
+    case 'f':
+    case 'g':
+      direction = 'right';
+      // fall through to default
+    default:
+      keyHandling(code[i], record);
+    }
+
+    // advance unless we're going to move elsewhere or switch a
+    // variant (peek ahead)
+    if (advance && direction !== null) {
+      var noadvance_next = [
+        'v', '\n', 'W', 'R', 'G', 'B', 'Q', 'E', 'A', 'S', 'D', 'F'
+      ];
+      var noadvance_now = ['(', '['];
+      if (
+        noadvance_now.indexOf(code[i]) < 0 &&
+        noadvance_next.indexOf(code[i + 1]) < 0
+      ) {
+        move(direction);
+      }
+    }
+  }
+  if (showLevels) {
+    Map.showLevelAnimation();
+  }
+}
+
+/**
+ * Recreates the models based on existing SVG elements (if loading a
+ * saved file) and the URL (if loading a page). When loading a file,
+ * We go through the elements and add the appropriate data to the
+ * various data models. When loading from a URL, we look at the
+ * keyword parameter and interpret it as a key sequence one might
+ * conceivably type. The only difference is the . character which is
+ * used to simulate a little pause (to prevent doors from rotating).
+ */
+function recreateModel () {
+  var re = /^([-a-z0-9]+)_(\d+)_(\d+)$/;
+  var z = 0;
+  for (var map; map = document.getElementById('level'+z); z++) {
+    var data = new Tiles();
+    recreateModelFor(re, data, document.getElementById('arcs'+z));
+    recreateModelFor(re, data, document.getElementById('floor'+z));
+    recreateModelFor(re, data, document.getElementById('labels'+z));
+    recreateModelForDoors(re, data, document.getElementById('walls'+z));
+    Map.levels[z] = data;
+  }
+  if (z === 0) {
+    createLevel(0);
+  }
+  // start at level 0
+  Map.setLevel(0);
+  // parse URL
+  var str = decodeURIComponent(window.location.search);
+  if (str.substr(0, 6) === '?load=') {
+    loadMap(wikiUrl + '/' + str.substr(6));
+  } else if (str.substr(0, 6) === '?join=') {
+    Map.exportarea.value = decodeURIComponent(str.substr(6));
+    join();
+  } else if (str.charAt(0) === '?') {
+    interpretMap(str.substring(1));
+  }
+  // at the end, move to the top of the dungeon and show it
+  Map.jump(0);
+  Map.showLevelAnimation();
+  moveElements(); // animate grows in the end
+}
+
+/**
+ * Recreates one particular model based on a matching SVG element.
+ * This looks only at id attributes.
+ */
+function recreateModelFor (re, data, element) {
+  for (var child = element.firstElementChild; child; child = child.nextElementSibling) {
+    var result = child.getAttribute('id').match(re);
+    if (result) {
+      child.type = result[1]; // to enable code generation
+      var x = result[2];
+      var y = result[3];
+      if (result[1] === 'label') {
+        data.get(x, y).label = child;
+      } else if (result[1].startsWith('arc')) {
+        data.get(x, y).arcs = child;
+      } else {
+        data.get(x, y).floor = child;
+      }
+    }
+  }
+}
+
+/**
+ * Recreates one particular wall model on a matching SVG element.
+ * This looks only at id attributes.
+ */
+function recreateModelForDoors (re, data, element) {
+  for (var child = element.firstElementChild; child; child = child.nextElementSibling) {
+    var result = child.getAttribute('id').match(re);
+    if (result) {
+      child.type = result[1]; // to enable code generation
+      var x = result[2];
+      var y = result[3];
+      data.get(x, y).walls.push(child);
+    }
+  }
+}
+
+/**
+ * Creates the SVG elements for a level. This must match the
+ * expectations in recreateModel.
+ */
+function createLevel (z) {
+  var level = document.createElementNS(svgNs, 'g');
+  level.setAttribute('id', 'level' + z);
+  level.setAttributeNS(inkscapeNs, 'groupmode', 'layer');
+  level.setAttributeNS(inkscapeNs, 'label', 'Level ' + (z + 1));
+  var arcs = document.createElementNS(svgNs, 'g');
+  arcs.setAttribute('id', 'arcs' + z);
+  var floor = document.createElementNS(svgNs, 'g');
+  floor.setAttribute('id', 'floor' + z);
+  var labels = document.createElementNS(svgNs, 'g');
+  labels.setAttribute('id', 'labels' + z);
+  var walls = document.createElementNS(svgNs, 'g');
+  walls.setAttribute('id', 'walls' + z);
+  level.appendChild(arcs);
+  level.appendChild(floor);
+  level.appendChild(labels);
+  level.appendChild(walls);
+  Map.levelsElement.insertBefore(level, Map.levelsElement.firstChild);
+  Map.levels[z] = new Tiles();
+}
+
+/**
+ * Initialize the user interface.
+ */
+function initialize () {
+  scaleTiles();
+  Map.initialize(); // don't reset the Map so we can load from a file
+  Pen.update(null); // show it
+  if (window.location.hostname === 'localhost') {
+    // testing
+    wikiUrl = 'http://localhost/cgi-bin/wiki';
+    wsUrl = 'ws://localhost:3000';
+  }
+
+  // setup the dnd listeners.
+  Map.exportarea.addEventListener('dragover', handleDragOver, false);
+  Map.exportarea.addEventListener('drop', handleFileSelect, false);
+
+  // Internet Explorer doesn't know how to handle XHTML.
+  if (document.documentMode > 0) {
+    remove(document.getElementById('label'));
+    remove(document.getElementById('textarea'));
+    // No text area means no exporting, saving or hosting
+    remove(document.getElementById('import-export'));
+    remove(document.getElementById('load'));
+    remove(document.getElementById('save'));
+    remove(document.getElementById('how-to-collaborate'));
+    // No XML means no demo
+    remove(document.getElementById('demo'));
+  }
+  recreateModel(); // create model from SVG or URL
+}
+
+function remove (element) {
+  if (element !== null) {
+    if (element.nextSibling !== null && element.nextSibling.nodeType === Node.TEXT_NODE) {
+      element.parentNode.removeChild(element.nextSibling);
+    }
+    // do not remove elements because this may cause null pointers elsewhere
+    element.setAttribute('display', 'none');
+  }
+}
+
+onload = initialize;
+]]></script>
+  <defs>
+    <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+      <rect width="30" height="30" fill="none" stroke="lightgrey" stroke-width="1"/>
+    </pattern>
+    <rect id="cursor" width="10" height="10" fill="forestgreen" opacity="0.2"/>
+    <rect id="others" width="10" height="10" fill="blue" opacity="0.2"/>
+    <rect id="empty" width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+    <rect id="void" width="10" height="10" fill="none" stroke="black" stroke-width="1"/>
+    <g id="water" width="20">
+      <rect width="20" height="20" class="background" stroke="black" stroke-width="2"/>
+      <path id="waves" fill="none" stroke="black" stroke-width="1" d="M3,5 v-1 A1,1 0 0,1 5,4 A1,1 0 1,0 7,4 A1,1 0 0,1 9,4 A1,1 0 1,0 11,4 A1,1 0 0,1 13,4 A1,1 0 1,0 15,4 A1,1 0 0,1 17,4 v1" />
+      <use xlink:href="#waves" transform="translate(0,6)"/>
+      <use xlink:href="#waves" transform="translate(0,12)"/>
+    </g>
+    <g id="exN" width="10">
+      <line x1="5" y1="1" x2="5" y2="-6" stroke="black" stroke-width="1" stroke-linecap="round"/>
+    </g>
+    <g id="exE" width="10">
+      <line x1="9" y1="5" x2="16" y2="5" stroke="black" stroke-width="1" stroke-linecap="round"/>
+    </g>
+    <g id="exNW" width="10">
+      <line x1="1" y1="1" x2="-6" y2="-6" stroke="black" stroke-width="1.1" stroke-linecap="round"/>
+    </g>
+    <g id="exNE" width="10">
+      <line x1="9" y1="1" x2="16" y2="-6" stroke="black" stroke-width="1.1" stroke-linecap="round"/>
+    </g>
+    <g id="exU" width="10">
+      <path fill="none" stroke="black" stroke-width="1" d="M4 4 L6 2 L8 4" />
+    </g>
+    <g id="exD" width="10">
+      <path fill="none" stroke="black" stroke-width="1" d="M6 6 L4 8 L2 6" />
+    </g>
+    <g id="wall" width="10">
+      <line x1="0" y1="0" x2="0" y2="10" stroke="black" stroke-width="3" stroke-linecap="round"/>
+    </g>
+    <g id="curtain" width="20">
+      <path fill="none" stroke="black" stroke-width="1" d="M5,3 h-1 A1,1 0 0,0 4,5 A1,1 0 0,1 4,7 A1,1 0 0,0 4,9 A1,1 0 0,1 4,11 A1,1 0 0,0 4,13 A1,1 0 0,1 4,15 A1,1 0 0,0 4,17 h1" />
+    </g>
+    <g id="portcullis" width="10">
+      <circle cx="2" cy="2" r="1" fill="black"/>
+      <circle cx="2" cy="5" r="1" fill="black"/>
+      <circle cx="2" cy="8" r="1" fill="black"/>
+    </g>
+    <g id="window" width="10">
+      <line x1="0" y1="0" x2="0" y2="2" stroke="black" stroke-width="3"/>
+      <line x1="0" y1="8" x2="0" y2="10" stroke="black" stroke-width="3"/>
+      <rect x="-0.75" y="2" width="1.5" height="6" class="background" stroke="black" stroke-width="0.5"/>
+    </g>
+    <g id="gap" width="10">
+      <line x1="0" y1="0" x2="0" y2="2" stroke="black" stroke-width="3" stroke-linecap="round"/>
+      <line x1="0" y1="8" x2="0" y2="10" stroke="black" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="2.5" cy="2" r="0.5" fill="black"/>
+      <circle cx="-3" cy="3" r="0.5" fill="black"/>
+      <circle cx="3" cy="4" r="0.6" fill="black"/>
+      <circle cx="1.5" cy="4.5" r="0.5" fill="black"/>
+      <circle cx="-1.5" cy="5" r="0.5" fill="black"/>
+      <circle cx="2" cy="6" r="0.5" fill="black"/>
+      <circle cx="5" cy="6" r="0.5" fill="black"/>
+      <circle cx="-2" cy="6.5" r="0.5" fill="black"/>
+      <circle cx="3" cy="8" r="0.5" fill="black"/>
+    </g>
+    <g id="corner-pillar" width="10">
+      <circle cx="0" cy="0" r="2" fill="black"/>
+    </g>
+    <g id="door" width="10">
+      <rect x="-1.5" y="2" width="3" height="6" class="background" stroke="black" stroke-width="1"/>
+    </g>
+    <g id="secret" width="10">
+      <path fill="none" stroke="black" stroke-width="1" d="M 2,3 C -2,1 -3,5 0,5 S 2,9 -2,7" />
+    </g>
+    <g id="concealed" width="10">
+      <path fill="none" stroke="black" stroke-width="1" d="M 2,3 C -3,1 -3,9 2,7" />
+    </g>
+    <g id="gate" width="10">
+      <rect x="-2" y="4" width="4" height="12" class="background" stroke="black" stroke-width="1"/>
+    </g>
+    <g id="archway" width="10">
+      <path fill="black" stroke="black" stroke-width="1" d="M -1 0 A 1 1 0 0 0 1 0"/>
+      <path fill="black" stroke="black" stroke-width="1" d="M -1 10 A 1 1 0 0 1 1 10"/>
+      <line x1="0" y1="0" x2="0" y2="2.5" stroke="black" stroke-width="1.5"/>
+      <line x1="-1.5" y1="2.5" x2="1.5" y2="2.5" stroke="black" stroke-width="1"/>
+      <line x1="0" y1="7.5" x2="0" y2="10" stroke="black" stroke-width="1.5"/>
+      <line x1="-1.5" y1="7.5" x2="1.5" y2="7.5" stroke="black" stroke-width="1"/>
+    </g>
+    <g id="pillar" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <circle cx="5" cy="5" r="2" fill="black"/>
+    </g>
+    <g id="altar" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <rect x="2" y="3" width="6" height="4" fill="none" stroke="black" stroke-width="0.5"/>
+      <circle cx="3.5" cy="5" r="0.5" fill="black"/>
+      <circle cx="6.5" cy="5" r="0.5" fill="black"/>
+    </g>
+    <g id="dais" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <rect x="2" y="2" width="6" height="6" fill="none" stroke="black" stroke-width="0.5"/>
+      <rect x="3" y="3" width="4" height="4" fill="none" stroke="black" stroke-width="0.5"/>
+      <rect x="4" y="4" width="2" height="2" fill="none" stroke="black" stroke-width="0.5"/>
+    </g>
+    <g id="dais-round" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <circle cx="5" cy="5" r="3" fill="none" stroke="black" stroke-width="0.5"/>
+      <circle cx="5" cy="5" r="2" fill="none" stroke="black" stroke-width="0.5"/>
+      <circle cx="5" cy="5" r="1" fill="none" stroke="black" stroke-width="0.5"/>
+    </g>
+    <g id="rubble" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <circle cx="7" cy="2" r="0.5" fill="black"/>
+      <circle cx="2" cy="3" r="0.5" fill="black"/>
+      <circle cx="4" cy="3" r="0.7" fill="black"/>
+      <circle cx="8" cy="4" r="0.6" fill="black"/>
+      <circle cx="6" cy="4" r="0.5" fill="black"/>
+      <circle cx="3" cy="5" r="0.7" fill="black"/>
+      <circle cx="5" cy="6" r="0.5" fill="black"/>
+      <circle cx="7" cy="6" r="0.7" fill="black"/>
+      <circle cx="4" cy="7" r="0.5" fill="black"/>
+      <circle cx="8" cy="8" r="0.5" fill="black"/>
+    </g>
+    <g id="statue" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <circle cx="5" cy="5" r="3.5" fill="none" stroke="black" stroke-width="0.5"/>
+      <path fill="black" d="M 2,4 H 8 L 3,7.5 5,2 7,7.5 Z"/>
+    </g>
+    <g id="well" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <circle cx="5" cy="5" r="2.25" fill="none" stroke="black" stroke-width="0.5"/>
+      <circle cx="5" cy="5" r="1" fill="black"/>
+    </g>
+    <g id="fountain" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <circle cx="5" cy="5" r="2.5" fill="none" stroke="black" stroke-width="0.5"/>
+      <circle cx="5" cy="4" r="1.5" fill="none" stroke="black" stroke-width="0.5"/>
+    </g>
+    <g id="trap" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <rect x="2" y="2" width="6" height="6" fill="none" stroke="black" stroke-width="1"/>
+      <line x1="2" y1="2" x2="8" y2="8" stroke="black" stroke-width="0.8"/>
+      <line x1="2" y1="8" x2="8" y2="2" stroke="black" stroke-width="0.8"/>
+    </g>
+    <g id="pit" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <rect x="2" y="2" width="6" height="6" fill="none" stroke="black" stroke-width="1"/>
+      <line x1="2" y1="2" x2="8" y2="8" stroke="black" stroke-width="0.5"/>
+      <line x1="2" y1="8" x2="8" y2="2" stroke="black" stroke-width="0.5"/>
+      <rect x="3.5" y="3.5" width="3" height="3" fill="black"/>
+    </g>
+    <g id="trap-door-ceiling" width="10" class="labels">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <circle cx="5" cy="5" r="3.5" fill="none" stroke="black" stroke-width="0.5"/>
+      <text x="8.3" y="12" fill="black" transform="scale(0.6,0.6)">C</text>
+    </g>
+    <g id="trap-door-floor" width="10" class="labels">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <circle cx="5" cy="5" r="3.5" fill="none" stroke="black" stroke-width="0.5"/>
+      <text x="8.3" y="12" fill="black" transform="scale(0.6,0.6)">F</text>
+    </g>
+    <g id="trap-door-secret" width="10" class="labels">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <circle cx="5" cy="5" r="3.5" fill="none" stroke="black" stroke-width="0.5"/>
+      <text x="8.3" y="12" fill="black" transform="scale(0.6,0.6)">S</text>
+    </g>
+    <g id="chest" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <rect x="2" y="3" width="6" height="4" fill="none" stroke="black" stroke-width="0.5"/>
+      <line x1="3.5" y1="2" x2="3.5" y2="8" stroke="black" stroke-width="0.5"/>
+      <line x1="6.5" y1="2" x2="6.5" y2="8" stroke="black" stroke-width="0.5"/>
+    </g>
+    <g id="bed" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <rect x="2" y="3" width="6" height="4" fill="none" stroke="black" stroke-width="0.5"/>
+      <line x1="4" y1="3" x2="4" y2="7" stroke="black" stroke-width="0.5"/>
+    </g>
+    <g id="table" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <rect x="2" y="3" width="6" height="4" fill="none" stroke="black" stroke-width="0.5"/>
+      <circle cx="3.5" cy="4" r="0.5" fill="black"/>
+      <circle cx="3.5" cy="6" r="0.5" fill="black"/>
+      <circle cx="6.5" cy="4" r="0.5" fill="black"/>
+      <circle cx="6.5" cy="6" r="0.5" fill="black"/>
+    </g>
+    <g id="chair" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <rect x="2.5" y="3.5" width="5" height="3.5" fill="none" stroke="black" stroke-width="0.5"/>
+      <rect x="3.5" y="3.5" width="3" height="2.5" fill="none" stroke="black" stroke-width="0.5"/>
+    </g>
+    <g id="screen" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <rect x="2" y="3" width="6" height="4" fill="none" stroke="black" stroke-width="0.5"/>
+    </g>
+    <g id="diagonal" width="10">
+      <path class="background" stroke="black" stroke-width="1" stroke-linejoin="bevel" d="M0,10 H10 V0 Z"/>
+    </g>
+    <g id="walled-diagonal" width="10">
+      <path class="background" stroke="black" stroke-width="1" stroke-linejoin="bevel" d="M0,10 H10 V0 Z"/>
+      <line x1="0" y1="10" x2="10" y2="0" stroke="black" stroke-width="3" stroke-linecap="round"/>
+    </g>
+    <g id="diagonal-wall" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <line x1="0" y1="10" x2="10" y2="0" stroke="black" stroke-width="3" stroke-linecap="round"/>
+    </g>
+    <g id="diagonal-line" width="10">
+      <line x1="0" y1="10" x2="10" y2="0" stroke="black" stroke-width="3" stroke-linecap="round"/>
+    </g>
+    <g id="diagonal-door" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <line x1="0" y1="10" x2="10" y2="0" stroke="black" stroke-width="3" stroke-linecap="round"/>
+      <rect x="-1.5" y="2" width="3" height="6" class="background" stroke="black" stroke-width="1" transform="translate(10,3) rotate(45) translate(-2.05,0)"/>
+    </g>
+    <g id="arc" width="10">
+      <path class="background" d="M0,10 A10,10 0 0,1 10,0 v10 Z" stroke="black" stroke-width="1"/>
+    </g>
+    <g id="arc2" class="center" width="10">
+      <path class="background" d="M0,20 A20,20 0 0,1 20,0 v20 Z" stroke="black" stroke-width="1"/>
+      <line x1="2.7" y1="10" x2="20" y2="10" stroke="black" stroke-width="1"/>
+      <line x1="10" y1="2.7" x2="10" y2="20" stroke="black" stroke-width="1"/>
+      <circle class="dot" cx="5" cy="5" r="1" fill="red" opacity="0"/>
+    </g>
+    <g id="arc3" class="center" width="10">
+      <path class="background" d="M0,30 A30,30 0 0,1 30,0 v30 Z" stroke="black" stroke-width="1"/>
+      <line x1="7.6" y1="10" x2="30" y2="10" stroke="black" stroke-width="1"/>
+      <line x1="1.7" y1="20" x2="30" y2="20" stroke="black" stroke-width="1"/>
+      <line x1="10" y1="7.6" x2="10" y2="30" stroke="black" stroke-width="1"/>
+      <line x1="20" y1="1.7" x2="20" y2="30" stroke="black" stroke-width="1"/>
+      <circle class="dot" cx="5" cy="5" r="1" fill="red" opacity="0"/>
+    </g>
+    <g id="arcw" width="10">
+      <path class="background" d="M0,10 A10,10 0 0,1 10,0 v10 z" stroke="black" stroke-width="1"/>
+      <path class="background" d="M0,10 A10,10 0 0,1 10,0" stroke="black" stroke-width="3" stroke-linecap="round"/>
+    </g>
+    <g id="arcw2" class="center" width="10">
+      <path class="background" d="M0,20 A20,20 0 0,1 20,0 v20 Z" stroke="black" stroke-width="1"/>
+      <path class="background" d="M0,20 A20,20 0 0,1 20,0" stroke="black" stroke-width="3" stroke-linecap="round"/>
+      <line x1="2.7" y1="10" x2="20" y2="10" stroke="black" stroke-width="1"/>
+      <line x1="10" y1="2.7" x2="10" y2="20" stroke="black" stroke-width="1"/>
+      <circle class="dot" cx="5" cy="5" r="1" fill="red" opacity="0"/>
+    </g>
+    <g id="arcw3" class="center" width="10">
+      <path class="background" d="M0,30 A30,30 0 0,1 30,0 v30 Z" stroke="black" stroke-width="1"/>
+      <path class="background" d="M0,30 A30,30 0 0,1 30,0" stroke="black" stroke-width="3" stroke-linecap="round"/>
+      <line x1="7.6" y1="10" x2="30" y2="10" stroke="black" stroke-width="1"/>
+      <line x1="1.7" y1="20" x2="30" y2="20" stroke="black" stroke-width="1"/>
+      <line x1="10" y1="7.6" x2="10" y2="30" stroke="black" stroke-width="1"/>
+      <line x1="20" y1="1.7" x2="20" y2="30" stroke="black" stroke-width="1"/>
+      <circle class="dot" cx="5" cy="5" r="1" fill="red" opacity="0"/>
+    </g>
+    <g id="stair" width="10">
+      <rect width="10" height="20" class="background" stroke="black" stroke-width="1"/>
+      <line x1="0" y1="3" x2="10" y2="3" stroke="black" stroke-width="0.8"/>
+      <line x1="1" y1="6" x2="9" y2="6" stroke="black" stroke-width="0.8"/>
+      <line x1="2" y1="9" x2="8" y2="9" stroke="black" stroke-width="0.8"/>
+      <line x1="3" y1="12" x2="7" y2="12" stroke="black" stroke-width="0.8"/>
+      <line x1="4" y1="15" x2="6" y2="15" stroke="black" stroke-width="0.8"/>
+    </g>
+    <g id="stair-small" width="10">
+      <rect width="10" height="10" class="background" stroke="black" stroke-width="1"/>
+      <line x1="1" y1="2" x2="9" y2="2" stroke="black" stroke-width="0.8"/>
+      <line x1="2" y1="4" x2="8" y2="4" stroke="black" stroke-width="0.8"/>
+      <line x1="3" y1="6" x2="7" y2="6" stroke="black" stroke-width="0.8"/>
+      <line x1="4" y1="8" x2="6" y2="8" stroke="black" stroke-width="0.8"/>
+    </g>
+    <g id="stair-big" width="10">
+      <rect width="20" height="20" class="background" stroke="black" stroke-width="1"/>
+      <line x1="1" y1="3" x2="19" y2="3" stroke="black" stroke-width="0.8"/>
+      <line x1="2" y1="6" x2="18" y2="6" stroke="black" stroke-width="0.8"/>
+      <line x1="3" y1="9" x2="17" y2="9" stroke="black" stroke-width="0.8"/>
+      <line x1="4" y1="12" x2="16" y2="12" stroke="black" stroke-width="0.8"/>
+      <line x1="5" y1="15" x2="15" y2="15" stroke="black" stroke-width="0.8"/>
+      <line x1="6" y1="18" x2="14" y2="18" stroke="black" stroke-width="0.8"/>
+    </g>
+    <g id="stair-big-spiral" width="50">
+      <rect width="100" height="100" class="background" stroke="black" stroke-width="5"/>
+      <circle cx="50" cy="50" r="40" fill="none" stroke="black" stroke-width="5"/>
+      <line x1="0" y1="50" x2="99" y2="50" stroke="black" stroke-width="5"/>
+      <line x1="50" y1="0" x2="50" y2="100" stroke="black" stroke-width="5"/>
+      <line x1="15" y1="30" x2="85" y2="70" stroke="black" stroke-width="5"/>
+      <line x1="15" y1="70" x2="85" y2="30" stroke="black" stroke-width="5"/>
+      <line x1="30" y1="15" x2="70" y2="85" stroke="black" stroke-width="5"/>
+      <line x1="30" y1="85" x2="70" y2="15" stroke="black" stroke-width="5"/>
+      <circle cx="50" cy="50" r="10" class="background" stroke="black" stroke-width="5"/>
+    </g>
+    <g id="stair-spiral" width="100">
+      <rect width="100" height="100" class="background" stroke="black" stroke-width="10"/>
+      <circle cx="50" cy="50" r="40" fill="none" stroke="black" stroke-width="7"/>
+      <line x1="10" y1="50" x2="90" y2="50" stroke="black" stroke-width="7"/>
+      <line x1="50" y1="10" x2="50" y2="90" stroke="black" stroke-width="7"/>
+      <line x1="22" y1="22" x2="78" y2="78" stroke="black" stroke-width="7"/>
+      <line x1="22" y1="78" x2="78" y2="22" stroke="black" stroke-width="7"/>
+      <circle cx="50" cy="50" r="10" class="background" stroke="black" stroke-width="7"/>
+    </g>
+    <path id="rock1" width="10" class="background" d="M0,10 v-1 L1,8 L0,6 v-1 L1,4 v-2 L0,1 L0,0 H10 V10 Z" stroke-miterlimit="1" stroke="black" stroke-width="1"/>
+    <path id="rock2a" width="10" class="background" d="M0,10 v-1 L1,8 L1,7 L2,5 L1,4 L2,2 L4,1 L5,2 L7,2 L10,0 V10 Z" stroke-miterlimit="1" stroke-linecap="round" stroke="black" stroke-width="1"/>
+    <path id="rock2b" width="10" class="background" d="M0,10 v-1 L1,8 L1,7 L2,5 v-1 L3,3 h1 L5,2 L7,2 L10,0 V10 Z" stroke-miterlimit="1" stroke-linecap="round" stroke="black" stroke-width="1"/>
+    <path id="rock3" width="10" class="background" d="M0,10 v-1 L1,7 v-1 L2,5 v-1 L2,2 L4,1 L5,2 L7,2 L9,1 L10,3 L8,6 L8,7 L10,10 Z" stroke-miterlimit="1" stroke-linecap="round" stroke="black" stroke-width="1"/>
+    <path id="rock4" width="10" class="background" d="M3,3 L5,2 L7,3 L8,5 L7,7 v1 h-1 L4,9 L2,7 L2,5 Z" stroke-linecap="round" stroke="black" stroke-width="1"/>
+    <path id="rockd" width="10" class="background" d="M0,10 v-1 L1,8 L0,6 v-1 L1,4 v-2 L0,1 L0,0 H10 v1 L9,2 v1 L8,6 L9,7 v1 L10,10 Z" stroke-miterlimit="1" stroke="black" stroke-width="1"/>
+  </defs>
+  <g id="background" inkscape:groupmode="layer" inkscape:label="Background">
+    <rect x="20" y="20" width="0" height="0" stroke="black" stroke-width="1"/>
+  </g>
+  <g id="levels" inkscape:groupmode="layer" inkscape:label="Levels"/>
+  <g id="region" inkscape:groupmode="layer" inkscape:label="Region">
+    <rect x="20" y="20" width="20" height="20" fill="green" opacity="0"/>
+  </g>
+  <use id="pointer" xlink:href="#cursor"/>
+  <rect id="ui" opacity="0"/>
+
+  <g id="help">
+    <rect x="10" y="80" width="480" height="600" stroke="black" stroke-width="1"/>
+    <text>
+      <tspan x="30" y="102">Use the mouse to draw and erase floor tiles.</tspan>
+      <tspan x="30" dy="17">Use the following keys to place or rotate</tspan>
+      <tspan x="30" dy="17">tiles. <a xlink:href="javascript:interpret('v')">Use <tspan class="key">v</tspan> to pick variants</a>.</tspan>
+    </text>
+
+    <svg x="30" y="150">
+      <a href="javascript:interpret('f')">
+	<text y="14"><tspan class="key">f</tspan> :</text>
+      </a>
+      <a xlink:href="javascript:interpret('f')" title="floor">
+	<use x="50" xlink:href="#empty"/>
+      </a>
+      <a xlink:href="javascript:interpret('fv')" title="void">
+	<rect x="80" width="20" height="20" fill="ivory"/>
+	<use x="80" xlink:href="#void"/>
+      </a>
+      <a xlink:href="javascript:interpret('fvv')" title="water">
+	<use x="110" xlink:href="#water"/>
+      </a>
+    </svg>
+
+    <svg x="30" y="180">
+      <a href="javascript:interpret('t')">
+	<text y="14"><tspan class="key">t</tspan> :</text>
+      </a>
+      <a xlink:href="javascript:interpret('t')" title="covered pit">
+	<use x="50" xlink:href="#trap"/>
+      </a>
+      <a xlink:href="javascript:interpret('tv')" title="open pit">
+	<use x="80" xlink:href="#pit"/>
+      </a>
+      <a xlink:href="javascript:interpret('tvv')" title="trap door in the ceiling">
+	<use x="110" xlink:href="#trap-door-ceiling"/>
+      </a>
+      <a xlink:href="javascript:interpret('tvvv')" title="trap door in the floor">
+	<use x="140" xlink:href="#trap-door-floor"/>
+      </a>
+      <a xlink:href="javascript:interpret('tvvvv')" title="secret trap door">
+	<use x="170" xlink:href="#trap-door-secret"/>
+      </a>
+    </svg>
+
+    <svg x="30" y="210">
+      <a href="javascript:interpret('b')">
+	<text y="14"><tspan class="key">b</tspan> :</text>
+      </a>
+      <a xlink:href="javascript:interpret('b')" title="statue">
+	<use x="50" xlink:href="#statue"/>
+      </a>
+      <a xlink:href="javascript:interpret('bv')" title="well">
+	<use x="80" xlink:href="#well"/>
+      </a>
+      <a xlink:href="javascript:interpret('bvv')" title="fountain">
+	<use x="110" xlink:href="#fountain"/>
+      </a>
+    </svg>
+
+    <svg x="30" y="240">
+      <a href="javascript:interpret('d')">
+	<text y="14"><tspan class="key">d</tspan> :</text>
+      </a>
+      <a xlink:href="javascript:interpret('d')" title="door">
+	<use x="50" xlink:href="#empty"/>
+	<use x="50" xlink:href="#door"/>
+      </a>
+      <a xlink:href="javascript:interpret('dv')" title="secret door">
+	<use x="80" xlink:href="#empty"/>
+	<use x="80" xlink:href="#secret"/>
+      </a>
+      <a xlink:href="javascript:interpret('dvv')" title="concealed door">
+	<use x="110" xlink:href="#empty"/>
+	<use x="110" xlink:href="#concealed"/>
+      </a>
+      <a xlink:href="javascript:interpret('dvvv')" title="double door, gate">
+	<use x="140" y="-20" xlink:href="#empty"/>
+	<use x="140" y="" xlink:href="#empty"/>
+	<use x="140" y="-20" xlink:href="#gate"/>
+      </a>
+      <a xlink:href="javascript:interpret('dvvvv')" title="archway">
+	<use x="170" xlink:href="#empty"/>
+	<use x="170" xlink:href="#archway"/>
+      </a>
+    </svg>
+
+    <svg x="30" y="270">
+      <a href="javascript:interpret('s')">
+	<text y="14"><tspan class="key">s</tspan> :</text>
+      </a>
+      <a xlink:href="javascript:interpret('s')" title="stairs">
+	<use x="50" xlink:href="#stair"/>
+      </a>
+      <a xlink:href="javascript:interpret('sv')" title="small stairs">
+	<use x="80" xlink:href="#stair-small"/>
+      </a>
+      <a xlink:href="javascript:interpret('svv')" title="spiral stairs">
+	<use x="80" y="31" xlink:href="#stair-spiral"/>
+      </a>
+      <a xlink:href="javascript:interpret('svvv')" title="big spiral stairs">
+	<use x="110" xlink:href="#stair-big-spiral"/>
+      </a>
+      <a xlink:href="javascript:interpret('svvvv')" title="bit stairs">
+	<use x="160" xlink:href="#stair-big"/>
+      </a>
+    </svg>
+
+    <svg x="30" y="360">
+      <a href="javascript:interpret('a')">
+	<text y="14"><tspan class="key">a</tspan> :</text>
+      </a>
+      <a xlink:href="javascript:interpret('a')" title="arc">
+	<use x="50" y="10" xlink:href="#arc"/>
+      </a>
+      <a xlink:href="javascript:interpret('av')" title="big arc">
+	<use x="80" y="-10" xlink:href="#arc2"/>
+      </a>
+      <a xlink:href="javascript:interpret('avv')" title="huge arc">
+	<use x="130" y="-30" xlink:href="#arc3"/>
+      </a>
+    </svg>
+
+  <svg x="30" y="400">
+    <a xlink:href="javascript:interpret('Q')" title="white">
+      <use x="0" xlink:href="#empty" class="colorQ"/>
+            <text y="14" x="6">
+                  <tspan class="">Q</tspan>
+            </text>
+      </a>
+      <a xlink:href="javascript:interpret('W')" title="white">
+            <use x="25" xlink:href="#empty" class="white"/>
+            <text y="14" x="31">
+                  <tspan class="">W</tspan>
+            </text>
+      </a>
+      <a xlink:href="javascript:interpret('E')" title="red">
+            <use x="50" xlink:href="#empty" class="colorE"/>
+            <text y="14" x="56">
+                  <tspan class="">E</tspan>
+            </text>
+      </a>
+      <a xlink:href="javascript:interpret('R')" title="red">
+            <use x="75" xlink:href="#empty" class="red"/>
+            <text y="14" x="81">
+                  <tspan class="">R</tspan>
+            </text>
+      </a>
+      <a xlink:href="javascript:interpret('A')" title="red">
+            <use x="100" xlink:href="#empty" class="colorA"/>
+            <text y="14" x="106">
+                  <tspan class="">A</tspan>
+            </text>
+      </a>
+      <a xlink:href="javascript:interpret('S')" title="red">
+            <use x="125" xlink:href="#empty" class="colorS"/>
+            <text y="14" x="131">
+                  <tspan class="">S</tspan>
+            </text>
+      </a>
+      <a xlink:href="javascript:interpret('D')" title="red">
+            <use x="150" xlink:href="#empty" class="colorD"/>
+            <text y="14" x="156">
+                  <tspan class="">D</tspan>
+            </text>
+      </a>
+      <a xlink:href="javascript:interpret('F')" title="red">
+            <use x="175" xlink:href="#empty" class="colorF"/>
+            <text y="14" x="181">
+                  <tspan class="">F</tspan>
+            </text>
+      </a>
+      <a xlink:href="javascript:interpret('G')" title="red">
+            <use x="200" xlink:href="#empty" class="green"/>
+            <text y="14" x="206">
+                  <tspan class="">G</tspan>
+            </text>
+      </a>
+      <a xlink:href="javascript:interpret('B')" title="red">
+            <use x="225" xlink:href="#empty" class="blue"/>
+            <text y="14" x="231">
+                  <tspan class="">B</tspan>
+            </text>
+      </a>
+    </svg>
+
+    <svg x="260" y="150">
+      <a href="javascript:interpret('w')">
+	<text y="14"><tspan class="key">w</tspan> :</text>
+      </a>
+      <a xlink:href="javascript:interpret('w')" title="wall">
+	<use x="50" xlink:href="#empty"/>
+	<use x="50" xlink:href="#wall"/>
+      </a>
+      <a xlink:href="javascript:interpret('wv')" title="curtain">
+	<use x="80" xlink:href="#empty"/>
+	<use x="80" xlink:href="#curtain"/>
+      </a>
+      <a xlink:href="javascript:interpret('wvv')" title="portcullis">
+	<use x="110" xlink:href="#empty"/>
+	<use x="110" xlink:href="#portcullis"/>
+      </a>
+      <a xlink:href="javascript:interpret('wvvv')" title="window">
+	<use x="140" xlink:href="#empty"/>
+	<use x="140" xlink:href="#window"/>
+      </a>
+      <a xlink:href="javascript:interpret('wvvvv')" title="gap">
+	<use x="170" xlink:href="#empty"/>
+	<use x="170" xlink:href="#gap"/>
+      </a>
+      <a xlink:href="javascript:interpret('wvvvvv')" title="corner pillar">
+	<use x="200" xlink:href="#empty"/>
+	<use x="200" xlink:href="#corner-pillar"/>
+      </a>
+    </svg>
+
+    <svg x="260" y="180">
+      <a href="javascript:interpret('p')">
+	<text y="14"><tspan class="key">p</tspan> :</text>
+      </a>
+      <a xlink:href="javascript:interpret('p')" title="pillar">
+	<use x="50" xlink:href="#pillar"/>
+      </a>
+      <a xlink:href="javascript:interpret('pv')" title="altar">
+	<use x="80" xlink:href="#altar"/>
+      </a>
+      <a xlink:href="javascript:interpret('pvv')" title="dais">
+	<use x="110" xlink:href="#dais"/>
+      </a>
+      <a xlink:href="javascript:interpret('pvvv')" title="round dais">
+	<use x="140" xlink:href="#dais-round"/>
+      </a>
+      <a xlink:href="javascript:interpret('pvvvv')" title="rubble">
+	<use x="170" xlink:href="#rubble"/>
+      </a>
+    </svg>
+
+    <svg x="260" y="210">
+      <a href="javascript:interpret('c')">
+	<text y="14"><tspan class="key">c</tspan> :</text>
+      </a>
+      <a xlink:href="javascript:interpret('c')" title="chest">
+	<use x="50" xlink:href="#chest"/>
+      </a>
+      <a xlink:href="javascript:interpret('cv')" title="bed">
+	<use x="80" xlink:href="#bed"/>
+      </a>
+      <a xlink:href="javascript:interpret('cvv')" title="table">
+	<use x="110" xlink:href="#table"/>
+      </a>
+      <a xlink:href="javascript:interpret('cvvv')" title="chair">
+	<use x="140" xlink:href="#chair"/>
+      </a>
+      <a xlink:href="javascript:interpret('cvvvv')" title="screen">
+	<use x="170" xlink:href="#screen"/>
+      </a>
+    </svg>
+
+  <svg x="260" y="240">
+      <a href="javascript:interpret('n')">
+	<text y="14"><tspan class="key">n</tspan> :</text>
+      </a>
+      <a xlink:href="javascript:interpret('n')" title="diagonal">
+	<use x="50" xlink:href="#diagonal"/>
+      </a>
+      <a xlink:href="javascript:interpret('nv')" title="diagonal with wall">
+	<use x="80" xlink:href="#walled-diagonal"/>
+      </a>
+      <a xlink:href="javascript:interpret('nvv')" title="diagonal wall">
+	<use x="110" xlink:href="#diagonal-wall"/>
+      </a>
+      <a xlink:href="javascript:interpret('nvvv')" title="diagonal line">
+        <use x="140" xlink:href="#diagonal-line"/>
+      </a>
+      <a xlink:href="javascript:interpret('nvvvv')" title="diagonal door">
+        <use x="170" xlink:href="#diagonal-door"/>
+      </a>
+    </svg>
+
+    <svg x="260" y="270">
+      <text x="-17" y="14"><tspan class="key">0-9</tspan><tspan> :</tspan></text>
+      <use x="50" xlink:href="#empty"/>
+      <g class="labels" title="labels">
+	<text x="60" y="13.5">123</text>
+      </g>
+    </svg>
+
+    <svg x="260" y="300">
+      <a xlink:href="javascript:interpret('g')" title="rocks">
+	<text y="14"><tspan class="key">g</tspan> :</text>
+	<use x="50" xlink:href="#rock3"/>
+      </a>
+    </svg>
+
+    <svg x="390" y="270">
+      <a href="javascript:interpret('&apos;')">
+	<text x="-34" y="14"><tspan class="key">"abc"</tspan> :</text>
+	<use x="40" xlink:href="#empty"/>
+	<g class="labels" title="labels">
+	  <text x="50" y="13.5">abc</text>
+	</g>
+	<text x="-34" y="44"><tspan class="key">'abc'</tspan> :</text>
+	<g class="labels" title="labels">
+	  <text x="40" y="44" class="left">abc</text>
+	</g>
+      </a>
+    </svg>
+
+    <svg x="260" y="330">
+      <a xlink:href="javascript:interpret('m')">
+	<text y="14"><tspan class="key">m</tspan><tspan> :</tspan></text>
+      </a>
+      <a xlink:href="javascript:interpret('m')" title="Wall Mode">
+	<use x="50" xlink:href="#empty"/>
+	<use x="40" xlink:href="#cursor"/>
+      </a>
+    </svg>
+
+  <svg x="260" y="360">
+    <a href="javascript:interpret('q')">
+	    <text y="14"><tspan class="key">q</tspan> :</text>
+    </a>
+    <a xlink:href="javascript:interpret('q')" title="arc with wall">
+	    <use x="50" y="10" xlink:href="#arcw"/>
+    </a>
+    <a xlink:href="javascript:interpret('qv')" title="big arc with wall">
+	    <use x="80" y="-10" xlink:href="#arcw2"/>
+    </a>
+    <a xlink:href="javascript:interpret('qvv')" title="huge arc with wall">
+	    <use x="130" y="-30" xlink:href="#arcw3"/>
+    </a>
+  </svg>
+
+  <svg x="290" y="400">
+    <text y="14">
+      <a xlink:href="javascript:interpret('&quot;🌳&quot;')" title="deciduous tree">
+        <tspan>🌳</tspan>
+      </a>
+      <a xlink:href="javascript:interpret('&quot;🌲&quot;')" title="evergreen tree">
+        <tspan>🌲</tspan>
+      </a>
+      <a xlink:href="javascript:interpret('&quot;🌴&quot;')" title="palm tree">
+        <tspan>🌴</tspan>
+      </a>
+      <a xlink:href="javascript:interpret('&quot;🌵&quot;')" title="evergreen tree">
+        <tspan>🌵</tspan>
+      </a>
+      <a xlink:href="javascript:interpret('&quot;🍄&quot;')" title="mushroom">
+        <tspan>🍄</tspan>
+      </a>
+      <a xlink:href="javascript:interpret('&quot;⚔&quot;')" title="evergreen tree">
+        <tspan>⚔</tspan>
+      </a>
+      <a xlink:href="javascript:interpret('&quot;☠&quot;')" title="evergreen tree">
+        <tspan>☠</tspan>
+      </a>
+      <a xlink:href="javascript:interpret('&quot;👽&quot;')" title="evergreen tree">
+        <tspan>👽</tspan>
+      </a>
+      <a xlink:href="javascript:interpret('&quot;☓&quot;')" title="evergreen tree">
+        <tspan>☓</tspan>
+      </a>
+    </text>
+  </svg>
+
+  <text>
+    <tspan x="30" y="450">
+      <a xlink:href="javascript:keyPressed('Z')" title="hide other levels or switch background">
+        <tspan class="key">Z</tspan> : switch background</a>&#160;&#160;&#160;&#160;&#160;&#160;<a xlink:href="javascript:regionOn()">
+	      <tspan class="key">Shift</tspan><tspan> : region mode</tspan>
+      </a>
+    </tspan>
+    <tspan x="30" dy="20">
+      Move : <a xlink:href="javascript:interpret('k')" title="up"><tspan class="key">k</tspan></a> or <tspan class="key">Arrows</tspan>
+       &#160;&#160;&#160;&#160;<tspan class="key">Alt+Arrows</tspan> : toggle floor
+    </tspan>
+    <tspan x="30" dy="20">
+       &#160;&#160;&#160;&#160;
+      <a xlink:href="javascript:interpret('h')" title="left">
+        <tspan class="key">h</tspan>
+      </a>
+      ╋
+      <a xlink:href="javascript:interpret('l')" title="right"><tspan class="key">l</tspan></a>&#160;&#160;<a xlink:href="javascript:keyPressed('y')"><tspan class="key">y</tspan> : level up</a>&#160;&#160;&#160;&#160;<a xlink:href="javascript:keyPressed(' ')"><tspan class="key">Space</tspan> : move right</a>
+    </tspan>
+    <tspan x="30" dy="20">
+      &#160;&#160;&#160;&#160;&#160;&#160;
+      <a xlink:href="javascript:interpret('j')" title="down">
+        <tspan class="key">j</tspan>
+      </a>&#160;&#160;&#160;<a xlink:href="javascript:keyPressed('z')"><tspan class="key">z</tspan> : level down</a>&#160;<a xlink:href="javascript:keyPressed('Enter')">
+  <tspan class="key">Enter</tspan> : new line</a>
+    </tspan>
+
+    <tspan x="30" dy="20">
+	    <a xlink:href="javascript:keyPressed('u')"><tspan class="key">u</tspan> : undo</a>  
+	    &#160;<a xlink:href="javascript:keyPressed('r')"><tspan class="key">r</tspan> : redo</a>
+      &#160;&#160;&#160;<a xlink:href="javascript:keyPressed('x')"><tspan class="key">x</tspan>, <tspan class="key">Delete</tspan> : delete</a>
+    </tspan>
+
+    <tspan x="30" dy="20" id="import-export"><a id="export" class="blue" xlink:href="javascript:textExport()">Export</a>  
+	    <a id="import" xlink:href="javascript:textImport()"><tspan class="blue">Import</tspan> or
+	    <tspan class="key">Ctrl Enter</tspan></a></tspan>
+  </text>
+
+    <foreignObject id="textarea" x="30" y="555" width="445" height="50">
+      <textarea id="exportarea" xmlns="http://www.w3.org/1999/xhtml"
+		style="position: fixed; width: 100%; height: 100%; margin: 0; padding: 0"/>
+    </foreignObject>
+
+    <text>
+      <tspan x="30" y="630">
+	<a class="blue" target="_blank" xlink:href="https://alexschroeder.ch/cgit/gridmapper/about/#how-to-save">How to Save</a>  
+	<a id="export" class="blue" xlink:href="javascript:link()">Link</a>  
+	<tspan id="download">
+	  <a class="blue" xlink:href="javascript:download()">Download</a>  
+	</tspan>
+	<tspan id="format" display="none">
+	  <a id="download_svg" class="blue">SVG</a>
+	  <a id="download_png" class="blue">PNG</a>
+	  <a id="download_txt" class="blue">TXT</a>  
+	</tspan>
+	<a id="save" class="blue" title="Save the map to the wiki" xlink:href="javascript:save()">Save</a>  
+	<a id="load" class="blue" title="Load a map from the wiki" xlink:href="javascript:load()">Load</a>  
+      </tspan>
+
+      <tspan x="30" dy="20">
+	<a id="how-to-collaborate" class="blue" target="_blank" xlink:href="https://alexschroeder.ch/cgit/gridmapper/about/#how-to-collaborate">How to Collaborate</a>  
+	<a id="join" class="blue" title="Host or join a map" xlink:href="javascript:join()">Join</a>  
+	<a id="join" class="blue" target="_blank" title="List of hosted maps" xlink:href="https://campaignwiki.org/gridmapper-server">Server</a>
+      </tspan>
+      <tspan x="30" dy="20">
+	<a id="demo" class="blue" xlink:href="javascript:Demo.start()">Demo</a>  
+	<a id="source" class="blue" target="_blank" title="Source code is available" xlink:href="https://alexschroeder.ch/cgit/gridmapper/about/#gridmapper">Source</a>  
+	<a id="license" class="blue" target="_blank" title="Dedicated to the Public Domain" xlink:href="https://alexschroeder.ch/cgit/gridmapper/tree/LICENSE.md#the-license">License</a>  
+	<a id="bugs" class="blue" target="_blank" title="Submit a bug report" xlink:href="https://alexschroeder.ch/software/Gridmapper">Issues</a>  
+	<a id="bugs" class="blue" target="_blank" title="Public dungeons" xlink:href="https://campaignwiki.org/wiki/Gridmapper/HomePage">Wiki</a>
+      </tspan>
+    </text>
+
+    <text id="level" x="500" y="110" style="font:30px 'Arial Narrow', 'Futura Condensed', 'HelveticaNeue Condensed', sans-serif; font-weight: bold;">1</text>
+    <text id="maxlevel" x="500" y="125" style="font:12px 'Arial Narrow', 'Futura Condensed', 'HelveticaNeue Condensed', sans-serif; font-weight: bold;">1</text>
+    <text x="470" y="110" transform="rotate(90,470,140)">
+      <a target="_blank" xlink:href="https://alexschroeder.ch/wiki/Gridmapper">
+	<tspan style="font-weight: bold;">Gridmapper</tspan>
+      </a>
+      <tspan>by</tspan>
+      <a target="_blank" xlink:href="https://alexschroeder.ch/">
+	<tspan style="font-weight: bold;">Alex Schroeder</tspan>
+      </a>
+    </text>
+  </g>
+
+  <foreignObject id="label" x="10" y="10" width="40em" height="20" opacity="0">
+    <input xmlns="http://www.w3.org/1999/xhtml" type="text" width="30"/>
+  </foreignObject>
+  <text id="messages" visibility="hidden">
+    <tspan class="step1" x="0" y="0">Hello! This is the demo!</tspan>
+    <tspan class="step1" x="0" dy="20">We're going to show you how to use this thing.</tspan>
+    <code class="step1">(10,10)</code>
+
+    <tspan class="step2" x="0" y="0">You can move around the map using your mouse.</tspan>
+    <tspan class="step2" x="0" dy="20">Or you can use the
+    <tspan class="key">Arrow keys</tspan> to move around.</tspan>
+    <code class="step2">(20,10)(20,20)(10,20)(10,10)</code>
+
+    <tspan class="step3" x="0" y="0">You can draw the floor using your mouse.</tspan>
+    <tspan class="step3" x="0" dy="20">Or you can use
+    <tspan class="key">Alt</tspan> and the
+    <tspan class="key">Arrow keys</tspan>.</tspan>
+    <code class="step3">(13,11)ffff(13,12)ffff(13,13)ffff</code>
+
+    <tspan class="step4" x="0" y="0">Use
+    <tspan class="key">Shift</tspan> and the
+    <tspan class="key">Arrow keys</tspan> to select a region.</tspan>
+    <tspan class="step4" x="0" dy="20">Use
+    <tspan class="key">Ctrl+x</tspan> to cut,
+    <tspan class="key">Ctrl+c</tspan> to copy and
+    <tspan class="key">Ctrl+v</tspan> to paste.</tspan>
+    <code class="step4">h;H;H;H;K;C;jjV;</code>
+
+    <tspan class="step5" x="0" y="0">In general I recomend using the
+    <tspan class="key">Arrow keys</tspan> to move.</tspan>
+    <tspan class="step5" x="0" dy="20">Use <tspan class="key">f</tspan>
+    to draw or erase the floor.</tspan>
+    <code class="step5">(14,16)ff(14,17)ff(11,18)ffffff(11,19)ffffff(11,20)ffffff;ffff-;f--;f--;f--;f-</code>
+
+    <tspan class="step6" x="0" y="0">Things like traps, statues and pillars are easy.</tspan>
+    <tspan class="step6" x="0" dy="20">Just use the appropriate key:
+    <tspan class="key">t</tspan>,
+    <tspan class="key">b</tspan>,
+    <tspan class="key">p</tspan>.</tspan>
+    <code class="step6">(12,19)t;(11,19)b;(11,18)p p p;(11,20)p p p</code>
+
+    <tspan class="step7" x="0" y="0">Doors are trickier. Use
+    <tspan class="key">d</tspan> to rotate the door.</tspan>
+    <tspan class="step7" x="0" dy="20">Watch: left, top, right, bottom, and back to left.</tspan>
+    <code class="step7">(17,12);d;d;d;d;d</code>
+
+    <tspan class="step8" x="0" y="0">Secret and concealed doors are variants of doors.</tspan>
+    <tspan class="step8" x="0" dy="20">Use
+    <tspan class="key">v</tspan> to switch between variants.</tspan>
+    <code class="step8">(17,14)dff(18,15)fff(19,16)ff;d;v;v;fff(21,17)fff(23,17);d;d;d;v;(21,18)fff</code>
+
+    <tspan class="step9" x="0" y="0">Use <tspan class="key">s</tspan>
+    to set stairs and rotate them into place.</tspan>
+    <tspan class="step9" x="0" dy="20">Use <tspan class="key">v</tspan>
+    to use a variant.</tspan>
+    <code class="step9">(11,12)s;s;s;s;(17,12)ffs;s;s;s;v </code>
+
+    <tspan class="step10" x="0" y="0">You can draw on multiple layers.</tspan>
+    <tspan class="step10" x="0" dy="20">Use
+    <tspan class="key">z</tspan> and <tspan class="key">y</tspan>
+    to move up and down.</tspan>
+    <code class="step10">z(21,11)fff(20,12)ffff(21,13)fff;y</code>
+
+    <tspan class="step11" x="0" y="0">Place a door and rotate it into place.</tspan>
+    <tspan class="step11" x="0" dy="20">Use <tspan class="key">v</tspan> to select the gate variant.</tspan>
+    <code class="step11">(15,16);d;d;v;v;v</code>
+
+    <tspan class="step12" x="0" y="0">Use <tspan class="key">n</tspan>
+    to place and rotate diagonals.</tspan>
+    <code class="step12">(17,15);n;n;n;n(18,14);n;n</code>
+
+    <tspan class="step13" x="0" y="0">Use <tspan class="key">a</tspan>
+    to place and rotate arcs.</tspan>
+    <tspan class="step13" x="0" dy="0">Use <tspan class="key">v</tspan>
+    use larger variants.</tspan>
+    <code class="step13">(13,9);a;v(16,9);a;a;v</code>
+
+    <tspan class="step14" x="0" y="0">You can draw walls using
+    <tspan class="key">w</tspan>.</tspan>
+    <tspan class="step14" x="0" dy="20">Thus, walls work just like doors.</tspan>
+    <code class="step14">(16,18);dv(16,19);w(16,20);w</code>
+
+    <tspan class="step15" x="0" y="0">This gets tedious very fast.</tspan>
+    <tspan class="step15" x="0" dy="20">Use
+    <tspan class="key">m</tspan> to enter
+    <tspan style="font-weight: bold">Wall Mode</tspan>.</tspan>
+    <tspan class="step15" x="0" dy="20">Note the shift by half a square!</tspan>
+    <code class="step15">z(21,11);m</code>
+
+    <tspan class="step16" x="0" y="0" style="font-weight: bold">Wall Mode</tspan>
+    <tspan class="step16">keeps the cursor on the walls.</tspan>
+    <tspan class="step16" x="0" dy="20">Doors and walls no longer rotate.</tspan>
+    <code class="step16"> w; w;(21.5,13)w; w</code>
+
+    <tspan class="step17" x="0" y="0">Move from wall to wall and use
+    <tspan class="key">d</tspan>,
+    <tspan class="key">v</tspan> or
+    <tspan class="key">w</tspan>.</tspan>
+    <tspan class="step17" x="0" dy="20">Use
+    <tspan class="key">m</tspan> to leave Wall Mode.</tspan>
+    <code class="step17">(21,11.5)d; d; d;(21,12.5)d; d; d;(23.5,12)dvm</code>
+
+    <tspan class="step18" x="0" y="0">You can draw grottos (caves) using
+    <tspan class="key">g</tspan>.</tspan>
+    <code class="step18">(26,9)g;g(26,10)g;g(26,11)g(24,12)g;g;g</code>
+
+    <tspan class="step19" x="0" y="0">Add colors using
+    <tspan class="key">R</tspan> (red),
+    <tspan class="key">G</tspan> (green) and
+    <tspan class="key">B</tspan> (blue).</tspan>
+    <tspan class="step15" x="0" dy="20">Use
+    <tspan class="key">W</tspan> (white) to undo the color.</tspan>
+    <code class="step19">(26,9)B B(26,10)B B;</code>
+
+    <tspan class="step20" x="0" y="0">Use the number keys
+    <tspan class="key">0-9</tspan> to add labels.</tspan>
+    <tspan class="step20" x="0" dy="20">Use
+    <tspan class="key">Delete</tspan> to delete labels.</tspan>
+    <code class="step20">(20,12)6y(15,12)1(14,19)2(19,16)4(22,17)5</code>
+
+    <tspan class="step21" x="0" y="0">Well, that's it. The rest is up to you.</tspan>
+    <tspan class="step21" x="0" dy="20">What lies beyond the secret door to the east?</tspan>
+
+  </text>
+</svg>

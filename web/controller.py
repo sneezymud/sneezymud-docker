@@ -1,4 +1,5 @@
 import auth
+import json
 from model import Player, Wizdata, Account, Room, Zone, Obj, Mob
 from main import app, db
 
@@ -26,7 +27,10 @@ def zones():
 @app.route("/rooms")
 @auth.requires_auth
 def rooms():
-    return render_template("list.html", type='room', things=Room.getMy(request.authorization.username))
+    if request.headers.get('Content-Type') == 'application/json':
+        return jsonifyRooms(Room.getMy(request.authorization.username))
+    else:
+        return render_template("list.html", type='room', things=Room.getMy(request.authorization.username))
 
 @app.route("/objs")
 @auth.requires_auth
@@ -69,3 +73,11 @@ def edit(vnum, Thing, template, name):
         flash("Saved!")
 
     return render_template(template, form=form, thing=thing)
+
+
+def jsonifyRooms(rooms):
+    roomDict = {}
+    for room in rooms:
+        roomDict[room.vnum] = dict(x=room.x, y=room.y, z=room.z)
+
+    return json.dumps(dict(rooms=roomDict))
