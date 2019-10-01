@@ -18,10 +18,12 @@ def getThingsOf(type, name):
             ).first()
 
     blockaExisting = (type.query
+            .filter(type.vnum != 0)
             .filter(wizdata.blockastart <= type.vnum)
             .filter(type.vnum <= wizdata.blockaend)).all()
 
     blockbExisting = (type.query
+            .filter(type.vnum != 0)
             .filter(wizdata.blockbstart <= type.vnum)
             .filter(type.vnum <= wizdata.blockbend)).all()
 
@@ -29,11 +31,16 @@ def getThingsOf(type, name):
     # so let's generate them
     things = blockaExisting + blockbExisting
     existingVnums = set(map(lambda r: r.vnum, things))
-    desiredVnums = set(list(range(wizdata.blockastart, wizdata.blockaend+1))
-            + list(range(wizdata.blockbstart, wizdata.blockbend+1)))
+
+    desiredVnums = set()
+    if wizdata.blockastart > 0:
+        desiredVnums = set(list(range(wizdata.blockastart, wizdata.blockaend+1)))
+    if wizdata.blockbstart > 0:
+        desiredVnums = desiredVnums.union(list(range(wizdata.blockbstart, wizdata.blockbend+1)))
+
     newVnums = desiredVnums.difference(existingVnums)
     for v in newVnums:
-        r = type.create(v)
+        r = type.create(v, name)
         things.append(r)
         db.session.add(r)
     db.session.commit()
@@ -41,6 +48,9 @@ def getThingsOf(type, name):
     return things
 
 def checkVnum(vnum, name):
+    if vnum == 0:
+        return False
+
     wizdata = (Wizdata.query
             .join(Player, Wizdata.player_id == Player.id)
             .join(Account, Account.account_id == Player.account_id)
