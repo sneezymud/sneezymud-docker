@@ -6,9 +6,17 @@ class ImmortalModel(db.Model):
     __abstract__ = True
     __bind_key__ = 'immortal'
 
+    def __repr__(self):
+        return "<Name: {}>".format(self.name)
+
+
 class SneezyModel(db.Model):
     __abstract__ = True
     __bind_key__ = 'sneezy'
+
+    def __repr__(self):
+        return "<Name: {}>".format(self.name)
+
 
 def getThingsOf(type, name):
     wizdata = (Wizdata.query
@@ -134,6 +142,29 @@ class Room(ImmortalModel):
 
     def getMy(name):
         return getThingsOf(Room, name)
+
+    def canAccess(vnum, name):
+        return checkVnum(vnum, name)
+
+class Roomexit(ImmortalModel):
+    vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
+    direction = db.Column(db.Integer)
+    name = db.Column(db.String(127))
+    description = db.Column(db.String())
+    type = db.Column(db.Integer)
+    condition_flag = db.Column(db.Integer)
+    lock_difficulty = db.Column(db.Integer)
+    weight = db.Column(db.Integer)
+    key_num = db.Column(db.Integer)
+    destination = db.Column(db.Integer)
+    owner = db.Column(db.String(127))
+    block = db.Column(db.Integer)
+
+    def create(vnum, owner):
+        return Roomexit(vnum=vnum, direction=0, name="", description="", type=0, condition_flag=0, lock_difficulty=0, weight=0, key_num=0, destination=0, owner=owner, block=0)
+
+    def getMy(name):
+        return getThingsOf(Roomexit, name)
 
     def canAccess(vnum, name):
         return checkVnum(vnum, name)
