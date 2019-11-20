@@ -2365,6 +2365,11 @@ function replace (data, element, x, y, old, tile, recursive) {
           element.removeChild(tile);
         if (old)
           element.appendChild(old);
+
+        Map.data.get(x, y).floor = null;
+        Map.freeRoomNrs.push(Map.coordToNr[[x, y]]);
+        delete Map.coordToNr[[x, y]];
+
         Map.data.get(x,y)[data] = old;
       },
       function(){
@@ -2372,6 +2377,14 @@ function replace (data, element, x, y, old, tile, recursive) {
           element.removeChild(old);
         if (tile)
           element.appendChild(tile);
+
+        var roomNr = Map.freeRoomNrs.pop();
+        if (roomNr === undefined) {
+          roomNr = Map.nextRoomNr;
+          Map.nextRoomNr++;
+        }
+        Map.coordToNr[[x, y]] = roomNr;
+
         Map.data.get(x,y)[data] = tile;
       });
     Pen.lastWall = null;
