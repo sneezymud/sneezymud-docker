@@ -1,5 +1,6 @@
 import auth
 import json
+from pprint import pprint
 from model import Player, Wizdata, Account, Room, Zone, Obj, Mob
 from main import app, db
 
@@ -24,13 +25,22 @@ def zones():
     return render_template("zones.html", zones=zones)
 
 
-@app.route("/rooms")
+@app.route("/rooms", methods=['GET', 'POST'])
 @auth.requires_auth
 def rooms():
-    if request.headers.get('Content-Type') == 'application/json':
-        return jsonifyRooms(Room.getMy(request.authorization.username))
-    else:
-        return render_template("list.html", type='room', things=Room.getMy(request.authorization.username))
+    if request.method == 'GET':
+        # Layoutificator getting map data for graphical display
+        if request.headers.get('Content-Type') == 'application/json':
+            return jsonifyRooms(Room.getMy(request.authorization.username), None)
+        # List of rooms for individual editing
+        else:
+            return render_template("list.html", type='room', things=Room.getMy(request.authorization.username))
+    # Layoutificator sending map data
+    elif request.method == 'POST':
+        print("v"*50)
+        pprint(request.json)
+        print("^"*50)
+        return "Saved!"
 
 @app.route("/objs")
 @auth.requires_auth
@@ -75,7 +85,7 @@ def edit(vnum, Thing, template, name):
     return render_template(template, form=form, thing=thing)
 
 
-def jsonifyRooms(rooms):
+def jsonifyRooms(rooms, exits):
     roomDict = {}
     for room in rooms:
         roomDict[room.vnum] = dict(x=room.x, y=room.y, z=room.z)

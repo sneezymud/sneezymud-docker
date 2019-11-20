@@ -487,8 +487,11 @@ var Map = {
         return; // exit to unmapped room. Helpful to visualise stuff, but not serializable.
 
       var roomNr = Map.coordToNr[[x, y]];
-      exits[roomNr] = {direction: dir, destination: exNr};
-      exits[exNr] = {direction: reverseDir(dir), destination: roomNr};
+      // TODO: terrain
+      exits[roomNr] = exits[roomNr] || {};
+      exits[roomNr][dir] = {dir: exNr};
+      exits[exNr] = exits[exNr] || {};
+      exits[exNr][reverseDir(dir)] = {dir: roomNr};
     }
 
     function exists(x, y) {
@@ -1431,6 +1434,20 @@ function link () {
  */
 function textExport () {
   Map.exportarea.value = getSource();
+  saveToMud(Map.exportarea.value);
+}
+
+async function saveToMud (serializedMap) {
+  let resp = await fetch('/rooms', {
+    credentials: 'same-origin',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: serializedMap
+  });
+
+  // Map.exportarea.value = await resp.text();
 }
 
 async function loadFromMud () {
