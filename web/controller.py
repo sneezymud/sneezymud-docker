@@ -1,7 +1,7 @@
 import auth
 import json
 from pprint import pprint
-from model import Player, Wizdata, Account, Room, Zone, Obj, Mob
+from model import Player, Wizdata, Account, Room, Zone, Obj, Mob, getOwnedVnums, getBlockForVnum, Roomexit
 from main import app, db
 
 from flask import render_template, request, flash
@@ -31,16 +31,14 @@ def rooms():
     if request.method == 'GET':
         # Layoutificator getting map data for graphical display
         if request.headers.get('Content-Type') == 'application/json':
+            # TODO: exits
             return jsonifyRooms(Room.getMy(request.authorization.username), None)
         # List of rooms for individual editing
         else:
             return render_template("list.html", type='room', things=Room.getMy(request.authorization.username))
     # Layoutificator sending map data
     elif request.method == 'POST':
-        print("v"*50)
-        pprint(request.json)
-        print("^"*50)
-        return "Saved!"
+        return sendRoomsToDb(request.json)
 
 @app.route("/objs")
 @auth.requires_auth
@@ -91,3 +89,45 @@ def jsonifyRooms(rooms, exits):
         roomDict[room.vnum] = dict(x=room.x, y=room.y, z=room.z)
 
     return json.dumps(dict(rooms=roomDict))
+
+
+# This function runs 10 DB queries, not counting begin/commit. Yummy.
+def sendRoomsToDb(fromSvg):
+    name = request.authorization.username
+    rooms = fromSvg['rooms']
+    exits = fromSvg['exits']
+    ownedVnums = getOwnedVnums(name)
+    if len(rooms) > len(ownedVnums):
+        return "You tried to save {tried} rooms, but you only have {available} rooms available".format(tried=len(rooms), available=len(ownedVnums)), 400
+
+    # map rooms to available vnums
+    # we should somehow calculate xyz coords based on exits pointing into this area, but this is probably not the right place
+    vnumMapping = {}
+    newRooms = {}
+    for (room, vnum) in zip(rooms, ownedVnums):
+        newRooms[vnum] = rooms[room]
+        vnumMapping[room] = vnum
+    newExits = {}
+    for sourceRoom in exits:
+        for direction in exits[sourceRoom]:
+            if vnumMapping[sourceRoom] not in newExits:
+                newExits[vnumMapping[sourceRoom]] = {}
+            newExits[vnumMapping[sourceRoom]][int(direction)] = {'tgt': vnumMapping[exits[sourceRoom][direction]['tgt']]}
+
+    # for side effect of creating the rooms
+    # TODO: opportunity to map xyz coordinates
+    _ = Room.getMy(name)
+
+    # ... and finally generate exits.
+    for sourceRoom in newExits:
+        for direction in newExits[sourceRoom]:
+            dst = newExits[sourceRoom][direction]['tgt']
+            ex = Roomexit.getOrCreate(name, sourceRoom, dst)
+            ex.owner=name
+            ex.direction=int(direction)
+            ex.destination=dst
+            ex.block=getBlockForVnum(name, sourceRoom)
+            db.session.add(ex)
+
+    db.session.commit()
+    return "Saved", 201

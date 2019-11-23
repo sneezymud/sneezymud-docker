@@ -489,9 +489,10 @@ var Map = {
       var roomNr = Map.coordToNr[[x, y]];
       // TODO: terrain
       exits[roomNr] = exits[roomNr] || {};
-      exits[roomNr][dir] = {dir: exNr};
+      // toString because JSON keys are strings, therefore it makes sense to keep values as strings too
+      exits[roomNr][dir] = {tgt: exNr.toString()};
       exits[exNr] = exits[exNr] || {};
-      exits[exNr][reverseDir(dir)] = {dir: roomNr};
+      exits[exNr][reverseDir(dir)] = {tgt: roomNr.toString()};
     }
 
     function exists(x, y) {

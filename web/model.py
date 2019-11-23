@@ -18,12 +18,29 @@ class SneezyModel(db.Model):
         return "<Name: {}>".format(self.name)
 
 
-def getThingsOf(type, name):
-    wizdata = (Wizdata.query
+def getWizdata(name):
+    return (Wizdata.query
             .join(Player, Wizdata.player_id == Player.id)
             .join(Account, Account.account_id == Player.account_id)
             .filter(Account.name == name)
             ).first()
+
+
+def getOwnedVnums(name):
+    wizdata = getWizdata(name)
+    blocka = range(wizdata.blockastart, wizdata.blockaend + 1)
+    blockb = range(wizdata.blockbstart, wizdata.blockbend + 1)
+    return sorted(set(list(blocka) + list(blockb)))
+
+
+def getBlockForVnum(name, vnum):
+    wizdata = getWizdata(name)
+    return (1 if wizdata.blockastart <= vnum and vnum <= wizdata.blockaend else
+           2 if wizdata.blockbstart <= vnum and vnum <= wizdata.blockbend else
+           0)
+
+def getThingsOf(type, name):
+    wizdata = getWizdata(name)
 
     blockaExisting = (type.query
             .filter(type.vnum != 0)
@@ -37,7 +54,7 @@ def getThingsOf(type, name):
 
     # It's possible that somebody has been assigned rooms that don't exist in Db
     # so let's generate them
-    things = blockaExisting + blockbExisting
+    things = set(blockaExisting + blockbExisting)
     existingVnums = set(map(lambda r: r.vnum, things))
 
     desiredVnums = set()
@@ -59,11 +76,7 @@ def checkVnum(vnum, name):
     if vnum == 0:
         return False
 
-    wizdata = (Wizdata.query
-            .join(Player, Wizdata.player_id == Player.id)
-            .join(Account, Account.account_id == Player.account_id)
-            .filter(Account.name == name)
-            ).first()
+    wizdata = getWizdata(name)
     
     inBlockA = wizdata.blockastart <= vnum and wizdata.blockaend >= vnum
     inBlockB = wizdata.blockbstart <= vnum and wizdata.blockbend >= vnum
@@ -160,11 +173,22 @@ class Roomexit(ImmortalModel):
     owner = db.Column(db.String(127))
     block = db.Column(db.Integer)
 
-    def create(vnum, owner):
-        return Roomexit(vnum=vnum, direction=0, name="", description="", type=0, condition_flag=0, lock_difficulty=0, weight=0, key_num=0, destination=0, owner=owner, block=0)
+    def create(vnum, owner, direction=0, destination=0, block=1):
+        return Roomexit(vnum=vnum, direction=direction, name="", description="", type=0, condition_flag=0, lock_difficulty=0, weight=0, key_num=0, destination=destination, owner=owner, block=block)
 
+    def getOrCreate(name, vnum, direction):
+        existing = Roomexit.query.filter(Roomexit.vnum == vnum).filter(Roomexit.direction == direction).first()
+        if existing != None:
+            return existing
+        return Roomexit.create(vnum, name)
+
+    # Untested!
     def getMy(name):
-        return getThingsOf(Roomexit, name)
+        myRooms = Room.getMy(name)
+
+        return Roomexit.query.filter(
+                Roomexit.vnum in map(myRooms, lambda r: r.vnum)
+                or Roomexit.vnum in map(myRooms, lambda r: r.destination))
 
     def canAccess(vnum, name):
         return checkVnum(vnum, name)
