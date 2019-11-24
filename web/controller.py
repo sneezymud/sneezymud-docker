@@ -119,14 +119,16 @@ def sendRoomsToDb(fromSvg):
     _ = Room.getMy(name)
 
     # ... and finally generate exits.
+    Roomexit.deleteOf(vnumMapping.values())
     for sourceRoom in newExits:
         for direction in newExits[sourceRoom]:
-            dst = newExits[sourceRoom][direction]['tgt']
-            ex = Roomexit.getOrCreate(name, sourceRoom, dst)
-            ex.owner=name
-            ex.direction=int(direction)
-            ex.destination=dst
-            ex.block=getBlockForVnum(name, sourceRoom)
+            ex = Roomexit.create(
+                    owner=name,
+                    vnum=sourceRoom,
+                    direction=direction,
+                    destination=newExits[sourceRoom][direction]['tgt'],
+                    block=getBlockForVnum(name, sourceRoom)
+                    )
             db.session.add(ex)
 
     db.session.commit()

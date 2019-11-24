@@ -173,14 +173,21 @@ class Roomexit(ImmortalModel):
     owner = db.Column(db.String(127))
     block = db.Column(db.Integer)
 
+    def deleteOf(vnums):
+        exits = (Roomexit.query.filter(Roomexit.vnum.in_(vnums)).all()
+                + Roomexit.query.filter(Roomexit.destination.in_(vnums)).all())
+        for e in exits:
+            db.session.delete(e)
+        db.session.commit()
+
     def create(vnum, owner, direction=0, destination=0, block=1):
         return Roomexit(vnum=vnum, direction=direction, name="", description="", type=0, condition_flag=0, lock_difficulty=0, weight=0, key_num=0, destination=destination, owner=owner, block=block)
 
-    def getOrCreate(name, vnum, direction):
-        existing = Roomexit.query.filter(Roomexit.vnum == vnum).filter(Roomexit.direction == direction).first()
-        if existing != None:
-            return existing
-        return Roomexit.create(vnum, name)
+    # def getOrCreate(name, vnum, direction):
+    #     existing = Roomexit.query.filter(Roomexit.vnum == vnum).filter(Roomexit.direction == direction).first()
+    #     if existing != None:
+    #         return existing
+    #     return Roomexit.create(vnum, name)
 
     # Untested!
     def getMy(name):
