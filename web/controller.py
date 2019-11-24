@@ -31,8 +31,8 @@ def rooms():
     if request.method == 'GET':
         # Layoutificator getting map data for graphical display
         if request.headers.get('Content-Type') == 'application/json':
-            # TODO: exits
-            return jsonifyRooms(Room.getMy(request.authorization.username), None)
+            name = request.authorization.username
+            return jsonifyRooms(Room.getMy(name), Roomexit.getMy(name))
         # List of rooms for individual editing
         else:
             return render_template("list.html", type='room', things=Room.getMy(request.authorization.username))
@@ -87,8 +87,15 @@ def jsonifyRooms(rooms, exits):
     roomDict = {}
     for room in rooms:
         roomDict[room.vnum] = dict(x=room.x, y=room.y, z=room.z)
+    exitDict = {}
+    pprint(exits)
+    for exit in exits:
+        if exit.vnum not in exitDict:
+            exitDict[exit.vnum] = {}
+        exitDict[exit.vnum][exit.direction] = {'tgt': exit.destination}
+    pprint(exitDict)
 
-    return json.dumps(dict(rooms=roomDict))
+    return json.dumps(dict(rooms=roomDict, exits=exitDict))
 
 
 # This function runs 10 DB queries, not counting begin/commit. Yummy.

@@ -160,8 +160,8 @@ class Room(ImmortalModel):
         return checkVnum(vnum, name)
 
 class Roomexit(ImmortalModel):
-    vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
-    direction = db.Column(db.Integer)
+    vnum = db.Column(db.Integer, nullable=False, primary_key=True)
+    direction = db.Column(db.Integer, nullable=False, primary_key=True)
     name = db.Column(db.String(127))
     description = db.Column(db.String())
     type = db.Column(db.Integer)
@@ -173,6 +173,9 @@ class Roomexit(ImmortalModel):
     owner = db.Column(db.String(127))
     block = db.Column(db.Integer)
 
+    def __repr__(self):
+        return "<From {vnum} {direction} to {destination}>".format(vnum=self.vnum, direction=self.direction, destination=self.destination)
+
     def deleteOf(vnums):
         exits = (Roomexit.query.filter(Roomexit.vnum.in_(vnums)).all()
                 + Roomexit.query.filter(Roomexit.destination.in_(vnums)).all())
@@ -183,19 +186,11 @@ class Roomexit(ImmortalModel):
     def create(vnum, owner, direction=0, destination=0, block=1):
         return Roomexit(vnum=vnum, direction=direction, name="", description="", type=0, condition_flag=0, lock_difficulty=0, weight=0, key_num=0, destination=destination, owner=owner, block=block)
 
-    # def getOrCreate(name, vnum, direction):
-    #     existing = Roomexit.query.filter(Roomexit.vnum == vnum).filter(Roomexit.direction == direction).first()
-    #     if existing != None:
-    #         return existing
-    #     return Roomexit.create(vnum, name)
-
-    # Untested!
     def getMy(name):
         myRooms = Room.getMy(name)
 
-        return Roomexit.query.filter(
-                Roomexit.vnum in map(myRooms, lambda r: r.vnum)
-                or Roomexit.vnum in map(myRooms, lambda r: r.destination))
+        return set(Roomexit.query.filter(Roomexit.vnum.in_(map(lambda r: r.vnum, myRooms))).all()
+                + Roomexit.query.filter(Roomexit.destination.in_(map(lambda r: r.vnum, myRooms))).all())
 
     def canAccess(vnum, name):
         return checkVnum(vnum, name)
