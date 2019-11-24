@@ -88,12 +88,10 @@ def jsonifyRooms(rooms, exits):
     for room in rooms:
         roomDict[room.vnum] = dict(x=room.x, y=room.y, z=room.z)
     exitDict = {}
-    pprint(exits)
     for exit in exits:
         if exit.vnum not in exitDict:
             exitDict[exit.vnum] = {}
         exitDict[exit.vnum][exit.direction] = {'tgt': exit.destination}
-    pprint(exitDict)
 
     return json.dumps(dict(rooms=roomDict, exits=exitDict))
 
