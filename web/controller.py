@@ -120,8 +120,12 @@ def sendRoomsToDb(fromSvg):
             newExits[vnumMapping[sourceRoom]][int(direction)] = {'tgt': vnumMapping[exits[sourceRoom][direction]['tgt']]}
 
     # for side effect of creating the rooms
-    # TODO: opportunity to map xyz coordinates
-    _ = Room.getMy(name)
+    for vnum in newRooms:
+        dbRoom = Room.query.filter(Room.vnum == vnum).first()
+        dbRoom.x = newRooms[vnum]['x']
+        dbRoom.y = newRooms[vnum]['y']
+        if 'z' in newRooms[vnum]:
+            dbRoom.z = newRooms[vnum]['z']
 
     # ... and finally generate exits.
     Roomexit.deleteOf(vnumMapping.values())
