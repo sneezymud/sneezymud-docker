@@ -1460,6 +1460,7 @@ async function loadFromMud () {
   });
 
   Map.exportarea.value = await resp.text();
+  interpretMap(Map.exportarea.value);
 }
 
 /**
@@ -2880,6 +2881,41 @@ function keyPressed (evt) {
   keyHandling (evt, true);
 }
 
+function toggleExits(dir, x, y) {
+  switch (dir) {
+    case '1':
+      toggleExit(x-1, y+1, 'exNE');
+      break;
+    case '2':
+      toggleExit(x, y+1, 'exN');
+      break;
+    case '3':
+      toggleExit(x+1, y+1, 'exNW');
+      break;
+    case '4':
+      toggleExit(x-1, y, 'exE');
+      break;
+    case '6':
+      toggleExit(x, y, 'exE');
+      break;
+    case '7':
+      toggleExit(x, y, 'exNW');
+      break;
+    case '8':
+      toggleExit(x, y, 'exN');
+      break;
+    case '9':
+      toggleExit(x, y, 'exNE');
+      break;
+    case '+':
+      toggleExit(x, y, 'exU');
+      break;
+    case '-':
+      toggleExit(x, y, 'exD');
+      break;
+  }
+}
+
 /**
  * Processes key press events and single character strings (in case
  * the interpreter is feeding us some). Many of the key commands need
@@ -3033,38 +3069,17 @@ function keyHandling (evt, recording) {
     break;
 
   case '1':
-    toggleExit(Pen.x-1, Pen.y+1, 'exNE');
-    break;
   case '2':
-    toggleExit(Pen.x, Pen.y+1, 'exN');
-    break;
   case '3':
-    toggleExit(Pen.x+1, Pen.y+1, 'exNW');
-    break;
   case '4':
-    toggleExit(Pen.x-1, Pen.y, 'exE');
-    break;
-  case '6':
-    toggleExit(Pen.x, Pen.y, 'exE');
-    break;
-  case '7':
-    toggleExit(Pen.x, Pen.y, 'exNW');
-    break;
-  case '8':
-    toggleExit(Pen.x, Pen.y, 'exN');
-    break;
-  case '9':
-    toggleExit(Pen.x, Pen.y, 'exNE');
-    break;
-  case '+':
-    toggleExit(Pen.x, Pen.y, 'exU');
-    break;
-  case '-':
-    toggleExit(Pen.x, Pen.y, 'exD');
-    break;
   case '5':
-  case '0':
-    addToLabel(Pen.x, Pen.y, key);
+  case '6':
+  case '7':
+  case '8':
+  case '9':
+  case '+':
+  case '-':
+    toggleExits(key, Pen.x, Pen.y);
     break;
 
   case 'x':
@@ -3276,45 +3291,24 @@ function keyHandling (evt, recording) {
   }
 }
 
-/**
- * Interprets a sequence of characters as a script: when loading a map
- * or executing the demo instructions. Most of the job will be handled
- * by keyPressed. The interpreter adds a few extra characters which
- * are only useful non-interactively.
- *
- * '.' will reset the Pen's timestamp, simulating a pause (to prevent
- * rotating the last tile)
- *
- * ';' will cause a pause (using a timeout). This is used for the
- * demo. This is why the real code runs as interpretCont – it has a
- * pointer into the code.
- *
- * '(1,2)' will move the pointer to this position.
- *
- * '[0,-1]' will move the pointer by this vector.
- *
- * '"abc"' will insert the label abc (instead of showing an input
- * field). This is why the link in the help area sends a single quote
- * instead of a double quote. The double quote is already taken for
- * strings.
- *
- * 'z' has an alternate implementation: when loading a map, going down
- * should not animate anything, unless we're looking at the demo.
- *
- * '-' moves point to the left (a shorthand for '[-1,0]') and the next
- * character is neither 'v' (a variation) nor a newline.
- *
- * 'f' and 'g' place floor tile and 'advance' to the right.
- *
- * '\01' introduces an edit made by another pen; it is followed by the
- * pen number (Ctrl-A is Start Of Heading), followed by '\02' and the
- * rest of the message (Ctrl-B is Start Of Text).
- *
- * '\02' causes a map reset; it is usually followed by a new map
- * (Ctrl-B is Start Of Text).
- */
 function interpretMap (code) {
-  interpretCont(code, 0, true, true);
+  let data = JSON.parse(code);
+  let rooms = data.rooms;
+  let exits = data.exits;
+  for (let vnum in rooms) {
+    let room = rooms[vnum];
+    floor(room.x, room.y);
+  }
+  for (let vnum in exits) {
+    for (let direction in exits[vnum]) {
+      // let destination = exits[vnum][direction].tgt; - unused, direction is enough to draw an exit
+      // find xy of room `vnum`
+      // use toggleExits to draw
+
+      // Map.data.get(x, y).vnum = roomNr;
+      // drawExit()
+    }
+  }
 }
 
 /**
