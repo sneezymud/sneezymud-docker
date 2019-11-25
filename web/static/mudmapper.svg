@@ -128,6 +128,7 @@ var Map = {
   freeRoomNrs: [],
   nextRoomNr: 0,
   coordToNr: {},
+  nrToCoord: {},
 
   /**
    * Initializes the datastructures if necessary. We only need to run
@@ -451,7 +452,7 @@ var Map = {
         }
       }
 
-      function dirToNumeric(direction) {
+      function dirToMudsideNumeric(direction) {
         switch (direction) {
           case 'exN': return 0;
           case 'exE': return 1;
@@ -459,7 +460,7 @@ var Map = {
           case 'exNW': return 7;
           case 'exU': return 4;
           case 'exD': return 5;
-          default: throw `Bad dir in dirToNumeric(${direction})`;
+          default: throw `Bad dir in dirToMudsideNumeric(${direction})`;
         }
       }
 
@@ -480,7 +481,7 @@ var Map = {
         }
       }
 
-      var dir = dirToNumeric(direction);
+      var dir = dirToMudsideNumeric(direction);
       var exXY = changeCoordsByDir(x, y, dir); // Assume all rooms exist already, for simplicity. This means running 2 passes over rooms, first serializing the rooms and afterwards their exits.
       var exNr = Map.coordToNr[[exXY[0], exXY[1]]];
       if (exNr === undefined || !Map.data.has(exXY[0], exXY[1]))
@@ -2300,7 +2301,7 @@ function removeWall (x, y) {
 /**
  * Draws an exit. If the exit is present, removes it.
  */
-function toggleExit (x, y, type) {
+function toggleExit (x, y, type, enforce) {
   var walls = Map.data.get(x, y).walls;
   var tile = createTile(x, y, type);
   var exists = false;
@@ -2324,7 +2325,7 @@ function toggleExit (x, y, type) {
         walls.push(tile);
         Map.wallsElement.appendChild(tile);
       });
-  } else {
+  } else if (!enforce) {
     // remove
     Commands.do(
       function(){
@@ -2386,6 +2387,7 @@ function replace (data, element, x, y, old, tile, recursive) {
           Map.nextRoomNr++;
         }
         Map.coordToNr[[x, y]] = roomNr;
+        Map.nrToCoord[roomNr] = [x, y]
 
         Map.data.get(x,y)[data] = tile;
       });
@@ -2704,6 +2706,7 @@ function drawToCommand (x, y, tile, type) {
       Map.nextRoomNr++;
     }
     Map.coordToNr[[x, y]] = roomNr;
+    Map.nrToCoord[roomNr] = [x, y]
     Map.data.get(x, y).floor = tile;
     Map.floorElement.appendChild(tile);
     checkRockyNeighbors(x, y);
@@ -2881,38 +2884,28 @@ function keyPressed (evt) {
   keyHandling (evt, true);
 }
 
-function toggleExits(dir, x, y) {
+function toggleExits(dir, x, y, enforce=false) {
   switch (dir) {
     case '1':
-      toggleExit(x-1, y+1, 'exNE');
-      break;
+      return toggleExit(x-1, y+1, 'exNE', enforce);
     case '2':
-      toggleExit(x, y+1, 'exN');
-      break;
+      return toggleExit(x, y+1, 'exN', enforce);
     case '3':
-      toggleExit(x+1, y+1, 'exNW');
-      break;
+      return toggleExit(x+1, y+1, 'exNW', enforce);
     case '4':
-      toggleExit(x-1, y, 'exE');
-      break;
+      return toggleExit(x-1, y, 'exE', enforce);
     case '6':
-      toggleExit(x, y, 'exE');
-      break;
+      return toggleExit(x, y, 'exE', enforce);
     case '7':
-      toggleExit(x, y, 'exNW');
-      break;
+      return toggleExit(x, y, 'exNW', enforce);
     case '8':
-      toggleExit(x, y, 'exN');
-      break;
+      return toggleExit(x, y, 'exN', enforce);
     case '9':
-      toggleExit(x, y, 'exNE');
-      break;
-    case '+':
-      toggleExit(x, y, 'exU');
-      break;
+      return toggleExit(x, y, 'exNE', enforce);
     case '-':
-      toggleExit(x, y, 'exD');
-      break;
+      return toggleExit(x, y, 'exU', enforce);
+    case '+':
+      return toggleExit(x, y, 'exD', enforce);
   }
 }
 
@@ -3072,7 +3065,6 @@ function keyHandling (evt, recording) {
   case '2':
   case '3':
   case '4':
-  case '5':
   case '6':
   case '7':
   case '8':
@@ -3295,18 +3287,57 @@ function interpretMap (code) {
   let data = JSON.parse(code);
   let rooms = data.rooms;
   let exits = data.exits;
+
+  // TODO: test how it works with 0 rooms
+  let minVnum = Number.MAX_SAFE_INTEGER;
   for (let vnum in rooms) {
+    if (vnum < minVnum)
+      minVnum = vnum;
     let room = rooms[vnum];
     floor(room.x, room.y);
   }
+
+  function normalizeVnum(vnum) {
+    return vnum - minVnum;
+  }
+
+  /*
+enum dirTypeT {
+     DIR_BOGUS = -2,
+     DIR_NONE = -1,
+     DIR_NORTH = 0,
+     DIR_EAST,
+     DIR_SOUTH,
+     DIR_WEST,
+     DIR_UP,
+     DIR_DOWN,
+     DIR_NORTHEAST,
+     DIR_NORTHWEST,
+     DIR_SOUTHEAST,
+     DIR_SOUTHWEST,
+     MAX_DIR
+};
+*/
+  let mudsideDirToNumpadDir = {
+    '0': '8',
+    '1': '6',
+    '2': '2',
+    '3': '4',
+    '4': '-',
+    '5': '+',
+    '6': '9',
+    '7': '7',
+    '8': '3',
+    '9': '1',
+  };
+
   for (let vnum in exits) {
     for (let direction in exits[vnum]) {
       // let destination = exits[vnum][direction].tgt; - unused, direction is enough to draw an exit
-      // find xy of room `vnum`
-      // use toggleExits to draw
-
-      // Map.data.get(x, y).vnum = roomNr;
-      // drawExit()
+      let sCoords = Map.nrToCoord[normalizeVnum(vnum)];
+      let sx = sCoords[0];
+      let sy = sCoords[1];
+      toggleExits(mudsideDirToNumpadDir[direction], sx, sy, enforce=true);
     }
   }
 }
