@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Mob {{thing.vnum}}</h1>
+
+<form action="{{thing.vnum}}" method="post">
+  <div class="ib">
+    <fieldset>
+      <input type="submit" value="Save" />
+      <button type="button" ><a href="../mobs">Back</a></button>
+      {{ form.hidden_tag() }}
+      <div class="grid">
+        {% for field in form %}
+          {% if field.type != 'CSRFTokenField' %}
+            {{ field.label() }}
+            {{ field() }}
+          {% endif %}
+        {% endfor %}
+      </div>
+      <input type="submit" value="Save" />
+      <button type="button" ><a href="../mobs">Back</a></button>
+    </fieldset>
+  </div>
+</form>
+
+{% endblock %}

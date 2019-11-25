@@ -5,3 +5,4 @@ RUN pip install -r requirements.txt
 RUN useradd -ms /bin/bash sneezy
 USER sneezy
 CMD python main.py
+# CMD /bin/bash -c "while true; do sleep 100;done"
