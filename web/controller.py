@@ -1,7 +1,7 @@
 import auth
 import json
 from pprint import pprint
-from model import Player, Wizdata, Account, Room, Zone, Obj, Mob, getOwnedVnums, getBlockForVnum, Roomexit
+from model import Player, Wizdata, Account, Room, Zone, Obj, Mob, getOwnedVnums, getBlockForVnum, Roomexit, getPlayerName
 from main import app, db
 
 from flask import render_template, request, flash
@@ -28,14 +28,14 @@ def zones():
 @app.route("/rooms", methods=['GET', 'POST'])
 @auth.requires_auth
 def rooms():
+    name = getPlayerName(request.authorization.username)
     if request.method == 'GET':
         # Layoutificator getting map data for graphical display
         if request.headers.get('Content-Type') == 'application/json':
-            name = request.authorization.username
             return jsonifyRooms(Room.getMy(name), Roomexit.getMy(name))
         # List of rooms for individual editing
         else:
-            return render_template("list.html", type='room', things=Room.getMy(request.authorization.username))
+            return render_template("list.html", type='room', things=Room.getMy(name))
     # Layoutificator sending map data
     elif request.method == 'POST':
         return sendRoomsToDb(request.json)
@@ -43,28 +43,33 @@ def rooms():
 @app.route("/objs")
 @auth.requires_auth
 def objects():
-    return render_template("list.html", type='obj', things=Obj.getMy(request.authorization.username))
+    name = getPlayerName(request.authorization.username)
+    return render_template("list.html", type='obj', things=Obj.getMy(name))
 
 @app.route("/mobs")
 @auth.requires_auth
 def mobs():
-    return render_template("list.html", type='mob', things=Mob.getMy(request.authorization.username))
+    name = getPlayerName(request.authorization.username)
+    return render_template("list.html", type='mob', things=Mob.getMy(name))
 
 @app.route('/room/<int:vnum>', methods=['GET', 'POST'])
 @auth.requires_auth
 def room(vnum):
-    return edit(vnum, Room, 'room.html', request.authorization.username)
+    name = getPlayerName(request.authorization.username)
+    return edit(vnum, Room, 'room.html', name)
 
 @app.route('/obj/<int:vnum>', methods=['GET', 'POST'])
 @auth.requires_auth
 def obj(vnum):
-    return edit(vnum, Obj, 'obj.html', request.authorization.username)
+    name = getPlayerName(request.authorization.username)
+    return edit(vnum, Obj, 'obj.html', name)
 
 
 @app.route('/mob/<int:vnum>', methods=['GET', 'POST'])
 @auth.requires_auth
 def mob(vnum):
-    return edit(vnum, Mob, 'mob.html', request.authorization.username)
+    name = getPlayerName(request.authorization.username)
+    return edit(vnum, Mob, 'mob.html', name)
 
 
 def edit(vnum, Thing, template, name):
@@ -98,7 +103,7 @@ def jsonifyRooms(rooms, exits):
 
 # This function runs 10 DB queries, not counting begin/commit. Yummy.
 def sendRoomsToDb(fromSvg):
-    name = request.authorization.username
+    name = getPlayerName(request.authorization.username)
     rooms = fromSvg['rooms']
     exits = fromSvg['exits']
     ownedVnums = getOwnedVnums(name)

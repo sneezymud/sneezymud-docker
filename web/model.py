@@ -18,11 +18,25 @@ class SneezyModel(db.Model):
         return "<Name: {}>".format(self.name)
 
 
+def getPlayerName(accountName):
+    return (Player.query
+            .join(Account, Account.account_id == Player.account_id)
+            .filter(Account.name == accountName)
+            .first().name)
+
 def getWizdata(name):
     return (Wizdata.query
             .join(Player, Wizdata.player_id == Player.id)
             .join(Account, Account.account_id == Player.account_id)
-            .filter(Account.name == name)
+            .filter(Player.name == name)
+            ).first()
+
+def getOwner(name):
+    # todo: player name
+    return (Wizdata.query
+            .join(Player, Wizdata.player_id == Player.id)
+            .join(Account, Account.account_id == Player.account_id)
+            .filter(Player.name == name)
             ).first()
 
 
@@ -66,11 +80,11 @@ def getThingsOf(type, name):
     newVnums = desiredVnums.difference(existingVnums)
     for v in newVnums:
         r = type.create(v, name)
-        things.append(r)
+        things.add(r)
         db.session.add(r)
     db.session.commit()
 
-    return things
+    return sorted(things, key=lambda r: r.vnum)
 
 def checkVnum(vnum, name):
     if vnum == 0:
@@ -195,7 +209,7 @@ class Roomexit(ImmortalModel):
     def canAccess(vnum, name):
         return checkVnum(vnum, name)
 
-class Player(ImmortalModel):
+class Player(SneezyModel):
     id = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     name = db.Column(db.String(80))
     talens = db.Column(db.Integer)
@@ -236,7 +250,7 @@ class Obj(ImmortalModel):
     # objextra = db.relationship('objextra', backref='obj', lazy=True)
     # objaffect = db.relationship('objaffect', backref='obj', lazy=True)
 
-    def create(vnum):
+    def create(vnum, owner):
         return Obj(vnum=vnum, name="", short_desc="", long_desc="", action_desc="", type=0, action_flag=0, wear_flag=0, val0=0, val1=0, val2=0, val3=0, weight=0, price=0, can_be_seen=0, spec_proc=0, max_exist=9999, max_struct=0, cur_struct=0, decay=0, volume=0, material=0)
 
     def __repr__(self):
@@ -269,8 +283,8 @@ class Mob(ImmortalModel):
     def getMy(name):
         return getThingsOf(Mob, name)
 
-    def create(vnum):
-        return Mob(vnum=vnum, name="", short_desc="", long_desc="", description="", actions=0, affects=0, faction=0, fact_perc=0, letter="", attacks=0, mob_class=0, level=0, tohit=0, ac=0, hpbonus=0, damage_level=0, damage_precision=0, gold=0, race=0, weight=0, height=0, str=0, bra=0, con=0, dex=0, agi=0, intel=0, wis=0, foc=0, per=0, cha=0, kar=0, spe=0, pos=0, def_position=0, sex=0, spec_proc=0, skin=0, vision=0, can_be_seen=0, max_exist=0, local_sound="", adjacent_sound="")
+    def create(vnum, owner):
+        return Mob(vnum=vnum, name="", short_desc="", long_desc="", description="", actions=0, affects=0, faction=0, fact_perc=0, letter="", attacks=0, mob_class=0, level=0, tohit=0, ac=0, hpbonus=0, damage_level=0, damage_precision=0, gold=0, race=0, weight=0, height=0, str=0, bra=0, con=0, dex=0, agi=0, intel=0, wis=0, foc=0, per=0, cha=0, kar=0, spe=0, pos=0, def_position=0, sex=0, spec_proc=0, skin=0, vision=0, can_be_seen=0, max_exist=0, local_sound="", adjacent_sound="", owner=owner)
 
     vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     name = db.Column(db.String(127))
@@ -316,6 +330,7 @@ class Mob(ImmortalModel):
     max_exist = db.Column(db.Integer)
     local_sound = db.Column(db.String(255))
     adjacent_sound = db.Column(db.String(255))
+    owner = db.Column(db.String(255))
 
     def canAccess(vnum, name):
         return checkVnum(vnum, name)
