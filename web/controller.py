@@ -129,6 +129,7 @@ def sendRoomsToDb(fromSvg):
         dbRoom = Room.query.filter(Room.vnum == vnum).first()
         dbRoom.x = newRooms[vnum]['x']
         dbRoom.y = -newRooms[vnum]['y']
+        dbRoom.block = getBlockForVnum(name, vnum)
         if 'z' in newRooms[vnum]:
             dbRoom.z = newRooms[vnum]['z']
 

@@ -159,6 +159,7 @@ class Room(ImmortalModel):
     capacity = db.Column(db.Integer)
     height = db.Column(db.Integer)
     spec = db.Column(db.Integer)
+    block = db.Column(db.Integer)
     owner = db.Column(db.String(127))
 
     def __repr__(self):

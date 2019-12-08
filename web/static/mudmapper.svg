@@ -3306,7 +3306,7 @@ function interpretMap (code) {
   function normalizeX(x) { return x - minX; }
   function normalizeY(y) { return y - minY; }
 
-  console.log(`min x = ${minX}, min y = ${minY}`);
+  console.log(`normalizing against min x = ${minX}, min y = ${minY}`);
 
   for (let vnum in rooms) {
     let room = rooms[vnum];
