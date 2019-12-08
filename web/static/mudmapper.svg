@@ -1440,7 +1440,7 @@ function textExport () {
 }
 
 async function saveToMud (serializedMap) {
-  let resp = await fetch('/rooms', {
+  let resp = await fetch('../rooms', {
     credentials: 'same-origin',
     method: 'POST',
     headers: {
@@ -1453,7 +1453,7 @@ async function saveToMud (serializedMap) {
 }
 
 async function loadFromMud () {
-  let resp = await fetch('/rooms', {
+  let resp = await fetch('../rooms', {
     credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json'
@@ -3290,15 +3290,33 @@ function interpretMap (code) {
 
   // TODO: test how it works with 0 rooms
   let minVnum = Number.MAX_SAFE_INTEGER;
+  let minX = Number.MAX_SAFE_INTEGER;
+  let minY = Number.MAX_SAFE_INTEGER;
   for (let vnum in rooms) {
-    if (vnum < minVnum)
-      minVnum = vnum;
     let room = rooms[vnum];
-    floor(room.x, room.y);
+    if (Number(vnum) < minVnum)
+      minVnum = Number(vnum);
+    if (Number(room.x) < minX)
+      minX = Number(room.x);
+    if (Number(room.y) < minY)
+      minY = Number(room.y);
   }
 
-  function normalizeVnum(vnum) {
-    return vnum - minVnum;
+  function normalizeVnum(vnum) { return vnum - minVnum; }
+  function normalizeX(x) { return x - minX; }
+  function normalizeY(y) { return y - minY; }
+
+  console.log(`min x = ${minX}, min y = ${minY}`);
+
+  for (let vnum in rooms) {
+    let room = rooms[vnum];
+    room.x = normalizeX(room.x)
+    room.y = normalizeY(room.y)
+  }
+
+  for (let vnum in rooms) {
+    let room = rooms[vnum];
+    floor(room.x, room.y);
   }
 
   /*
@@ -3334,6 +3352,8 @@ enum dirTypeT {
   for (let vnum in exits) {
     for (let direction in exits[vnum]) {
       // let destination = exits[vnum][direction].tgt; - unused, direction is enough to draw an exit
+      if (!(normalizeVnum(vnum) in Map.nrToCoord))
+        continue; // exits in other areas, leading to this area
       let sCoords = Map.nrToCoord[normalizeVnum(vnum)];
       let sx = sCoords[0];
       let sy = sCoords[1];

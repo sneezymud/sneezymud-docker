@@ -91,7 +91,7 @@ def edit(vnum, Thing, template, name):
 def jsonifyRooms(rooms, exits):
     roomDict = {}
     for room in rooms:
-        roomDict[room.vnum] = dict(x=room.x, y=room.y, z=room.z)
+        roomDict[room.vnum] = dict(x=room.x, y=-room.y, z=room.z)
     exitDict = {}
     for exit in exits:
         if exit.vnum not in exitDict:
@@ -128,7 +128,7 @@ def sendRoomsToDb(fromSvg):
     for vnum in newRooms:
         dbRoom = Room.query.filter(Room.vnum == vnum).first()
         dbRoom.x = newRooms[vnum]['x']
-        dbRoom.y = newRooms[vnum]['y']
+        dbRoom.y = -newRooms[vnum]['y']
         if 'z' in newRooms[vnum]:
             dbRoom.z = newRooms[vnum]['z']
 
