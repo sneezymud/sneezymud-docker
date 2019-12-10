@@ -20,6 +20,7 @@ class SneezyModel(db.Model):
 
 def getPlayerName(accountName):
     return (Player.query
+            .join(Wizdata, Wizdata.player_id == Player.id)
             .join(Account, Account.account_id == Player.account_id)
             .filter(Account.name == accountName)
             .first().name)
