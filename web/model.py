@@ -361,5 +361,17 @@ class Mob_imm(ImmortalModel):
 
 class Mobresponses(ImmortalModel):
     vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
+    owner = db.Column(db.Text)
     response = db.Column(db.Text)
 
+    def __repr__(self):
+        return "<vnum: {} resp: {}>".format(self.vnum, self.response[:20])
+
+    def getMy(name):
+        return getThingsOf(Mob, name)
+
+    def canAccess(vnum, name):
+        return checkVnum(vnum, name)
+
+    def create(vnum, owner):
+        return Mobresponses(vnum=vnum, response="", owner=owner)

@@ -1,10 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h1>Mob {{thing.vnum}}</h1>
-<p><a href="../../mobresponse/{{thing.vnum}}">Edit mobresponses</a></p>
+<h1>Mobresponses for {{vnum}}</h1>
 
-<form action="{{thing.vnum}}" method="post">
+<form action="{{vnum}}" method="post">
   <div class="ib">
     <fieldset>
       <input type="submit" value="Save" />

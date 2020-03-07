@@ -1,7 +1,7 @@
 import auth
 import json
 from pprint import pprint
-from model import Player, Wizdata, Account, Room, Zone, Obj, Mob, getOwnedVnums, getBlockForVnum, Roomexit, getPlayerName
+from model import Player, Wizdata, Account, Room, Zone, Obj, Mob, Mobresponses, getOwnedVnums, getBlockForVnum, Roomexit, getPlayerName
 from main import app, db
 
 from flask import render_template, request, flash
@@ -11,6 +11,8 @@ from flask_wtf import FlaskForm
 from wtforms import StringField
 from wtforms.validators import DataRequired
 from wtforms.ext.sqlalchemy.orm import model_form
+
+# TODO: figure out how to lazily create objects
 
 @app.route("/")
 @auth.requires_auth
@@ -72,11 +74,22 @@ def mob(vnum):
     return edit(vnum, Mob, 'mob.html', name)
 
 
+@app.route('/mobresponse/<int:vnum>', methods=['GET', 'POST'])
+@auth.requires_auth
+def mobresponse(vnum):
+    name = getPlayerName(request.authorization.username)
+    return edit(vnum, Mobresponses, 'mobresponse.html', name)
+
+
 def edit(vnum, Thing, template, name):
     if not Thing.canAccess(vnum, name):
         return render_template("badaccess.html")
 
     thing = Thing.query.filter_by(vnum=vnum).first()
+    if thing is None:
+        thing = Thing.create(vnum, name)
+        db.session.add(thing)
+
     Form = model_form(Thing, base_class=FlaskForm, db_session=db.session)
     form = Form(obj=thing)
 
@@ -85,7 +98,7 @@ def edit(vnum, Thing, template, name):
         db.session.commit()
         flash("Saved!")
 
-    return render_template(template, form=form, thing=thing)
+    return render_template(template, form=form, vnum=vnum, thing=thing)
 
 
 def jsonifyRooms(rooms, exits):
