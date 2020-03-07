@@ -1,4 +1,5 @@
 from main import db
+import crypt
 
 from flask_sqlalchemy import SQLAlchemy
 
@@ -18,6 +19,15 @@ class SneezyModel(db.Model):
         return "<Name: {}>".format(self.name)
 
 
+def authenticate(username, password):
+    sneezy_pw = crypt.crypt(password, username)[:10]
+    return Account.query.filter_by(name=username, passwd=sneezy_pw).first()
+
+
+def hasAssignedBlock(account):
+    return any(getOwnedVnums(getPlayerName(account.name)))
+
+
 def getPlayerName(accountName):
     return (Player.query
             .join(Wizdata, Wizdata.player_id == Player.id)
@@ -25,15 +35,14 @@ def getPlayerName(accountName):
             .filter(Account.name == accountName)
             .first().name)
 
-def getWizdata(name):
+def getWizdata(playerName):
     return (Wizdata.query
             .join(Player, Wizdata.player_id == Player.id)
             .join(Account, Account.account_id == Player.account_id)
-            .filter(Player.name == name)
+            .filter(Player.name == playerName)
             ).first()
 
-def getOwner(name):
-    # todo: player name
+def getOwner(playerName):
     return (Wizdata.query
             .join(Player, Wizdata.player_id == Player.id)
             .join(Account, Account.account_id == Player.account_id)
