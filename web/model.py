@@ -261,6 +261,7 @@ class Obj(ImmortalModel):
     decay = db.Column(db.Integer)
     volume = db.Column(db.Integer)
     material = db.Column(db.Integer)
+    owner = db.Column(db.String(32))
     # objextra = db.relationship('objextra', backref='obj', lazy=True)
     # objaffect = db.relationship('objaffect', backref='obj', lazy=True)
 
