@@ -265,7 +265,7 @@ class Obj(ImmortalModel):
     # objaffect = db.relationship('objaffect', backref='obj', lazy=True)
 
     def create(vnum, owner):
-        return Obj(vnum=vnum, name="", short_desc="", long_desc="", action_desc="", type=0, action_flag=0, wear_flag=0, val0=0, val1=0, val2=0, val3=0, weight=0, price=0, can_be_seen=0, spec_proc=0, max_exist=9999, max_struct=0, cur_struct=0, decay=0, volume=0, material=0)
+        return Obj(vnum=vnum, name="", short_desc="", long_desc="", action_desc="", type=0, action_flag=0, wear_flag=0, val0=0, val1=0, val2=0, val3=0, weight=0, price=0, can_be_seen=0, spec_proc=0, max_exist=9999, max_struct=0, cur_struct=0, decay=0, volume=0, material=0, owner=owner)
 
     def __repr__(self):
         return "<Name: {}>".format(self.name)
