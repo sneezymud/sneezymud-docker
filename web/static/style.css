@@ -12,3 +12,7 @@
 button a {
   text-decoration: none;
 }
+
+div.buttons {
+  margin: 0.5em;
+}

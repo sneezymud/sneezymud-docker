@@ -63,30 +63,30 @@ def mobs():
 @auth.requires_auth
 def room(vnum):
     name = getPlayerName(request.authorization.username)
-    return edit(vnum, Room, 'room.html', name)
+    return edit(vnum, Room, 'room.html', name, backlink='rooms')
 
 @app.route('/obj/<int:vnum>', methods=['GET', 'POST'])
 @auth.requires_auth
 def obj(vnum):
     name = getPlayerName(request.authorization.username)
-    return edit(vnum, Obj, 'obj.html', name)
+    return edit(vnum, Obj, 'obj.html', name, backlink='objs')
 
 
 @app.route('/mob/<int:vnum>', methods=['GET', 'POST'])
 @auth.requires_auth
 def mob(vnum):
     name = getPlayerName(request.authorization.username)
-    return edit(vnum, Mob, 'mob.html', name)
+    return edit(vnum, Mob, 'mob.html', name, backlink='mobs')
 
 
 @app.route('/mobresponse/<int:vnum>', methods=['GET', 'POST'])
 @auth.requires_auth
 def mobresponse(vnum):
     name = getPlayerName(request.authorization.username)
-    return edit(vnum, Mobresponses, 'mobresponse.html', name)
+    return edit(vnum, Mobresponses, 'mobresponse.html', name, backlink='mob/{vnum}'.format(vnum=vnum))
 
 
-def edit(vnum, Thing, template, name):
+def edit(vnum, Thing, template, name, backlink):
     if not Thing.canAccess(vnum, name):
         return render_template("badaccess.html")
 
@@ -104,7 +104,7 @@ def edit(vnum, Thing, template, name):
         db.session.commit()
         flash("Saved!")
 
-    return render_template(template, form=form, vnum=vnum, thing=thing)
+    return render_template(template, form=form, vnum=vnum, thing=thing, backlink=backlink)
 
 
 def jsonifyRooms(rooms, exits):

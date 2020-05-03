@@ -1,24 +1,13 @@
-{% extends "base.html" %}
-{% block content %}
+{% extends "editform.html" %}
+{% block form %}
 
-<h1>Object {{thing.vnum}}</h1>
-
-<form action="{{thing.vnum}}" method="post">
-  <div class="ib">
-    <fieldset>
-      {{ form.hidden_tag() }}
-      <div class="grid">
-        {% for field in form %}
-          {% if field.type != 'CSRFTokenField' and field.name != 'owner' %}
-            {{ field.label() }}
-            {{ field() }}
-          {% endif %}
-        {% endfor %}
-      </div>
-      <input type="submit" value="Save" />
-      <button type="button" ><a href="../objs">Back</a></button>
-    </fieldset>
-  </div>
-</form>
+<div class="grid">
+  {% for field in form %}
+    {% if field.type != 'CSRFTokenField' and field.name != 'owner' %}
+      {{ field.label() }}
+      {{ field() }}
+    {% endif %}
+  {% endfor %}
+</div>
 
 {% endblock %}
