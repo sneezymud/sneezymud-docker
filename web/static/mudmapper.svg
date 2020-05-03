@@ -3312,11 +3312,13 @@ function interpretMap (code) {
     let room = rooms[vnum];
     room.x = normalizeX(room.x)
     room.y = normalizeY(room.y)
+    room.vnum = vnum;
   }
 
   for (let vnum in rooms) {
     let room = rooms[vnum];
     floor(room.x, room.y);
+    console.log(`Room ${room.vnum} @ ${room.x},${room.y}`);
   }
 
   /*
