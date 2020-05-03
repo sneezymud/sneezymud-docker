@@ -214,8 +214,11 @@ class Roomexit(ImmortalModel):
     def getMy(name):
         myRooms = Room.getMy(name)
 
-        return set(Roomexit.query.filter(Roomexit.vnum.in_(map(lambda r: r.vnum, myRooms))).all()
-                + Roomexit.query.filter(Roomexit.destination.in_(map(lambda r: r.vnum, myRooms))).all())
+        # exclude exits leading into the zone because they create lots of confusion in Layoutificator
+        return set(Roomexit.query.filter(
+            Roomexit.vnum.in_(map(lambda r: r.vnum, myRooms))
+            ).filter(Roomexit.destination.in_(map(lambda r: r.vnum, myRooms))
+            ).all())
 
     def canAccess(vnum, name):
         return checkVnum(vnum, name)
