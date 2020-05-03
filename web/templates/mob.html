@@ -12,7 +12,7 @@
       {{ form.hidden_tag() }}
       <div class="grid">
         {% for field in form %}
-          {% if field.type != 'CSRFTokenField' %}
+          {% if field.type != 'CSRFTokenField' and field.name != 'owner' %}
             {{ field.label() }}
             {{ field() }}
           {% endif %}

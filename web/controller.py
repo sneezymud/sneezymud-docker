@@ -19,6 +19,11 @@ from wtforms.ext.sqlalchemy.orm import model_form
 def home():
     return render_template("home.html")
 
+def log(*args, **kwargs):
+    print("↓"*50)
+    print(*args, **kwargs)
+    print("↑"*50)
+
 
 @app.route("/zones")
 @auth.requires_auth
@@ -95,6 +100,7 @@ def edit(vnum, Thing, template, name):
 
     if form.validate_on_submit():
         form.populate_obj(thing)
+        thing.owner = getPlayerName(request.authorization.username)
         db.session.commit()
         flash("Saved!")
 
