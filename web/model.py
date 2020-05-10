@@ -389,7 +389,7 @@ class Mobresponses(ImmortalModel):
     def parseTriggersFromMobResponse(vnum):
         mobresponse = Mobresponses.query.filter_by(vnum=vnum).first()
         if mobresponse is None:
-            return []
+            return {}
 
         # get rid of comments and empty lines
         lines = map(lambda x: x.strip(), filter(lambda x: x.lstrip() and x.lstrip()[0] != '#', mobresponse.response.split('\n')))
