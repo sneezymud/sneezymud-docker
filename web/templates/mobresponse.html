@@ -1,7 +1,60 @@
 {% extends "editform.html" %}
+
+{% block preform %}
+<h2>Add/edit response</h2>
+
+<div class="nodisplay" id="mobResponseJson" >
+  {{ extraData['responsesJson'] }}
+</div>
+
+<div class="ib">
+  <form> <!-- don't submit, handled in JS -->
+    <div class="ib">
+      <fieldset>
+        <div class="nongrid">
+          <div><label for="trigger">Trigger:</label></div>
+          <div>
+            <input list="triggers" id="trigger" required />
+            <datalist id="triggers">
+              {% for trigger, paramToActions in extraData['responses'].items() %}
+                {% for param in paramToActions %}
+                  <option value="{{ trigger + " " + param }}" />
+                {% endfor %}
+              {% endfor %}
+            </datalist>
+          </div>
+          <div><label for="action">Action:</label></div>
+          <div><textarea disabled id="action" rows="10" cols="120" required ></textarea></div>
+
+          <div class="buttons">
+            <button type="button" id="addNewResponse">Add new</button>
+            <button type="button" id="editResponse">Overwrite existing</button>
+          </div>
+        </div>
+      </fieldset>
+    </div>
+  </form>
+</div>
+
+<script src="../../static/mobresponse.js" ></script>
+
+{% endblock %}
+
 {% block form %}
+<label for="response"><h2>Existing responses</h2></label>
+<div>{{ form.response(cols=120, rows=24) }}</div>
+{% endblock %}
 
-<label for="response">Response</label>
-<div>{{ form.response(cols=80, rows=24) }}</div>
+{% block rightpane %}
+<h2>Instructions</h2>
+<p>Read the book (load obj 1461)</p>
+<h3>Trigger</h3>
+<p>Use any command, or some non-commands (click open the dropdown to see suggested triggers).</p>
 
+<h3>Argument</h3>
+<p>Modifies the trigger.</p>
+<p>For "roomenter", leave empty to trigger on any enter.</p>
+<p>Enter vnum to only trigger if the player entered from that room.</p>
+<p>For "say", it's the keyword expected from the player.</p>
+<p>For "give", it's vnum of the object given.</p>
 {% endblock %}

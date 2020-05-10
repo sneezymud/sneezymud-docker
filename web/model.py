@@ -379,3 +379,42 @@ class Mobresponses(ImmortalModel):
 
     def create(vnum, owner):
         return Mobresponses(vnum=vnum, response="", owner=owner)
+
+    # parse this:
+    # say {"hello";
+    # 	smile %n;
+    # 	tovict <c>$n says, <z>"Hello %n, do you need help <c>getting started<z>?";
+    # 	}
+    # ... into a dict of trigger -> argument -> [actions1, actions2..]
+    def parseTriggersFromMobResponse(vnum):
+        mobresponse = Mobresponses.query.filter_by(vnum=vnum).first()
+        if mobresponse is None:
+            return []
+
+        # get rid of comments and empty lines
+        lines = map(lambda x: x.strip(), filter(lambda x: x.lstrip() and x.lstrip()[0] != '#', mobresponse.response.split('\n')))
+        rest = ' '.join(lines).replace('\t', '        ').replace('\r', '')
+
+        out = {}
+        # XXX: fat assumption: there are no }s inside actions.
+        while True:
+            trigger, separator, rest = rest.partition('{')
+            if separator == '':
+                break
+            trigger = trigger.strip()
+            argument, separator, rest = rest.partition(';')
+            if separator == '':
+                break
+            argument = argument.strip()
+            actions, separator, rest = rest.partition('}')
+            if separator == '':
+                break
+            actions = filter(lambda x: x, map(lambda x: x.strip(), actions.split(';')))
+
+            if trigger not in out:
+                out[trigger] = {}
+            if argument not in out[trigger]:
+                out[trigger][argument] = []
+            out[trigger][argument].append(list(actions))
+
+        return out

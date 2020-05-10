@@ -13,6 +13,7 @@ from wtforms.validators import DataRequired
 from wtforms.ext.sqlalchemy.orm import model_form
 
 # TODO: figure out how to lazily create objects
+# TODO: for every slightest action, this bloody thing causes a million DB requests.
 
 @app.route("/")
 @auth.requires_auth
@@ -83,10 +84,13 @@ def mob(vnum):
 @auth.requires_auth
 def mobresponse(vnum):
     name = getPlayerName(request.authorization.username)
-    return edit(vnum, Mobresponses, 'mobresponse.html', name, backlink='mob/{vnum}'.format(vnum=vnum))
+    responses = Mobresponses.parseTriggersFromMobResponse(vnum)
+    extraData = {"responses": responses, "responsesJson": json.dumps(responses)}
+
+    return edit(vnum, Mobresponses, 'mobresponse.html', name, backlink='mob/{vnum}'.format(vnum=vnum), extraData=extraData)
 
 
-def edit(vnum, Thing, template, name, backlink):
+def edit(vnum, Thing, template, name, backlink, extraData=None):
     if not Thing.canAccess(vnum, name):
         return render_template("badaccess.html")
 
@@ -104,7 +108,7 @@ def edit(vnum, Thing, template, name, backlink):
         db.session.commit()
         flash("Saved!")
 
-    return render_template(template, form=form, vnum=vnum, thing=thing, backlink=backlink)
+    return render_template(template, form=form, vnum=vnum, thing=thing, backlink=backlink, extraData=extraData)
 
 
 def jsonifyRooms(rooms, exits):
