@@ -1,4 +1,4 @@
-version: '2'
+version: '3'
  
 services:
   db:
@@ -18,7 +18,7 @@ services:
   sneezy:
     depends_on:
       - db
-    build: ./docker
+    image: sneezymud
     container_name: sneezy
     cap_add:
       - SYS_PTRACE
