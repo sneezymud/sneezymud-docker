@@ -6,4 +6,3 @@ RUN pip install -r requirements.txt
 RUN useradd -ms /bin/bash -u $UID sneezy
 USER sneezy
 CMD python main.py
-# CMD /bin/bash -c "while true; do sleep 100;done"

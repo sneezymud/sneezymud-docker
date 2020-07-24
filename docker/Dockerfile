@@ -7,7 +7,7 @@ RUN useradd -m -u $UID sneezy
 USER sneezy
 
 WORKDIR /home/sneezy
-RUN git clone --recurse-submodules https://github.com/sneezymud/sneezymud
+RUN git clone --depth 1 --shallow-submodules --recurse-submodules https://github.com/sneezymud/sneezymud
 WORKDIR /home/sneezy/sneezymud/code
 RUN scons -j`grep -c ^processor /proc/cpuinfo` -Q debug=1 -Q sanitize=0 -Q olevel=1 sneezy
 
@@ -15,13 +15,14 @@ FROM ubuntu:bionic as run
 RUN apt update && apt-get install --yes --no-install-recommends libboost-program-options1.65.1 libboost-regex1.65.1 libboost-filesystem1.65.1 libboost-system1.65.1 libmariadbclient18 libcurl4 gdb
 ARG UID=1000
 RUN useradd -m -u $UID sneezy
-USER sneezy
+RUN mkdir -p /home/sneezy/code/objs/
+RUN mkdir -p /home/sneezy/lib
+WORKDIR /home/sneezy/code
 COPY --from=build /home/sneezy/sneezymud/code/objs/libsneezy.a /home/sneezy/code/objs/libsneezy.a
 COPY --from=build /home/sneezy/sneezymud/code/sneezy /home/sneezy/code/sneezy
-COPY --from=build /home/sneezy/sneezymud/lib /home/sneezy/
-COPY --from=build /home/sneezy/sneezymud/code/sneezy_docker_compose.cfg /home/sneezy/code/sneezy.cfg
-WORKDIR /home/sneezy/code
-RUN mkdir -p ../lib/roomdata/saved ../lib/immortals ../lib/corpses/corrupt ../lib/rent/corrupt ../lib/player/corrupt
-RUN for i in a b c d e f g h i j k l m n o p q r s t u v w x y z; do mkdir -p ../lib/rent/$i ../lib/account/$i ../lib/player/$i;done
+COPY --from=build /home/sneezy/sneezymud/lib /home/sneezy/lib
+COPY --from=build /home/sneezy/sneezymud/code/sneezy_docker_compose.cfg /home/sneezy/code/sneezy.cfg 
+RUN chown -R sneezy:sneezy /home/sneezy
+USER sneezy
 EXPOSE 7900
 CMD ./sneezy
