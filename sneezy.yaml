@@ -1,0 +1,90 @@
+# TODO:
+# container/pod with builder tools
+# better persistent storage for DB
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      nodeSelector:
+        "beta.kubernetes.io/os": linux
+      containers:
+      - name: db
+        image: sneezymud/sneezymud-db:latest
+        ports:
+        - containerPort: 3306
+          name: db
+        volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: db-persistence-files
+      volumes:
+      - name: db-persistence-files
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+spec:
+  ports:
+  - port: 3306
+  selector:
+    app: db
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sneezymud
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sneezymud
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  minReadySeconds: 5 
+  template:
+    metadata:
+      labels:
+        app: sneezymud
+    spec:
+      nodeSelector:
+        "beta.kubernetes.io/os": linux
+      containers:
+      - name: sneezymud
+        image: sneezymud/sneezymud:latest
+        ports:
+        - containerPort: 7900
+        resources:
+          requests:
+            cpu: 250m
+          limits:
+            cpu: 500m
+        env:
+        - name: DB
+          value: "sneezydb"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sneezymud
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 7900
+  selector:
+    app: sneezymud
