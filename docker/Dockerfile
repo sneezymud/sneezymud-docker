@@ -18,7 +18,6 @@ RUN useradd -m -u $UID sneezy
 RUN mkdir -p /home/sneezy/code/objs/
 RUN mkdir -p /home/sneezy/lib
 WORKDIR /home/sneezy/code
-COPY --from=build /home/sneezy/sneezymud/code/objs/libsneezy.a /home/sneezy/code/objs/libsneezy.a
 COPY --from=build /home/sneezy/sneezymud/code/sneezy /home/sneezy/code/sneezy
 COPY --from=build /home/sneezy/sneezymud/lib /home/sneezy/lib
 COPY --from=build /home/sneezy/sneezymud/code/sneezy_docker_compose.cfg /home/sneezy/code/sneezy.cfg 
