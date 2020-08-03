@@ -22,6 +22,8 @@ services:
     ports:
         - "7900:7900"
     restart: always
+    volumes:
+      - mutableFiles:/home/sneezy/mutable/
 
   web:
     container_name: sneezy-web
@@ -33,3 +35,4 @@ services:
     restart: always
 volumes:
   sneezydb:
+  mutableFiles:
