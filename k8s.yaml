@@ -20,7 +20,7 @@ spec:
         "beta.kubernetes.io/os": linux
       containers:
       - name: db
-        image: sneezymud/sneezymud-db:latest
+        image: crsneezy.azurecr.io/sneezymud-db:1
         ports:
         - containerPort: 3306
           name: db
@@ -66,7 +66,7 @@ spec:
         "beta.kubernetes.io/os": linux
       containers:
       - name: sneezymud
-        image: sneezymud/sneezymud:latest
+        image: crsneezy.azurecr.io/sneezymud:1
         ports:
         - containerPort: 7900
         resources:
