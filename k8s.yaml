@@ -1,7 +1,34 @@
 # TODO:
-# container/pod with builder tools
-# better persistent storage for DB
+# container/with builder tools
+# container/pod with websockify
+# populate lib and db from backup using an init container
 
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sneezydb-disk
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: default
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sneezy-files-disk
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: default
+  resources:
+    requests:
+      storage: 1Gi
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,7 +56,8 @@ spec:
             name: db-persistence-files
       volumes:
       - name: db-persistence-files
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: sneezydb-disk
 
 ---
 apiVersion: v1
@@ -64,6 +92,16 @@ spec:
     spec:
       nodeSelector:
         "beta.kubernetes.io/os": linux
+      initContainers:
+      - name: wait-for-db
+        image: mariadb:10.5
+        command: ['sh', '-c', "until mysql -h db -u root --password=111111  < /dev/null ; do echo waiting for db; sleep 2; done"]
+      # - name: populate-data
+      #   image: ubuntu:focal
+      #   command: ['sh', '-c', "while sleep 2; do echo waiting; done"]
+      #   volumeMounts:
+      #     - mountPath: /home/sneezy/lib
+      #       name: sneezy-files-disk
       containers:
       - name: sneezymud
         image: crsneezy.azurecr.io/sneezymud:1
@@ -74,9 +112,13 @@ spec:
             cpu: 250m
           limits:
             cpu: 500m
-        env:
-        - name: DB
-          value: "sneezydb"
+        volumeMounts:
+          - mountPath: /home/sneezy/lib
+            name: sneezy-files-disk
+      volumes:
+      - name: sneezy-files-disk
+        persistentVolumeClaim:
+          claimName: sneezy-files-disk
 ---
 apiVersion: v1
 kind: Service
