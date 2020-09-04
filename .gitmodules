@@ -1,3 +1,6 @@
 [submodule "sneezymud"]
 	path = sneezymud
 	url = https://github.com/sneezymud/sneezymud
+[submodule "nginx/connectificator"]
+	path = nginx/connectificator
+	url = https://github.com/cizra/connectificator
