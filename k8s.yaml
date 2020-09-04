@@ -6,7 +6,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: sneezydb-disk
+  name: sneezy-db-disk
 spec:
   accessModes:
   - ReadWriteOnce
@@ -30,45 +30,56 @@ spec:
 
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  name: db
+  name: sneezy-db
 spec:
+  serviceName: sneezy-db
   replicas: 1
   selector:
     matchLabels:
-      app: db
+      app: sneezy-db
   template:
     metadata:
       labels:
-        app: db
+        app: sneezy-db
     spec:
       nodeSelector:
         "beta.kubernetes.io/os": linux
       containers:
-      - name: db
-        image: crsneezy.azurecr.io/sneezymud-db:1
+      - name: sneezy-db
+        image: mariadb:10.5
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "111111"
+        - name: MYSQL_USER
+          value: "sneezy"
+        - name: MYSQL_PASSWORD
+          value: "password"
         ports:
         - containerPort: 3306
-          name: db
+          name: sneezy-db
         volumeMounts:
           - mountPath: /var/lib/mysql
-            name: db-persistence-files
+            name: sneezy-db-disk
       volumes:
-      - name: db-persistence-files
+      - name: sneezy-db-disk
         persistentVolumeClaim:
-          claimName: sneezydb-disk
+          claimName: sneezy-db-disk
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: db
+  name: sneezy-db
+  labels:
+    app: sneezy-db
 spec:
   ports:
   - port: 3306
+    name: mariadb
   selector:
-    app: db
+    app: sneezy-db
 
 ---
 apiVersion: apps/v1
@@ -95,16 +106,35 @@ spec:
       initContainers:
       - name: wait-for-db
         image: mariadb:10.5
-        command: ['sh', '-c', "until mysql -h db -u root --password=111111  < /dev/null ; do echo waiting for db; sleep 2; done"]
-      # - name: populate-data
-      #   image: ubuntu:focal
-      #   command: ['sh', '-c', "while sleep 2; do echo waiting; done"]
-      #   volumeMounts:
-      #     - mountPath: /home/sneezy/lib
-      #       name: sneezy-files-disk
+        command: ['sh', '-c', "until mysql -h sneezy-db -u root --password=111111  < /dev/null ; do echo waiting for db; sleep 2; done"]
+      - name: populate-data-and-db
+        image: mariadb:10.5
+        command:
+          - 'sh'
+          - '-c'
+          - |
+            apt-get update && apt-get install --yes --no-install-recommends ca-certificates curl
+            cd /home/sneezy
+            curl -L https://sneezymud.org/sneezybackups/latest.tar.xz | tar xvJ
+            # Sneezy runs as UID=1000
+            chown -R 1000:1000 lib
+            echo > dbsetup.sql <<EOF
+            CREATE USER 'sneezy'@'sneezy.sneezymuddocker_default' IDENTIFIED BY 'password';
+            CREATE USER 'sneezy'@'localhost' IDENTIFIED BY 'password';
+            CREATE DATABASE IF NOT EXISTS immortal CHARACTER SET utf8 COLLATE utf8_general_ci;
+            GRANT ALL ON immortal.* to 'sneezy'@'%';
+            CREATE DATABASE IF NOT EXISTS sneezy CHARACTER SET utf8 COLLATE utf8_general_ci;
+            GRANT ALL ON sneezy.* to 'sneezy'@'%';
+            EOF
+            # dbdump.sql comes from the backup
+            mysql -h sneezy-db -u root --password=111111 < dbdump.sql
+            rm dbdump.sql
+        volumeMounts:
+          - mountPath: /home/sneezy/lib
+            name: sneezy-files-disk
       containers:
       - name: sneezymud
-        image: crsneezy.azurecr.io/sneezymud:1
+        image: sneezymud/sneezymud:latest
         ports:
         - containerPort: 7900
         resources:
