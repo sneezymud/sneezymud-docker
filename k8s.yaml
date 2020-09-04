@@ -133,7 +133,7 @@ spec:
             name: sneezy-files-disk
       containers:
       - name: sneezymud
-        image: sneezymud/sneezymud:latest
+        image: sneezymud/sneezymud:1
         ports:
         - containerPort: 7900
         resources:
