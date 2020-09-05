@@ -114,6 +114,7 @@ spec:
           - '-c'
           - |
             set -ex
+            [ -f /home/sneezy/lib/tipsfile ] && exit 0
             apt-get update && apt-get install --yes --no-install-recommends ca-certificates curl
             echo "DROP USER IF EXISTS 'sneezy'@'%';" | mysql -h sneezy-db -u root --password=111111
             echo "FLUSH PRIVILEGES;" | mysql -h sneezy-db -u root --password=111111
