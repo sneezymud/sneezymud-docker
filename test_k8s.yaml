@@ -1,0 +1,130 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sneezy-test-db
+spec:
+  serviceName: sneezy-test-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sneezy-test-db
+  template:
+    metadata:
+      labels:
+        app: sneezy-test-db
+    spec:
+      nodeSelector:
+        "beta.kubernetes.io/os": linux
+      containers:
+      - name: sneezy-test-db
+        image: mariadb:10.5
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "111111"
+        - name: MYSQL_USER
+          value: "sneezy"
+        - name: MYSQL_PASSWORD
+          value: "password"
+        ports:
+        - containerPort: 3306
+          name: sneezy-test-db
+        volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: sneezy-test-db-disk
+      volumes:
+      - name: sneezy-test-db-disk
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sneezy-test-db
+  labels:
+    app: sneezy-test-db
+spec:
+  ports:
+  - port: 3306
+    name: mariadb
+  selector:
+    app: sneezy-test-db
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sneezymud-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sneezymud-test
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  minReadySeconds: 5 
+  template:
+    metadata:
+      labels:
+        app: sneezymud-test
+    spec:
+      nodeSelector:
+        "beta.kubernetes.io/os": linux
+      initContainers:
+      - name: wait-for-db
+        image: mariadb:10.5
+        command: ['sh', '-c', "until mysql -h sneezy-test-db -u root --password=111111  < /dev/null ; do echo waiting for db; sleep 2; done"]
+      - name: populate-data-and-db
+        image: mariadb:10.5
+        command:
+          - 'sh'
+          - '-c'
+          - |
+            set -ex
+            [ -f /home/sneezy/lib/tipsfile ] && exit 0
+            apt-get update && apt-get install --yes --no-install-recommends ca-certificates curl
+            echo "DROP USER IF EXISTS 'sneezy'@'%';" | mysql -h sneezy-test-db -u root --password=111111
+            echo "FLUSH PRIVILEGES;" | mysql -h sneezy-test-db -u root --password=111111
+            echo "CREATE DATABASE IF NOT EXISTS immortal CHARACTER SET utf8 COLLATE utf8_general_ci;" | mysql -h sneezy-test-db -u root --password=111111
+            echo "CREATE DATABASE IF NOT EXISTS sneezy CHARACTER SET utf8 COLLATE utf8_general_ci;" | mysql -h sneezy-test-db -u root --password=111111
+            echo "CREATE USER 'sneezy'@'%' IDENTIFIED BY 'password';" | mysql -h sneezy-test-db -u root --password=111111
+            echo "GRANT ALL PRIVILEGES ON immortal.* to 'sneezy'@'%';" | mysql -h sneezy-test-db -u root --password=111111
+            echo "GRANT ALL PRIVILEGES ON sneezy.* to 'sneezy'@'%';" | mysql -h sneezy-test-db -u root --password=111111
+            cd /home/sneezy
+            curl -L https://sneezymud.org/sneezybackups/latest.tar.xz | tar xvJ
+            # Sneezy runs as UID=1000
+            chown -R 1000:1000 lib
+            mysql -h sneezy-test-db -u root --password=111111 < dbdump.sql
+            rm dbdump.sql
+        volumeMounts:
+          - mountPath: /home/sneezy/lib
+            name: sneezy-files-disk
+      containers:
+      - name: sneezymud-test
+        image: sneezymud/sneezymud:keepalive
+        command: ./sneezy -p 7902 --sneezy_host sneezy-test-db --immortal_host sneezy-test-db
+        ports:
+        - containerPort: 7902
+        resources:
+          requests:
+            cpu: 250m
+          limits:
+            cpu: 500m
+        volumeMounts:
+          - mountPath: /home/sneezy/lib
+            name: sneezy-files-disk
+      volumes:
+      - name: sneezy-files-disk
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sneezymud-test
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 7902
+  selector:
+    app: sneezymud-test
