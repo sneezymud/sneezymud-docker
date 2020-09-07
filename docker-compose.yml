@@ -1,20 +1,20 @@
 version: '3'
  
 services:
-  db:
+  sneezy-db:
     image: sneezymud/sneezymud-db:latest
     environment:
       MYSQL_ROOT_PASSWORD: "111111"
       MYSQL_USER: sneezy
       MYSQL_PASSWORD: password
-    container_name: sneezydb
+    container_name: sneezy-db
     volumes:
       - sneezydb:/var/lib/mysql
     restart: always
 
   sneezy:
     depends_on:
-      - db
+      - sneezy-db
     image: sneezymud/sneezymud:latest
     container_name: sneezy
     cap_add:
@@ -31,7 +31,7 @@ services:
     ports:
         - "5001:5000"
     depends_on:
-        - db
+        - sneezy-db
     restart: always
 volumes:
   sneezydb:
