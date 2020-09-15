@@ -1,8 +1,9 @@
 #!/bin/sh
 set -e
 
-docker build -t sneezymud/sneezymud:latest docker
-docker build -t sneezymud/sneezymud-buildertools:latest web
+TAG="${1:-latest}"
+docker build -t sneezymud/sneezymud:"$TAG" docker
+docker build -t sneezymud/sneezymud-buildertools:"$TAG" web
 
-docker push sneezymud/sneezymud:latest
-docker push sneezymud/sneezymud-buildertools:latest
+docker push sneezymud/sneezymud:"$TAG"
+docker push sneezymud/sneezymud-buildertools:"$TAG"
