@@ -5,6 +5,7 @@ set -e
 TEMPLOCATION="/tmp"
 SNEEZYLIB="/home/sneezy"
 BACKUPDIR="."
+POD=`kubectl get pods| grep sneezymud | cut -d\  -f1`
 
 # Setting the backup filename
 FNAME="$BACKUPDIR/sneezy-backup-`date +%s`.tar"
@@ -14,7 +15,7 @@ FNAME="$BACKUPDIR/sneezy-backup-`date +%s`.tar"
 
 # Perform the backup
 kubectl exec -t pod/sneezy-db-0 -- mysqldump -h sneezy-db -u root -p111111 --databases sneezy immortal > "$TEMPLOCATION/dbdump.sql"
-(kubectl exec -t pod/sneezymud-69f668d569-cfmnn -- tar -c --exclude='core' -C "$SNEEZYLIB" lib || true ) > "$FNAME"
+(kubectl exec -t "$POD" -- tar -c --exclude='core' -C "$SNEEZYLIB" lib || true ) > "$FNAME"
 tar --owner=sneezy:1000 --group=sneezy:1000 -rf "$FNAME" -C "$TEMPLOCATION" dbdump.sql
 xz "$FNAME"
 
