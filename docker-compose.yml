@@ -40,5 +40,16 @@ services:
     depends_on:
         - db
     restart: always
+
+  websockify:
+    image: efrecon/websockify
+    depends_on:
+      - sneezy
+    container_name: websockify
+    ports:
+      - "8080:8080"
+    restart: always
+    command: 8080 sneezy:7900
+
 volumes:
   sneezydb:
