@@ -42,6 +42,19 @@ spec:
       storage: 1Gi
 
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sneezy-webclient-certs
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: default
+  resources:
+    requests:
+      storage: 10Mi
+
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -169,6 +182,66 @@ spec:
   - port: 7900
   selector:
     app: sneezymud
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sneezy-webclient
+spec:
+  serviceName: sneezy-webclient
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sneezy-webclient
+  template:
+    metadata:
+      labels:
+        app: sneezy-webclient
+    spec:
+      nodeSelector:
+        "beta.kubernetes.io/os": linux
+      initContainers:
+      - name: generate-cert
+        image: asamoshkin/letsencrypt-certgen
+        ports:
+        - containerPort: 80
+          name: letsencrypt-http
+        env:
+          - name: DOMAINS
+            value: sneezymud.org,www.sneezymud.org
+        volumeMounts:
+          - mountPath: /var/ssl
+            name: sneezy-webclient-certs
+      containers:
+      - name: sneezy-webclient
+        image: sneezymud/webclient:5
+        ports:
+        - containerPort: 80
+          name: webclient-http
+        - containerPort: 443
+          name: webclient-https
+        volumeMounts:
+          - mountPath: /certs
+            name: sneezy-webclient-certs
+      volumes:
+      - name: sneezy-webclient-certs
+        persistentVolumeClaim:
+          claimName: sneezy-webclient-certs
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sneezy-webclient
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+  - port: 443
+  selector:
+    app: sneezy-webclient
+
 
       # ---
       # apiVersion: batch/v1beta1
