@@ -96,19 +96,15 @@ spec:
 
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: sneezymud
 spec:
+  serviceName: sneezy
   replicas: 1
   selector:
     matchLabels:
       app: sneezymud
-  strategy:
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 1
-  minReadySeconds: 5
   template:
     metadata:
       labels:
@@ -174,61 +170,61 @@ spec:
   selector:
     app: sneezymud
 
----
-apiVersion: batch/v1beta1
-kind: CronJob
-metadata:
-  name: sneezy-daily-backup
-spec:
-  schedule: "* * */1 * *"
-  jobTemplate:
-    spec:
-      template:
-        spec:
-          restartPolicy: OnFailure
-          volumes:
-          - name: sneezy-files-disk
-            persistentVolumeClaim:
-              claimName: sneezy-files-disk
-          - name: sneezy-backups-disk
-            persistentVolumeClaim:
-              claimName: sneezy-backups-disk
-          containers:
-          - name: sneezy-backup
-            image: busybox
-            volumeMounts:
-              - mountPath: /home/sneezy/lib
-                name: sneezy-files-disk
-                readOnly: true
-              - mountPath: /sneezybackups
-                name: sneezy-backups-disk
-            args:
-            - /bin/sh
-            - -c
-            - |
-              set -ex
-
-              # Important locations
-              TEMPLOCATION="/tmp"
-              SNEEZYLIB="/home/sneezy"
-              BACKUPDIR="/sneezybackups"
-
-              # Setting the backup filename
-              if [ -z "$1" ]
-              then
-                      FNAME="$BACKUPDIR/sneezy-backup-`date +%s`.tar.xz"
-              else
-                      FNAME="$1"
-              fi
-
-              # Dump the database (this takes a bit of time)
-              mysqldump -h sneezy-db -u root -p111111 --databases sneezy immortal > "$TEMPLOCATION/dbdump.sql"
-
-              # Perform the backup
-              tar -cJf "$FNAME" --exclude='core' -C "$TEMPLOCATION" dbdump.sql -C "$SNEEZYLIB" lib || true  # tends to fail with "file changed" or "file deleted" -- proper LVM snapshotting would be better
-
-              # Remove our temps
-              rm "$TEMPLOCATION/dbdump.sql"
-
-              # Push the backup to any online repositories.
-              #drive push -no-prompt -quiet -destination backups "$FNAME"
+      # ---
+      # apiVersion: batch/v1beta1
+      # kind: CronJob
+      # metadata:
+      #   name: sneezy-daily-backup
+      # spec:
+      #   schedule: "* * */1 * *"
+      #   jobTemplate:
+      #     spec:
+      #       template:
+      #         spec:
+      #           restartPolicy: OnFailure
+      #           volumes:
+      #           - name: sneezy-files-disk
+      #             persistentVolumeClaim:
+      #               claimName: sneezy-files-disk
+      #           - name: sneezy-backups-disk
+      #             persistentVolumeClaim:
+      #               claimName: sneezy-backups-disk
+      #           containers:
+      #           - name: sneezy-backup
+      #             image: busybox
+      #             volumeMounts:
+      #               - mountPath: /home/sneezy/lib
+      #                 name: sneezy-files-disk
+      #                 readOnly: true
+      #               - mountPath: /sneezybackups
+      #                 name: sneezy-backups-disk
+      #             args:
+      #             - /bin/sh
+      #             - -c
+      #             - |
+      #               set -ex
+      # 
+      #               # Important locations
+      #               TEMPLOCATION="/tmp"
+      #               SNEEZYLIB="/home/sneezy"
+      #               BACKUPDIR="/sneezybackups"
+      # 
+      #               # Setting the backup filename
+      #               if [ -z "$1" ]
+      #               then
+      #                       FNAME="$BACKUPDIR/sneezy-backup-`date +%s`.tar.xz"
+      #               else
+      #                       FNAME="$1"
+      #               fi
+      # 
+      #               # Dump the database (this takes a bit of time)
+      #               mysqldump -h sneezy-db -u root -p111111 --databases sneezy immortal > "$TEMPLOCATION/dbdump.sql"
+      # 
+      #               # Perform the backup
+      #               tar -cJf "$FNAME" --exclude='core' -C "$TEMPLOCATION" dbdump.sql -C "$SNEEZYLIB" lib || true  # tends to fail with "file changed" or "file deleted" -- proper LVM snapshotting would be better
+      # 
+      #               # Remove our temps
+      #               rm "$TEMPLOCATION/dbdump.sql"
+      # 
+      #               # Push the backup to any online repositories.
+      #               #drive push -no-prompt -quiet -destination backups "$FNAME"
