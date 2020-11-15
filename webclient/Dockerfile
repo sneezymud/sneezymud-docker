@@ -3,6 +3,8 @@ RUN ln -sf /usr/share/nginx/html/connectificator.html /usr/share/nginx/html/inde
 ADD connectificator/*.css /usr/share/nginx/html/
 ADD connectificator/*.html /usr/share/nginx/html/
 ADD connectificator/*.js /usr/share/nginx/html/
-ADD nginx.conf /etc/nginx/ngingx.conf
+ADD http_redirect_to_https.conf /etc/nginx/conf.d/
+ADD sneezy-webclient.conf /etc/nginx/conf.d/
+
 
 EXPOSE 80 443
