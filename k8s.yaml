@@ -41,18 +41,18 @@ spec:
     requests:
       storage: 1Gi
 
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: sneezy-webclient-certs
-spec:
-  accessModes:
-  - ReadWriteOnce
-  storageClassName: default
-  resources:
-    requests:
-      storage: 10Mi
+        # ---
+        # apiVersion: v1
+        # kind: PersistentVolumeClaim
+        # metadata:
+        #   name: sneezy-webclient-certs
+        # spec:
+        #   accessModes:
+        #   - ReadWriteOnce
+        #   storageClassName: default
+        #   resources:
+        #     requests:
+        #       storage: 10Mi
 
 ---
 apiVersion: apps/v1
@@ -154,23 +154,23 @@ spec:
         volumeMounts:
           - mountPath: /home/sneezy/lib
             name: sneezy-files-disk
-      - name: generate-cert
-        image: certbot/certbot
-        args:
-          - "certonly"
-          - "--standalone"
-          - "--agree-tos"
-          - "-m"
-          - "elmo.todurov@eesti.ee"
-          - "-n"
-          - "-d"
-          - "sneezymud.org,www.sneezymud.org"
-        ports:
-        - containerPort: 80
-          name: acme-http
-        volumeMounts:
-          - mountPath: /etc/letsencrypt
-            name: sneezy-webclient-certs
+              #       - name: generate-cert
+              #         image: certbot/certbot
+              #         args:
+              #           - "certonly"
+              #           - "--standalone"
+              #           - "--agree-tos"
+              #           - "-m"
+              #           - "elmo.todurov@eesti.ee"
+              #           - "-n"
+              #           - "-d"
+              #           - "sneezymud.org,www.sneezymud.org"
+              #         ports:
+              #         - containerPort: 80
+              #           name: acme-http
+              # volumeMounts:
+              #   - mountPath: /etc/letsencrypt
+              #     name: sneezy-webclient-certs
       containers:
       - name: sneezymud
         image: sneezymud/sneezymud:5
@@ -184,31 +184,32 @@ spec:
         volumeMounts:
           - mountPath: /home/sneezy/lib
             name: sneezy-files-disk
-      - name: sneezy-webclient
-        image: sneezymud/webclient:5
-        ports:
-        - containerPort: 80
-          name: webclient-http
-        - containerPort: 443
-          name: webclient-https
-        volumeMounts:
-          - mountPath: /etc/letsencrypt
-            name: sneezy-webclient-certs
-      - name: sneezy-websockify
-        image: efrecon/websockify
-        command:
-          - "7901"
-          - "sneezymud:7900"
-        ports:
-        - containerPort: 7901
-          name: websocket
+              #       - name: sneezy-webclient
+              #         image: sneezymud/webclient:5
+              #         ports:
+              #         - containerPort: 80
+              #           name: webclient-http
+              #         - containerPort: 443
+              #           name: webclient-https
+              #         volumeMounts:
+              #           - mountPath: /etc/letsencrypt
+              #             name: sneezy-webclient-certs
+              #       - name: sneezy-websockify
+              #         image: efrecon/websockify
+              #         command:
+              #           - "7901"
+              #           - "sneezymud:7900"
+              #         ports:
+              #         - containerPort: 7901
+              #           name: websocket
       volumes:
       - name: sneezy-files-disk
         persistentVolumeClaim:
           claimName: sneezy-files-disk
-      - name: sneezy-webclient-certs
-        persistentVolumeClaim:
-          claimName: sneezy-webclient-certs
+            #       - name: sneezy-webclient-certs
+            #         persistentVolumeClaim:
+            #           claimName: sneezy-webclient-certs
+
 ---
 apiVersion: v1
 kind: Service
@@ -219,12 +220,14 @@ spec:
   ports:
   - port: 7900
     name: sneezymud
-  - port: 80
-    name: webclient-http
-  - port: 443
-    name: webclient-https
-  - port: 7901
-    name: websocket
+#   - port: 80
+#     name: acme-http
+#   - port: 80
+#     name: webclient-http
+#   - port: 443
+#     name: webclient-https
+#   - port: 7901
+#     name: websocket
   selector:
     app: sneezymud
 
