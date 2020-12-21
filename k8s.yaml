@@ -3,6 +3,77 @@
 # container/pod with websockify
 # cronjob for refreshing certs
 
+# Setup guide
+#
+# Kubernetes Ingress takes care of routing HTTP (redirect to HTTPS), HTTPS (serves webclient), Websockets (carries MUDdy traffic) and Letsencrypt challenges.
+# To set up ingress, you need 1) a pod with ingress controller (that's an instance of nginx), 2) configuration here in this file.
+#
+# From https://docs.microsoft.com/en-us/azure/aks/ingress-tls
+# 1. Create a static IP - the resource group is important, it determines the scope the Service will search it in.
+# az network public-ip create --resource-group rg-sneezy --name mc_rg-sneezy_aks-sneezy_westus --sku Standard --allocation-method static --query publicIp.ipAddress -o tsv
+# 2. Set up a DNS record for your IP. Wait until it goes live (it might take a while, depending on DNS server).
+# 3. Set up ingress controller:
+#    kubectl create namespace sneezy-test
+#    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+#    helm install nginx-ingress ingress-nginx/ingress-nginx --namespace sneezy-test --set controller.replicaCount=2 --set controller.nodeSelector."beta\.kubernetes\.io/os"=linux --set defaultBackend.nodeSelector."beta\.kubernetes\.io/os"=linux --set controller.service.loadBalancerIP="PUT YOUR STATIC IP HERE"
+# 4. Add components to generate a TLS cert: https://cert-manager.io/docs/installation/kubernetes/
+#    kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.1.0/cert-manager.yaml
+#    XXX: If you get error that something-or-other about validator is not reachable, then: kubectl delete -A ValidatingWebhookConfiguration ingress-nginx-admission
+# 5. Now set up Sneezy, webclient, and all the stuff, then wait a bit until the TLS cert gets generated:
+#    (depending on test/prod, change the FQDNs in ingress controller):
+#    kubectl -n sneezy-test apply -f k8s.yaml
+
+apiVersion: cert-manager.io/v1alpha2
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: elmo_sneezymud-letsencrypt@todurov.eu
+    privateKeySecretRef:
+      name: letsencrypt
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+          podTemplate:
+            spec:
+              nodeSelector:
+                "kubernetes.io/os": linux
+
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: sneezy-web-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  tls:
+  - hosts:
+    - test.sneezymud.org
+    secretName: tls-secret
+  rules:
+  - host: test.sneezymud.org
+    http:
+      paths:
+      - backend:
+          serviceName: sneezymud
+          servicePort: 7901
+        path: /ws
+      - backend:
+          serviceName: sneezymud
+          servicePort: 80
+        path: /(static\/.*)
+      - backend:
+          serviceName: sneezymud
+          servicePort: 80
+
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -40,19 +111,6 @@ spec:
   resources:
     requests:
       storage: 1Gi
-
-        # ---
-        # apiVersion: v1
-        # kind: PersistentVolumeClaim
-        # metadata:
-        #   name: sneezy-webclient-certs
-        # spec:
-        #   accessModes:
-        #   - ReadWriteOnce
-        #   storageClassName: default
-        #   resources:
-        #     requests:
-        #       storage: 10Mi
 
 ---
 apiVersion: apps/v1
@@ -154,23 +212,6 @@ spec:
         volumeMounts:
           - mountPath: /home/sneezy/lib
             name: sneezy-files-disk
-              #       - name: generate-cert
-              #         image: certbot/certbot
-              #         args:
-              #           - "certonly"
-              #           - "--standalone"
-              #           - "--agree-tos"
-              #           - "-m"
-              #           - "elmo.todurov@eesti.ee"
-              #           - "-n"
-              #           - "-d"
-              #           - "sneezymud.org,www.sneezymud.org"
-              #         ports:
-              #         - containerPort: 80
-              #           name: acme-http
-              # volumeMounts:
-              #   - mountPath: /etc/letsencrypt
-              #     name: sneezy-webclient-certs
       containers:
       - name: sneezymud
         image: sneezymud/sneezymud:5
@@ -184,31 +225,23 @@ spec:
         volumeMounts:
           - mountPath: /home/sneezy/lib
             name: sneezy-files-disk
-              #       - name: sneezy-webclient
-              #         image: sneezymud/webclient:5
-              #         ports:
-              #         - containerPort: 80
-              #           name: webclient-http
-              #         - containerPort: 443
-              #           name: webclient-https
-              #         volumeMounts:
-              #           - mountPath: /etc/letsencrypt
-              #             name: sneezy-webclient-certs
-              #       - name: sneezy-websockify
-              #         image: efrecon/websockify
-              #         command:
-              #           - "7901"
-              #           - "sneezymud:7900"
-              #         ports:
-              #         - containerPort: 7901
-              #           name: websocket
+      - name: sneezy-webclient
+        image: sneezymud/webclient:13
+        ports:
+        - containerPort: 80
+          name: http
+      - name: sneezy-websockify
+        image: efrecon/websockify
+        args:
+          - "7901"
+          - "sneezymud:7900"
+        ports:
+        - containerPort: 7901
+          name: websocket
       volumes:
       - name: sneezy-files-disk
         persistentVolumeClaim:
           claimName: sneezy-files-disk
-            #       - name: sneezy-webclient-certs
-            #         persistentVolumeClaim:
-            #           claimName: sneezy-webclient-certs
 
 ---
 apiVersion: v1
@@ -219,15 +252,14 @@ spec:
   type: LoadBalancer
   ports:
   - port: 7900
+    protocol: TCP
     name: sneezymud
-#   - port: 80
-#     name: acme-http
-#   - port: 80
-#     name: webclient-http
-#   - port: 443
-#     name: webclient-https
-#   - port: 7901
-#     name: websocket
+  - port: 80
+    name: http
+    protocol: TCP
+  - port: 7901
+    name: websocket
+    protocol: TCP
   selector:
     app: sneezymud
 
