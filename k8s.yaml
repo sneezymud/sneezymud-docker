@@ -15,13 +15,17 @@
 # 3. Set up ingress controller:
 #    kubectl create namespace sneezy-test
 #    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-#    helm install nginx-ingress ingress-nginx/ingress-nginx --namespace sneezy-test --set controller.replicaCount=2 --set controller.nodeSelector."beta\.kubernetes\.io/os"=linux --set defaultBackend.nodeSelector."beta\.kubernetes\.io/os"=linux --set controller.service.loadBalancerIP="PUT YOUR STATIC IP HERE"
+#    helm install nginx-ingress ingress-nginx/ingress-nginx --namespace sneezy-test --set controller.replicaCount=1 --set controller.nodeSelector."beta\.kubernetes\.io/os"=linux --set defaultBackend.nodeSelector."beta\.kubernetes\.io/os"=linux --set controller.service.loadBalancerIP="PUT YOUR STATIC IP HERE"
 # 4. Add components to generate a TLS cert: https://cert-manager.io/docs/installation/kubernetes/
 #    kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.1.0/cert-manager.yaml
 #    XXX: If you get error that something-or-other about validator is not reachable, then: kubectl delete -A ValidatingWebhookConfiguration ingress-nginx-admission
-# 5. Now set up Sneezy, webclient, and all the stuff, then wait a bit until the TLS cert gets generated:
+# 5. Set up port forwarding of telnet traffic, in the ingress controller (sounds like major hack, I'm surprised it's supported): add --tcp-services as per https://stackoverflow.com/questions/61430311/exposing-multiple-tcp-udp-services-using-a-single-loadbalancer-on-k8s#61461960
+#    kubectl -n sneezy-test patch deployment nginx-ingress-ingress-nginx-controller --patch "$(cat nginx-ingress-controller-patch.yaml)"
+#    kubectl -n sneezy-test patch service nginx-ingress-ingress-nginx-controller --patch "$(cat nginx-ingress-svc-controller-patch.yaml)"
+# 6. Now set up Sneezy, webclient, and all the stuff, then wait a bit until the TLS cert gets generated:
 #    (depending on test/prod, change the FQDNs in ingress controller):
 #    kubectl -n sneezy-test apply -f k8s.yaml
+
 
 apiVersion: cert-manager.io/v1alpha2
 kind: ClusterIssuer
@@ -41,6 +45,14 @@ spec:
             spec:
               nodeSelector:
                 "kubernetes.io/os": linux
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tcp-services
+data:
+  "7900": sneezy-test/sneezymud:7900
 
 ---
 apiVersion: networking.k8s.io/v1beta1
@@ -249,7 +261,7 @@ kind: Service
 metadata:
   name: sneezymud
 spec:
-  type: LoadBalancer
+  type: ClusterIP # not LoadBalancer - it's exposed through the ingress controller
   ports:
   - port: 7900
     protocol: TCP
