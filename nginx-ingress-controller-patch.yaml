@@ -5,4 +5,4 @@ spec:
       - name: controller
         ports:
          - containerPort: 7900
-           hostPort: 30790
+           hostPort: 30990

@@ -20,6 +20,7 @@
 #    kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.1.0/cert-manager.yaml
 #    XXX: If you get error that something-or-other about validator is not reachable, then: kubectl delete -A ValidatingWebhookConfiguration ingress-nginx-admission
 # 5. Set up port forwarding of telnet traffic, in the ingress controller (sounds like major hack, I'm surprised it's supported): add --tcp-services as per https://stackoverflow.com/questions/61430311/exposing-multiple-tcp-udp-services-using-a-single-loadbalancer-on-k8s#61461960
+#    kubectl edit deployments -n sneezy-test nginx-ingress-ingress-nginx-controller
 #    kubectl -n sneezy-test patch deployment nginx-ingress-ingress-nginx-controller --patch "$(cat nginx-ingress-controller-patch.yaml)"
 #    kubectl -n sneezy-test patch service nginx-ingress-ingress-nginx-controller --patch "$(cat nginx-ingress-svc-controller-patch.yaml)"
 # 6. Now set up Sneezy, webclient, and all the stuff, then wait a bit until the TLS cert gets generated:
@@ -206,6 +207,10 @@ spec:
           - '-c'
           - |
             set -ex
+            ###
+            echo "XXX: DISABLED"
+            exit 0
+            ###
             [ -f /home/sneezy/lib/tipsfile ] && exit 0
             apt-get update && apt-get install --yes --no-install-recommends ca-certificates curl
             echo "DROP USER IF EXISTS 'sneezy'@'%';" | mysql -h sneezy-db -u root --password=111111
@@ -233,7 +238,7 @@ spec:
           requests:
             cpu: 250m
           limits:
-            cpu: 500m
+            cpu: 1000m
         volumeMounts:
           - mountPath: /home/sneezy/lib
             name: sneezy-files-disk
@@ -250,6 +255,11 @@ spec:
         ports:
         - containerPort: 7901
           name: websocket
+        resources:
+          requests:
+            cpu: 100m
+          limits:
+            cpu: 300m
       volumes:
       - name: sneezy-files-disk
         persistentVolumeClaim:

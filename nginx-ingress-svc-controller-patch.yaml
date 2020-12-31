@@ -1,5 +1,5 @@
 spec:
   ports:
-  - nodePort: 30790
+  - nodePort: 30990
     port: 7900
     name: sneezymud
