@@ -13,7 +13,7 @@ FNAME="$BACKUPDIR/sneezy-backup-`date +%s`.tar"
 
 # Perform the backup
 kubectl "$NAMESPACE" exec -t pod/sneezy-db-0 -- mysqldump -h sneezy-db -u root -p111111 --databases sneezy immortal > "$TEMPLOCATION/dbdump.sql"
-(kubectl "$NAMESPACE" exec -t "$POD" -- tar -c --exclude='core' -C "$SNEEZYLIB" lib || true ) > "$FNAME"
+(kubectl "$NAMESPACE" exec -t "$POD" -c sneezymud -- tar -c --exclude='core' -C "$SNEEZYLIB" lib || true ) > "$FNAME"
 tar --owner=sneezy:1000 --group=sneezy:1000 -rf "$FNAME" -C "$TEMPLOCATION" dbdump.sql
 xz "$FNAME"
 
