@@ -1,0 +1,11 @@
+FROM ubuntu:groovy as build
+LABEL maintainer Elmo Todurov <elmo.todurov@eesti.ee>
+
+RUN apt-get update && apt-get install --yes --no-install-recommends build-essential libboost-dev libboost-program-options-dev libboost-regex-dev libboost-filesystem-dev libboost-system-dev libmariadbclient-dev scons libcurl4-openssl-dev git ca-certificates
+ARG UID=1000
+ARG BRANCH="master"
+RUN useradd -m -u $UID sneezy
+USER sneezy
+
+# mount https://github.com/sneezymud/sneezymud-docker into /sneezymud-docker
+WORKDIR /sneezymud-docker/sneezymud/code/
