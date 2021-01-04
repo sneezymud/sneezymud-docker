@@ -53,7 +53,7 @@ kind: ConfigMap
 metadata:
   name: tcp-services
 data:
-  "7900": sneezy-test/sneezymud:7900
+  "7900": default/sneezymud:7900
 
 ---
 apiVersion: networking.k8s.io/v1beta1
@@ -68,10 +68,10 @@ metadata:
 spec:
   tls:
   - hosts:
-    - test.sneezymud.org
+    - sneezymud.org
     secretName: tls-secret
   rules:
-  - host: test.sneezymud.org
+  - host: sneezymud.org
     http:
       paths:
       - backend:
@@ -271,7 +271,8 @@ kind: Service
 metadata:
   name: sneezymud
 spec:
-  type: ClusterIP # not LoadBalancer - it's exposed through the ingress controller
+  # depending on whether you want webclient or direct access, choose either ClusterIP or LoadBalancer
+  type: ClusterIP
   ports:
   - port: 7900
     protocol: TCP
