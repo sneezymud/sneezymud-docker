@@ -1,7 +1,7 @@
-FROM ubuntu:bionic as build
+FROM ubuntu:groovy as build
 LABEL maintainer Elmo Todurov <elmo.todurov@eesti.ee>
 
-RUN apt-get update && apt-get install --yes --no-install-recommends build-essential libboost1.65-dev libboost-program-options1.65-dev libboost-regex1.65-dev libboost-filesystem1.65-dev libboost-system1.65-dev libmariadbclient-dev libmariadbclient18 scons libcurl4-openssl-dev git ca-certificates
+RUN apt-get update && apt-get install --yes --no-install-recommends build-essential libboost-dev libboost-program-options-dev libboost-regex-dev libboost-filesystem-dev libboost-system-dev libmariadbclient-dev scons libcurl4-openssl-dev git ca-certificates
 ARG UID=1000
 ARG BRANCH="master"
 RUN useradd -m -u $UID sneezy
@@ -12,8 +12,8 @@ RUN echo cloning $BRANCH; git clone --depth 1 --shallow-submodules --recurse-sub
 WORKDIR /home/sneezy/sneezymud/code
 RUN scons -j`grep -c ^processor /proc/cpuinfo` -Q debug=1 -Q sanitize=0 -Q olevel=1 sneezy
 
-FROM ubuntu:bionic as run
-RUN apt-get update && apt-get install --yes --no-install-recommends libboost-program-options1.65.1 libboost-regex1.65.1 libboost-filesystem1.65.1 libboost-system1.65.1 libmariadbclient18 libcurl4 gdb
+FROM ubuntu:groovy as run
+RUN apt-get update && apt-get install --yes --no-install-recommends libboost-program-options1.71.0 libboost-regex1.71.0 libboost-filesystem1.71.0 libboost-system1.71.0 libmariadb3 libcurl4 gdb
 ARG UID=1000
 RUN useradd -m -u $UID sneezy
 RUN mkdir -p /home/sneezy/code/objs/
