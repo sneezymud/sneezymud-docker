@@ -10,7 +10,7 @@ USER sneezy
 WORKDIR /home/sneezy
 RUN echo cloning $BRANCH; git clone --depth 1 --shallow-submodules --recurse-submodules --single-branch --branch $BRANCH --no-tags https://github.com/sneezymud/sneezymud
 WORKDIR /home/sneezy/sneezymud/code
-RUN scons -j`grep -c ^processor /proc/cpuinfo` -Q debug=1 -Q sanitize=0 -Q olevel=1 sneezy
+RUN scons -j`grep -c ^processor /proc/cpuinfo` -Q debug=1 -Q sanitize=1 -Q olevel=0 pretty=0 check sneezy
 
 FROM ubuntu:groovy as run
 RUN apt-get update && apt-get install --yes --no-install-recommends libboost-program-options1.71.0 libboost-regex1.71.0 libboost-filesystem1.71.0 libboost-system1.71.0 libmariadb3 libcurl4 gdb
