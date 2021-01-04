@@ -2,7 +2,7 @@ version: '3'
  
 services:
   sneezy-db:
-    image: sneezymud/sneezymud-db:latest
+    image: mariadb:10.5
     environment:
       MYSQL_ROOT_PASSWORD: "111111"
       MYSQL_USER: sneezy
@@ -15,7 +15,10 @@ services:
   sneezy:
     depends_on:
       - sneezy-db
-    image: sneezymud/sneezymud:latest
+        # image: sneezymud/sneezymud:15
+    image: sneezy-dev
+    command:
+      - ./sneezy
     container_name: sneezy
     cap_add:
       - SYS_PTRACE
@@ -23,16 +26,17 @@ services:
         - "7900:7900"
     restart: always
     volumes:
-      - mutableFiles:/home/sneezy/mutable/
+      - sneezy-lib:/home/sneezy/lib/
+      - .:/sneezymud-docker/
 
-  web:
-    container_name: sneezy-web
-    image: sneezymud/sneezymud-buildertools:latest
-    ports:
-        - "5001:5000"
-    depends_on:
-        - sneezy-db
-    restart: always
+        #  web:
+        #    container_name: sneezy-web
+        #    image: sneezymud/sneezymud-buildertools:latest
+        #    ports:
+        #        - "5001:5000"
+        #    depends_on:
+        #        - sneezy-db
+        #    restart: always
 volumes:
   sneezydb:
-  mutableFiles:
+  sneezy-lib:
