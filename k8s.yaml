@@ -396,7 +396,7 @@ spec:
             name: sneezy-files-disk
       containers:
       - name: sneezymud
-        image: sneezymud/sneezymud:18
+        image: sneezymud/sneezymud:19
         ports:
         - containerPort: 7900
         resources:
@@ -407,24 +407,6 @@ spec:
         volumeMounts:
           - mountPath: /home/sneezy/lib
             name: sneezy-files-disk
-      - name: sneezy-webclient
-        image: sneezymud/webclient:14
-        ports:
-        - containerPort: 80
-          name: http
-      - name: sneezy-websockify
-        image: efrecon/websockify
-        args:
-          - "7901"
-          - "sneezymud:7900"
-        ports:
-        - containerPort: 7901
-          name: websocket
-        resources:
-          requests:
-            cpu: 100m
-          limits:
-            cpu: 300m
       volumes:
       - name: sneezy-files-disk
         persistentVolumeClaim:
