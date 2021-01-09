@@ -1,0 +1,23 @@
+#config {packet patch} 0.1
+#config repeat on
+
+#macro {\eOx} {#echo n;n}
+#macro {\eOv} {#echo e;e}
+#macro {\eOr} {#echo s;s}
+#macro {\eOt} {#echo w;w}
+#macro {\eOk} {#echo d;d}
+#macro {\eOm} {#echo u;u}
+#macro {\eOq} {#echo sw;sw}
+#macro {\eOw} {#echo nw;nw}
+#macro {\eOy} {#echo ne;ne}
+#macro {\eOs} {#echo se;se}
+
+#macro {\eOp} {#echo {keypad 0}}
+#macro {\eOu} {#echo {keypad 5}}
+#macro {\eOo} {#echo {keypad /}}
+#macro {\eOj} {#echo {keypad *}}
+#macro {\eOn} {#echo {keypad .}}
+
+#rem for PuTTY
+#macro {\eOl} {#echo d;d}
+#macro {\eOS} {#echo u;u}
