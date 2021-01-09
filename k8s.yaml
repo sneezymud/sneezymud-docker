@@ -52,6 +52,7 @@ metadata:
   name: tcp-services
 data:
   "7900": default/sneezymud:7900
+  "7901": sneezy-test/sneezymud:7900
 
 ---
 apiVersion: networking.k8s.io/v1beta1
@@ -89,6 +90,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: sneezy-db-disk
+  namespace: default
 spec:
   accessModes:
   - ReadWriteOnce
@@ -101,6 +103,21 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
+  name: sneezy-db-disk
+  namespace: sneezy-test
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: default
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: default
   name: sneezy-files-disk
 spec:
   accessModes:
@@ -114,7 +131,8 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: sneezy-backups-disk
+  namespace: sneezy-test
+  name: sneezy-files-disk
 spec:
   accessModes:
   - ReadWriteOnce
@@ -127,6 +145,47 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
+  namespace: default
+  name: sneezy-db
+spec:
+  serviceName: sneezy-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sneezy-db
+  template:
+    metadata:
+      labels:
+        app: sneezy-db
+    spec:
+      nodeSelector:
+        "beta.kubernetes.io/os": linux
+      containers:
+      - name: sneezy-db
+        image: mariadb:10.5
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "111111"
+        - name: MYSQL_USER
+          value: "sneezy"
+        - name: MYSQL_PASSWORD
+          value: "password"
+        ports:
+        - containerPort: 3306
+          name: sneezy-db
+        volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: sneezy-db-disk
+      volumes:
+      - name: sneezy-db-disk
+        persistentVolumeClaim:
+          claimName: sneezy-db-disk
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  namespace: sneezy-test
   name: sneezy-db
 spec:
   serviceName: sneezy-db
@@ -166,6 +225,22 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  namespace: default
+  name: sneezy-db
+  labels:
+    app: sneezy-db
+spec:
+  ports:
+  - port: 3306
+    name: mariadb
+  selector:
+    app: sneezy-db
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: sneezy-test
   name: sneezy-db
   labels:
     app: sneezy-db
@@ -180,6 +255,7 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
+  namespace: default
   name: sneezymud
 spec:
   serviceName: sneezy
@@ -264,9 +340,101 @@ spec:
           claimName: sneezy-files-disk
 
 ---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  namespace: sneezy-test
+  name: sneezymud
+spec:
+  serviceName: sneezy
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sneezymud
+  template:
+    metadata:
+      labels:
+        app: sneezymud
+    spec:
+      nodeSelector:
+        "beta.kubernetes.io/os": linux
+      initContainers:
+      - name: wait-for-db
+        image: mariadb:10.5
+        command: ['sh', '-c', "until mysql -h sneezy-db -u root --password=111111  < /dev/null ; do echo waiting for db; sleep 2; done"]
+      - name: populate-data-and-db
+        image: mariadb:10.5
+        command:
+          - 'sh'
+          - '-c'
+          - |
+            set -ex
+            # [ -f /home/sneezy/lib/tipsfile ] && exit 0
+            ###
+            echo "XXX: DISABLED"
+            exit 0
+            ###
+            rm -rf /home/sneezy/lib/* # a disaster waiting to happen
+            apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends ca-certificates curl
+            echo "DROP USER IF EXISTS 'sneezy'@'%';" | mysql -h sneezy-db -u root --password=111111
+            echo "FLUSH PRIVILEGES;" | mysql -h sneezy-db -u root --password=111111
+            echo "DROP DATABASE if exists sneezy;" | mysql -h sneezy-db -u root --password=111111
+            echo "DROP DATABASE if exists immortal;" | mysql -h sneezy-db -u root --password=111111
+            echo "CREATE DATABASE immortal CHARACTER SET utf8 COLLATE utf8_general_ci;" | mysql -h sneezy-db -u root --password=111111
+            echo "CREATE DATABASE sneezy CHARACTER SET utf8 COLLATE utf8_general_ci;" | mysql -h sneezy-db -u root --password=111111
+            echo "CREATE USER 'sneezy'@'%' IDENTIFIED BY 'password';" | mysql -h sneezy-db -u root --password=111111
+            echo "GRANT ALL PRIVILEGES ON immortal.* to 'sneezy'@'%';" | mysql -h sneezy-db -u root --password=111111
+            echo "GRANT ALL PRIVILEGES ON sneezy.* to 'sneezy'@'%';" | mysql -h sneezy-db -u root --password=111111
+            cd /home/sneezy
+            curl -L https://sneezymud.org/static/sneezy-backup.tar.gz | tar xvz
+            # Sneezy runs as UID=1000
+            chown -R 1000:1000 lib
+            mysql -h sneezy-db -u root --password=111111 < dbdump.sql
+            rm dbdump.sql
+        volumeMounts:
+          - mountPath: /home/sneezy/lib
+            name: sneezy-files-disk
+      containers:
+      - name: sneezymud
+        image: sneezymud/sneezymud:18
+        ports:
+        - containerPort: 7900
+        resources:
+          requests:
+            cpu: 250m
+          limits:
+            cpu: 1000m
+        volumeMounts:
+          - mountPath: /home/sneezy/lib
+            name: sneezy-files-disk
+      - name: sneezy-webclient
+        image: sneezymud/webclient:14
+        ports:
+        - containerPort: 80
+          name: http
+      - name: sneezy-websockify
+        image: efrecon/websockify
+        args:
+          - "7901"
+          - "sneezymud:7900"
+        ports:
+        - containerPort: 7901
+          name: websocket
+        resources:
+          requests:
+            cpu: 100m
+          limits:
+            cpu: 300m
+      volumes:
+      - name: sneezy-files-disk
+        persistentVolumeClaim:
+          claimName: sneezy-files-disk
+
+---
 apiVersion: v1
 kind: Service
 metadata:
+  namespace: default
   name: sneezymud
 spec:
   # depending on whether you want webclient or direct access, choose either ClusterIP or LoadBalancer
@@ -281,6 +449,22 @@ spec:
   - port: 7901
     name: websocket
     protocol: TCP
+  selector:
+    app: sneezymud
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: sneezy-test
+  name: sneezymud
+spec:
+  # depending on whether you want webclient or direct access, choose either ClusterIP or LoadBalancer
+  type: ClusterIP
+  ports:
+  - port: 7900
+    protocol: TCP
+    name: sneezymud
   selector:
     app: sneezymud
 

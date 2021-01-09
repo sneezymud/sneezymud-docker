@@ -1,5 +1,8 @@
 spec:
   ports:
-  - nodePort: 30990
+  - nodePort: 30991
     port: 7900
     name: sneezymud
+  - nodePort: 30992
+    port: 7901
+    name: sneezy-test
