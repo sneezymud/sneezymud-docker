@@ -8,7 +8,9 @@ RUN useradd -m -u $UID sneezy
 USER sneezy
 
 WORKDIR /home/sneezy
-RUN echo Building from branch: $BRANCH; git clone --depth 1 --shallow-submodules --recurse-submodules --single-branch --branch $BRANCH --no-tags https://github.com/sneezymud/sneezymud && cd /home/sneezy/sneezymud/code && scons -j`grep -c ^processor /proc/cpuinfo` -Q debug=1 -Q sanitize=1 -Q olevel=0 check sneezy
+ARG FORCE_REBUILD=1
+RUN echo Building from branch: $BRANCH; git clone --depth 1 --shallow-submodules --recurse-submodules --single-branch --branch $BRANCH --no-tags https://github.com/sneezymud/sneezymud && cd /home/sneezy/sneezymud/code
+RUN scons -j`nproc` -Q debug=1 sanitize=1 olevel=0 check sneezy
 
 FROM ubuntu:focal as run
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive TZ=utc apt-get install --yes --no-install-recommends libboost-program-options1.71.0 libboost-regex1.71.0 libboost-filesystem1.71.0 libboost-system1.71.0 libmariadb3 libcurl4 libasan5 gdb
