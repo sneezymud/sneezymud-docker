@@ -9,7 +9,8 @@ USER sneezy
 
 WORKDIR /home/sneezy
 ARG FORCE_REBUILD=1
-RUN echo Building from branch: $BRANCH; git clone --depth 1 --shallow-submodules --recurse-submodules --single-branch --branch $BRANCH --no-tags https://github.com/sneezymud/sneezymud && cd /home/sneezy/sneezymud/code
+RUN echo Building from branch: $BRANCH; git clone --depth 1 --shallow-submodules --recurse-submodules --single-branch --branch $BRANCH --no-tags https://github.com/sneezymud/sneezymud
+WORKDIR /home/sneezy/sneezymud/code
 RUN scons -j`nproc` -Q debug=1 sanitize=1 olevel=0 check sneezy
 
 FROM ubuntu:focal as run
