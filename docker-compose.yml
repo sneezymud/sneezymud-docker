@@ -18,7 +18,10 @@ services:
         # image: sneezymud/sneezymud:15
     image: sneezy-dev
     command:
-      - ./sneezy
+      - "/bin/sh"
+      - "-c"
+      - |
+        scons -j`nproc` -Q sanitize=1 olevel=0 check sneezy && ./sneezy
     container_name: sneezy
     cap_add:
       - SYS_PTRACE
