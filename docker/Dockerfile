@@ -22,7 +22,7 @@ RUN mkdir -p /home/sneezy/lib
 WORKDIR /home/sneezy/code
 COPY --from=build /home/sneezy/sneezymud/code/sneezy /home/sneezy/code/sneezy
 COPY --from=build /home/sneezy/sneezymud/lib /home/sneezy/lib
-COPY --from=build /home/sneezy/sneezymud/code/sneezy_k8s.cfg /home/sneezy/code/sneezy.cfg 
+COPY --from=build /home/sneezy/sneezymud/code/sneezy.cfg /home/sneezy/code/sneezy.cfg 
 RUN chown -R sneezy:sneezy /home/sneezy
 USER sneezy
 EXPOSE 7900
