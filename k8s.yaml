@@ -304,7 +304,7 @@ spec:
           - mountPath: /home/sneezy/lib
             name: sneezy-files-disk
       containers:
-      - name: sneezymud
+      - name: sneezymud  # Prod
         image: sneezymud/sneezymud:14
         ports:
         - containerPort: 7900
@@ -395,8 +395,8 @@ spec:
           - mountPath: /home/sneezy/lib
             name: sneezy-files-disk
       containers:
-      - name: sneezymud
-        image: sneezymud/sneezymud:19
+      - name: sneezymud  # test
+        image: sneezymud/sneezymud:30
         ports:
         - containerPort: 7900
         resources:
