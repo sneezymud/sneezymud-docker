@@ -52,7 +52,6 @@ metadata:
   name: tcp-services
 data:
   "7900": default/sneezymud:7900
-  "7901": sneezy-test/sneezymud:7900
 
 ---
 apiVersion: networking.k8s.io/v1beta1
@@ -305,7 +304,7 @@ spec:
             name: sneezy-files-disk
       containers:
       - name: sneezymud  # Prod
-        image: sneezymud/sneezymud:14
+        image: sneezymud/sneezymud:35  # prev: 14
         ports:
         - containerPort: 7900
         resources:
@@ -317,7 +316,7 @@ spec:
           - mountPath: /home/sneezy/lib
             name: sneezy-files-disk
       - name: sneezy-webclient
-        image: sneezymud/webclient:14
+        image: sneezymud/webclient:26
         ports:
         - containerPort: 80
           name: http
@@ -396,7 +395,7 @@ spec:
             name: sneezy-files-disk
       containers:
       - name: sneezymud  # test
-        image: sneezymud/sneezymud:30
+        image: sneezymud/sneezymud:36
         ports:
         - containerPort: 7900
         resources:
@@ -442,7 +441,8 @@ metadata:
   name: sneezymud
 spec:
   # depending on whether you want webclient or direct access, choose either ClusterIP or LoadBalancer
-  type: ClusterIP
+  type: LoadBalancer
+  loadBalancerIP: 13.91.201.138
   ports:
   - port: 7900
     protocol: TCP
