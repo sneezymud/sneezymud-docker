@@ -17,9 +17,10 @@ If mysql_upgrade warnings are emitted run /db/mysql_update.sh - preferrably afte
 
 ## To develop
 
-1. Clone the repo, and submodules: `git clone --config core.autocrlf=input --recursive https://github.com/sneezymud/sneezymud-docker`
-2. Hop in: `cd sneezymud-docker`
-3. Set up a Docker dev container with compiler, libs and stuff: `docker build -t sneezy-dev -f docker/Dockerfile-dev docker/`
-4. Launch the dev container, mounting the current source code into it: `docker run -it --rm -v $(pwd):/sneezymud-docker sneezy-dev /usr/bin/env bash`
-5. Compile & run unittests: `scons -j`nproc` check sneezy` (`check` is the target for unittests)
-6. Now edit the code, _outside the container_ - the source is mounted into the container, so the changes sync instantly.
+1. Clone the repo, and submodules:
+    `git clone --config core.autocrlf=input --recursive https://github.com/sneezymud/sneezymud-docker`
+2. Hop in:
+    `cd sneezymud-docker`
+3. Compile and run the whole mess:
+    `docker-compose -f docker-compose-compile.yml up`
+4. Now edit the code, _outside the container_ - the source is mounted into the container, so the changes sync instantly.

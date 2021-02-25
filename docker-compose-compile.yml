@@ -1,0 +1,70 @@
+version: '3'
+ 
+services:
+  sneezy-db:
+    image: mariadb:10.5
+    environment:
+      MYSQL_ROOT_PASSWORD: "111111"
+      MYSQL_USER: sneezy
+      MYSQL_PASSWORD: password
+    container_name: sneezy-db
+    volumes:
+      - sneezydb:/var/lib/mysql
+    restart: always
+
+  sneezy:
+    depends_on:
+      - sneezy-db
+    build:
+      context: docker
+      dockerfile: Dockerfile-dev
+    command:
+      - "/bin/sh"
+      - "-c"
+      - |
+        scons -j`nproc` -Q olevel=0 sanitize=1 fortify=1 check sneezy && ./sneezy
+    container_name: sneezy
+    cap_add:
+      - SYS_PTRACE
+    ports:
+        - "7900:7900"
+    restart: always
+    volumes:
+      - sneezy-mutable:/home/sneezy/lib/
+      - .:/sneezymud-docker/
+
+  buildertools:
+    container_name: sneezy-buildertools
+    build:
+      context: web
+    ports:
+        - "5001:5000"
+    depends_on:
+        - sneezy-db
+    restart: always
+
+  websockify:
+    container_name: sneezy-websockify
+    image: efrecon/websockify
+    command:
+      - "7901"
+      - "sneezy:7900"
+    ports:
+      - "7901:7901"
+    depends_on:
+        - sneezy
+    restart: always
+
+  webclient:
+    container_name: sneezy-webclient
+    build:
+      context: webclient
+    ports:
+        - "8080:80"
+    depends_on:
+        - websockify
+    restart: always
+
+volumes:
+  sneezydb:
+  sneezy-mutable:
