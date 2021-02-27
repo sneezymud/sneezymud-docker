@@ -22,7 +22,7 @@ services:
       - "/bin/sh"
       - "-c"
       - |
-        scons -j`nproc` -Q olevel=0 sanitize=1 fortify=1 check sneezy && ./sneezy
+        scons -j`nproc` -Q olevel=2 sanitize=1 fortify=1 check sneezy && gdb -ex run ./sneezy
     container_name: sneezy
     cap_add:
       - SYS_PTRACE
