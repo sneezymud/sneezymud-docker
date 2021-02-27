@@ -3,26 +3,25 @@ set -e
 
 # Important locations
 TEMPLOCATION="/tmp"
-SNEEZYLIB="/home/sneezy/sneezymud"
-BACKUPDIR="/var/www/html/sneezybackups"
+SNEEZYLIB="/home/sneezy"
+BACKUPDIR="/mnt/www/sneezybackups"
 
 # Setting the backup filename
-if [ -z "$1" ] 
-then
-        FNAME="$BACKUPDIR/sneezy-backup-`date +%s`.tar.xz"
-else
-        FNAME="$1"
-fi
-
-# Dump the database (this takes a bit of time)
-mysqldump -u root -p<yourpassword> --databases sneezy immortal > "$TEMPLOCATION/dbdump.sql"
+FNAME="$BACKUPDIR/sneezy-backup-`date +%s`.tar"
+CFNAME="$FNAME".xz
+NICE="ionice -c idle nice -n19"
 
 # Perform the backup
-tar -cJf "$FNAME" --exclude='core' -C "$TEMPLOCATION" dbdump.sql -C "$SNEEZYLIB" lib || true  # tends to fail with "file changed" or "file deleted" -- proper LVM snapshotting would be better
+$NICE docker exec -i sneezy-db $NICE mysqldump --single-transaction -h sneezy-db -u root -p111111 --databases sneezy immortal > "$TEMPLOCATION/dbdump.sql"
+($NICE docker exec -i sneezy $NICE tar -c --exclude='core' -C "$SNEEZYLIB" lib || true ) > "$FNAME"
+$NICE tar --owner=sneezy:1000 --group=sneezy:1000 -rf "$FNAME" -C "$TEMPLOCATION" dbdump.sql
 
 # Remove our temps
 rm "$TEMPLOCATION/dbdump.sql"
 
-# Push the backup to any online repositories.
-#drive push -no-prompt -quiet -destination backups "$FNAME"
+$NICE xz "$FNAME"
 
+# Push the backup to any online repositories.
+drive push -no-prompt -quiet -destination backups/sneezy-backups "$CFNAME"
+ln -sf $CFNAME "$BACKUPDIR"/latest.tar.xz
+echo Backed up to "$CFNAME"
