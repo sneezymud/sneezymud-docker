@@ -15,13 +15,8 @@ services:
   sneezy:
     depends_on:
       - sneezy-db
-        # image: sneezymud/sneezymud:15
-    image: sneezy-dev
-    command:
-      - "/bin/sh"
-      - "-c"
-      - |
-        scons -j`nproc` -Q sanitize=1 olevel=0 check sneezy && ./sneezy
+        # last known good: 45 48
+    image: sneezymud/sneezymud:48
     container_name: sneezy
     cap_add:
       - SYS_PTRACE
@@ -30,16 +25,37 @@ services:
     restart: always
     volumes:
       - sneezy-lib:/home/sneezy/lib/
-      - .:/sneezymud-docker/
 
-        #  web:
-        #    container_name: sneezy-web
-        #    image: sneezymud/sneezymud-buildertools:latest
-        #    ports:
-        #        - "5001:5000"
-        #    depends_on:
-        #        - sneezy-db
-        #    restart: always
+  buildertools:
+    container_name: sneezy-buildertools
+    image: sneezymud/sneezymud-buildertools:44
+    ports:
+        - "5001:5000"
+    depends_on:
+        - sneezy-db
+    restart: always
+
+  webclient:
+    container_name: sneezy-webclient
+    image: sneezymud/webclient:43
+    ports:
+        - "8080:80"
+    depends_on:
+        - sneezy-db
+    restart: always
+
+  websockify:
+    container_name: sneezy-websockify
+    image: efrecon/websockify
+    command:
+      - "7901"
+      - "sneezy:7900"
+    ports:
+      - "7901:7901"
+    depends_on:
+        - sneezy-db
+    restart: always
+
 volumes:
   sneezydb:
   sneezy-lib:
