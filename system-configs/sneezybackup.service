@@ -1,0 +1,17 @@
+[Unit]
+Description=Back up SneezyMUD into 1) webroot, 2) Google Drive
+
+[Service]
+ExecStart=/home/elmo/sneezymud-docker/backup.sh
+
+# Hardening
+ProtectSystem=full
+PrivateTmp=true
+ProtectHome=true
+# these don't work:
+# SystemCallArchitectures=native
+# MemoryDenyWriteExecute=true
+# NoNewPrivileges=true
+
+[Install]
+WantedBy=timers.target
