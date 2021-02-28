@@ -7,7 +7,8 @@ SNEEZYLIB="/home/sneezy"
 BACKUPDIR="/mnt/www/sneezybackups"
 
 # Setting the backup filename
-FNAME="$BACKUPDIR/sneezy-backup-`date +%s`.tar"
+# FNAME="$BACKUPDIR/sneezy-backup-`date +%s`.tar" <- the Google Drive client is dumb and wants me to store authorization in the same place as pushable files
+FNAME="/home/elmo/sneezymud-docker/sneezy-backup-`date +%s`.tar"
 CFNAME="$FNAME".xz
 NICE="ionice -c idle nice -n19"
 
@@ -23,5 +24,6 @@ $NICE xz "$FNAME"
 
 # Push the backup to any online repositories.
 drive push -no-prompt -quiet -destination backups/sneezy-backups "$CFNAME"
+mv "$CFNAME" "$BACKUPDIR"/
 ln -sf $CFNAME "$BACKUPDIR"/latest.tar.xz
 echo Backed up to "$CFNAME"
