@@ -2,11 +2,8 @@ version: '3'
  
 services:
   sneezy-db:
-    image: mariadb:10.5
-    environment:
-      MYSQL_ROOT_PASSWORD: "111111"
-      MYSQL_USER: sneezy
-      MYSQL_PASSWORD: password
+    build:
+      context: db
     container_name: sneezy-db
     volumes:
       - sneezydb:/var/lib/mysql
