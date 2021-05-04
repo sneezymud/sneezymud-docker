@@ -2,11 +2,7 @@ version: '3'
  
 services:
   sneezy-db:
-    image: mariadb:10.5
-    environment:
-      MYSQL_ROOT_PASSWORD: "111111"
-      MYSQL_USER: sneezy
-      MYSQL_PASSWORD: password
+    image: sneezymud/sneezy-db:55
     container_name: sneezy-db
     volumes:
       - sneezydb:/var/lib/mysql
@@ -15,8 +11,8 @@ services:
   sneezy:
     depends_on:
       - sneezy-db
-        # last known good: 45 48
-    image: sneezymud/sneezymud:48
+        # last known good: 45 48 54
+    image: sneezymud/sneezymud:55
     container_name: sneezy
     cap_add:
       - SYS_PTRACE
@@ -28,7 +24,7 @@ services:
 
   buildertools:
     container_name: sneezy-buildertools
-    image: sneezymud/sneezymud-buildertools:44
+    image: sneezymud/sneezymud-buildertools:55
     ports:
         - "5001:5000"
     depends_on:
@@ -37,7 +33,7 @@ services:
 
   webclient:
     container_name: sneezy-webclient
-    image: sneezymud/webclient:43
+    image: sneezymud/webclient:55
     ports:
         - "8080:80"
     depends_on:

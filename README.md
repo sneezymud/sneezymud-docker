@@ -8,6 +8,7 @@ Instructions
 1. Browse to https://www.docker.com/ and install Docker (works on Windows, Mac, Linux)
 1. `git clone --config core.autocrlf=input https://github.com/sneezymud/sneezymud-docker`
 1. `cd sneezymud-docker`
+1. `docker-compose run sneezy-db` - this will seed the database
 1. `docker-compose up -d`
   1. or `docker-compose up` if you want to shut down with ctrl-c
   1. in the `-d` case, you can view logs with `docker-compose logs -f sneezy`
