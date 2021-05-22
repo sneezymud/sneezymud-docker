@@ -11,8 +11,7 @@ services:
   sneezy:
     depends_on:
       - sneezy-db
-        # last known good: 45 48 54
-    image: sneezymud/sneezymud:55
+    image: sneezymud/sneezymud:57
     container_name: sneezy
     cap_add:
       - SYS_PTRACE
