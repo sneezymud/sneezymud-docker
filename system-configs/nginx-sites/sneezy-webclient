@@ -10,6 +10,7 @@ server {
 	ssl_session_tickets on;
 	ssl_certificate /etc/letsencrypt/live/sneezymud.org/fullchain.pem;
 	ssl_certificate_key /etc/letsencrypt/live/sneezymud.org/privkey.pem;
+	ssl_verify_client optional_no_ca;
 
 	proxy_set_header Proxy "";
 
@@ -19,6 +20,9 @@ server {
 	}
 
 	location /sneezybackups/ {
+		if ($ssl_client_fingerprint != "8fec39a58d5254baac380cc1745829dffb0b296b") {
+		     return 403;
+		}
 		root /mnt/www/;
 	}
 
