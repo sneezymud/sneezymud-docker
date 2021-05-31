@@ -2,6 +2,7 @@ server {
 	server_name _ ;
 
 	listen 80 default_server ;
+	add_header Permissions-Policy "interest-cohort=()";
 
 	location ^~ /.well-known/acme-challenge/ {
 		default_type "text/plain";

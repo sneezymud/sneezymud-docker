@@ -7,6 +7,7 @@ server {
 	ssl_ciphers ECDH+AESGCM:ECDH+AES256-CBC:ECDH+AES128-CBC:DH+3DES:!ADH:!AECDH:!MD5;
 	ssl_dhparam /etc/nginx/certs/dhparam.pem;
 	add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+	add_header Permissions-Policy "interest-cohort=()";
 	ssl_session_tickets on;
 	ssl_certificate /etc/letsencrypt/live/sneezymud.org/fullchain.pem;
 	ssl_certificate_key /etc/letsencrypt/live/sneezymud.org/privkey.pem;
