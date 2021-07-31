@@ -23,7 +23,7 @@ services:
 
   buildertools:
     container_name: sneezy-buildertools
-    image: sneezymud/sneezymud-buildertools:55
+    image: sneezymud/sneezymud-buildertools:59
     ports:
         - "5001:5000"
     depends_on:
