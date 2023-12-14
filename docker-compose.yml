@@ -1,22 +1,24 @@
 version: '3'
- 
+
 services:
   sneezy-db:
-    image: sneezymud/sneezy-db:55
+    image: sneezymud/sneezy-db:57
     container_name: sneezy-db
     volumes:
       - sneezydb:/var/lib/mysql
     restart: always
 
   sneezy:
+    # Doing this here instead of in the Dockerfile ensures that the files inside the Docker volume have correct ownership. Those files aren't accessible to the Dockerfile, as they won't be mounted until the container is created. This is helpful in case a new file ever needs to be copied into the volume.
+    command: /bin/bash -c "chown -R sneezy:sneezy /home/sneezy && su sneezy -c './sneezy'"
     depends_on:
       - sneezy-db
-    image: sneezymud/sneezymud:58
+    image: sneezymud/sneezymud:latest
     container_name: sneezy
     cap_add:
       - SYS_PTRACE
     ports:
-        - "7900:7900"
+      - "7900:7900"
     restart: always
     volumes:
       - sneezy-lib:/home/sneezy/lib/
@@ -25,18 +27,18 @@ services:
     container_name: sneezy-buildertools
     image: sneezymud/sneezymud-buildertools:59
     ports:
-        - "5001:5000"
+      - "5001:5000"
     depends_on:
-        - sneezy-db
+      - sneezy-db
     restart: always
 
   webclient:
     container_name: sneezy-webclient
-    image: sneezymud/webclient:55
+    image: sneezymud/webclient:60
     ports:
-        - "8080:80"
+      - "8080:80"
     depends_on:
-        - sneezy-db
+      - sneezy-db
     restart: always
 
   websockify:
@@ -48,7 +50,7 @@ services:
     ports:
       - "7901:7901"
     depends_on:
-        - sneezy-db
+      - sneezy-db
     restart: always
 
 volumes:
