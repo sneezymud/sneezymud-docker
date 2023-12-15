@@ -22,6 +22,7 @@ services:
     restart: always
     volumes:
       - sneezy-lib:/home/sneezy/lib/
+      - sneezy-mutable:/home/sneezy/lib/mutable
 
   buildertools:
     container_name: sneezy-buildertools
@@ -56,3 +57,4 @@ services:
 volumes:
   sneezydb:
   sneezy-lib:
+  sneezy-mutable:
