@@ -1,5 +1,5 @@
 version: '3'
- 
+
 services:
   sneezy-db:
     build:
@@ -27,7 +27,7 @@ services:
         - "7900:7900"
     restart: always
     volumes:
-      - sneezy-mutable:/home/sneezy/lib/
+      - sneezy-mutable:/home/sneezy/lib/mutable
       - .:/sneezymud-docker/
 
   buildertools:
