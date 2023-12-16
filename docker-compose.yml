@@ -9,8 +9,6 @@ services:
     restart: always
 
   sneezy:
-    # Doing this here instead of in the Dockerfile ensures that the files inside the Docker volume have correct ownership. Those files aren't accessible to the Dockerfile, as they won't be mounted until the container is created. This is helpful in case a new file ever needs to be copied into the volume.
-    command: /bin/bash -c "chown -R sneezy:sneezy /home/sneezy && su sneezy -c './sneezy'"
     depends_on:
       - sneezy-db
     image: sneezymud/sneezymud:latest
