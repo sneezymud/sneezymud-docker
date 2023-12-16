@@ -30,14 +30,11 @@ ARG UID=1000
 RUN useradd -m -u "$UID" sneezy && \
   mkdir -p /home/sneezy/code/objs/ && \
   mkdir -p /home/sneezy/lib
-
+WORKDIR /home/sneezy/code
 COPY --from=build /home/sneezy/sneezymud/code/sneezy /home/sneezy/code/sneezy
 COPY --from=build /home/sneezy/sneezymud/lib /home/sneezy/lib
 COPY --from=build /home/sneezy/sneezymud/code/sneezy.cfg /home/sneezy/code/sneezy.cfg
 RUN chown -R sneezy:sneezy /home/sneezy
 EXPOSE 7900
-
-# This is necessary because the lib folder is searched for relative to the working directory
-WORKDIR /home/sneezy/code
-
-# Don't run the binary here - do it from the docker-compose file to allow changing ownership of volume files before switching to sneezy user and starting game.
+USER sneezy
+RUN ./sneezy
