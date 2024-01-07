@@ -18,6 +18,7 @@ ROOM_UNVISITED = -1
 ROOM_QUEUED = 0
 ROOM_VISITED = 1
 
+INF = 1000000 # something big idk
 ORIGIN = 100 # Center Square
 
 # Entry points to assign to places that can only be reached through portal/teleport
@@ -444,12 +445,12 @@ def map_rooms(rooms, origin):
                 'name':room.zone_name, 
                 'room_count':0, 
                 'unlinked':0, 
-                'x_max':-float('inf'),
-                'y_max':-float('inf'),
-                'x_min':float('inf'),
-                'y_min':float('inf'),
-                'z_min':float('inf'),
-                'z_max':-float('inf')
+                'x_max':-INF,
+                'y_max':-INF,
+                'x_min':INF,
+                'y_min':INF,
+                'z_min':INF,
+                'z_max':-INF
                 }
             zone_report[room.zone_nr] = zone
         zone_report[room.zone_nr]['room_count'] += 1 
@@ -470,7 +471,7 @@ def map_rooms(rooms, origin):
             #print(f"Zone {zone} ({int(100*zone_report[zone]['unlinked']/zone_report[zone]['room_count'])}%) [{zone_report[zone]['name']}]: {zone_report[zone]['unlinked']}/{zone_report[zone]['room_count']} unlinked")
             ...
 
-    zone_report = {zone:report for zone,report in zone_report.items() if report['linked']>0}
+    #zone_report = {zone:report for zone,report in zone_report.items() if report['linked']>0}
 
     with open(path / 'static/data/zones.json', 'w') as f:
         json.dump(zone_report, f)
@@ -495,6 +496,17 @@ def draw_map(mapped_rooms, rooms, bounds, zone_report):
         ),
     )
 
+
+    svg_groups = {}
+    svg_group_ct = {}
+    for z_index in range(bounds[0][2],bounds[1][2]+1):
+        svg_groups[z_index] = {}
+        svg_group_ct[z_index] = {}
+        for zone in zone_report:
+            svg_groups[z_index][zone_report[zone]['nr']] = svg.g(id=f"zone{zone_report[zone]['nr']}level{z_index}", class_=f"zonelevel zone{zone_report[zone]['nr']} level{z_index}")
+            svg_group_ct[z_index][zone_report[zone]['nr']] = 0
+
+
     # first draw zone bounds
     for zn,zone in zone_report.items():
         draw_zone_bounds(svg, zone, bounds, rooms)
@@ -513,7 +525,8 @@ def draw_map(mapped_rooms, rooms, bounds, zone_report):
                         # skip links to imm rooms
                         continue
                     if exit['euclidian'] == "non-euclidian":
-                        draw_exit(svg, rooms, exit, bounds)
+                        draw_exit(svg_groups[z_index][room.zone_nr], svg, rooms, exit, bounds)
+                        svg_group_ct[z_index][room.zone_nr] += 1
         # draw euclidian exits
         for room in mapped_rooms:
             if room.coords[2] == z_index:
@@ -523,16 +536,23 @@ def draw_map(mapped_rooms, rooms, bounds, zone_report):
                         # skip links to imm rooms
                         continue
                     if exit['euclidian'] != "non-euclidian":
-                        draw_exit(svg, rooms, exit, bounds)
+                        draw_exit(svg_groups[z_index][room.zone_nr], svg, rooms, exit, bounds)
+                        svg_group_ct[z_index][room.zone_nr] += 1
         # draw rooms
         for room in mapped_rooms:
             if room.coords[2] == z_index:
-                draw_room(svg, rooms, room, bounds)
+                draw_room(svg_groups[z_index][room.zone_nr], svg, rooms, room, bounds)
+                svg_group_ct[z_index][room.zone_nr] += 1
         # draw portal/teleport links        
         for room in mapped_rooms:
             if room.coords[2] == z_index:
-                draw_portal_connections(svg, rooms, room, bounds)
+                draw_portal_connections(svg_groups[z_index][room.zone_nr], svg, rooms, room, bounds)
+                svg_group_ct[z_index][room.zone_nr] += 1
 
+    for z_index in range(bounds[0][2],bounds[1][2]+1):
+        for zone in zone_report:
+            if svg_group_ct[z_index][zone_report[zone]['nr']] >0:
+                svg.add(svg_groups[z_index][zone_report[zone]['nr']])
     
     svg.save()
 
@@ -553,14 +573,14 @@ def draw_zone_bounds(svg, zone, bounds, rooms):
         insert=(min_x-EXIT_SIZE,min_y-EXIT_SIZE,),
         size=(max_x-min_x+ROOM_SIZE+2*EXIT_SIZE, max_y-min_y+ROOM_SIZE+2*EXIT_SIZE),
         stroke=("black"),
-        stroke_width=ROOM_BORDER,
+        stroke_width=0,
         fill="darkkhaki",
     )
     rect.set_desc(title=desc)
     svg.add(rect)
 
 
-def draw_portal_connections(svg, rooms, room, bounds):
+def draw_portal_connections(g, svg, rooms, room, bounds):
     map_x, map_y = get_room_map_coords(room.coords, bounds)
     start_x = map_x + ROOM_SIZE/2 
     start_y = map_y + ROOM_SIZE/2 
@@ -581,7 +601,7 @@ def draw_portal_connections(svg, rooms, room, bounds):
             stroke_dasharray="3,3",
         )
         connection.set_desc(title=f"Teleport to {rooms[room.teletarg].name} [{room.teletarg}]")
-        svg.add(connection)
+        g.add(connection)
 
     for portal in room.portals:
         if portal.target in rooms and rooms[portal.target].coords != (None, None, None):
@@ -602,11 +622,11 @@ def draw_portal_connections(svg, rooms, room, bounds):
                 stroke_dasharray="3,3",
             )
             connection.set_desc(title=f"Portal to {rooms[portal.target].name} [{portal.target}]")
-            svg.add(connection)
+            g.add(connection)
 
 
 
-def draw_exit(svg, rooms, exit, bounds):
+def draw_exit(g, svg, rooms, exit, bounds):
     if exit['direction'] == 4 or exit['direction'] == 5: return # we don't draw up/down this way
 
     if exit['drawn'] == True and not exit['zone_exit']: return #we already drew this exit from the other side
@@ -646,7 +666,7 @@ def draw_exit(svg, rooms, exit, bounds):
             stroke_width=stroke,
         )
 
-        svg.add(line)
+        g.add(line)
     else:
         # draw the complex exit
         origin_stub_x, origin_stub_y = get_exit_stub_map_coords(origin_x, origin_y, exit['direction'])
@@ -674,14 +694,14 @@ def draw_exit(svg, rooms, exit, bounds):
             stroke_width=1,
             stroke_dasharray="1,1",
         )
-        svg.add(stub_connection)
-        svg.add(dest_stub)
-        svg.add(origin_stub)
+        g.add(stub_connection)
+        g.add(dest_stub)
+        g.add(origin_stub)
     exit['drawn'] = True
     if exit['ret'] != None:
         exit['ret']['drawn'] = True
 
-def draw_room(svg, rooms, room, bounds):
+def draw_room(g, svg, rooms, room, bounds):
     map_x, map_y = get_room_map_coords(room.coords, bounds)
 
     room_class=f"mapelement zlevel{room.coords[2]} zone{room.zone_nr} vnum{room.vnum}"
@@ -698,11 +718,11 @@ def draw_room(svg, rooms, room, bounds):
     rect.set_desc(
         title=f"[{room.vnum}] {room.name} {room.coords} \n{room.zone_name}\n{room.flags if len(room.flags)>0 else ''}\n{room.description}")
 
-    svg.add(rect)
+    g.add(rect)
 
     # draw a blue directional arrow in a room with a river flow setting
     if room.river_speed > 0:
-        draw_river_flow(svg, room, bounds, room_class)
+        draw_river_flow(g, svg, room, bounds, room_class)
 
     # draw up/down markers
     for exit in room.exits:
@@ -720,7 +740,7 @@ def draw_room(svg, rooms, room, bounds):
                 stroke="black",
                 stroke_width="0",
             )
-            svg.add(marker)
+            g.add(marker)
         if exit['direction'] == 5: # down
             ax, ay = x-r, y+1
             bx, by = x+r, y+1
@@ -732,7 +752,7 @@ def draw_room(svg, rooms, room, bounds):
                 stroke="black",
                 stroke_width="0",
             )
-            svg.add(marker)
+            g.add(marker)
 
     # draw a black X in a room flagged for instant DEATH
     if "DEATH" in room.flags:
@@ -756,8 +776,8 @@ def draw_room(svg, rooms, room, bounds):
             stroke_width="1",
             fill="black",
         )
-        svg.add(line_1)
-        svg.add(line_2)
+        g.add(line_1)
+        g.add(line_2)
     
     # draw a green square in a room with a teleport
     if room.teletarg > 0 and room.teletarg != room.vnum:
@@ -773,7 +793,7 @@ def draw_room(svg, rooms, room, bounds):
             fill="green",
         )
         rect.set_desc(title=f"Teleport to {rooms[room.teletarg].name} [{room.teletarg}] ({room.telelook}, {room.teletime})")
-        svg.add(rect)
+        g.add(rect)
 
     # draw a gold circle in a room with a trainer/gm
     if len(room.trainers) > 0:
@@ -791,7 +811,7 @@ def draw_room(svg, rooms, room, bounds):
         )
         trainer = room.trainers[0]
         circle.set_desc(title=f"L{trainer.level} {trainer.trainer['name']}: {trainer.short_desc}")
-        svg.add(circle)
+        g.add(circle)
 
     # draw a purple square in a room with a portal
     if len(room.portals) > 0:
@@ -808,11 +828,11 @@ def draw_room(svg, rooms, room, bounds):
         )
         portal_strings = [f"{portal.short_desc} to {rooms[portal.target].name if portal.target in rooms else portal.target}" for portal in room.portals]
         rect.set_desc(title=f"Passage {portal_strings}")
-        svg.add(rect)
+        g.add(rect)
 
 # Helper functions
 
-def draw_river_flow(svg, room, bounds, room_class):
+def draw_river_flow(g, svg, room, bounds, room_class):
     direction = room.river_dir
     if direction in [0,1,2,3,6,7,8,9]:
         x, y = get_room_map_coords(room.coords, bounds)
@@ -869,7 +889,7 @@ def draw_river_flow(svg, room, bounds, room_class):
         )
         marker.set_desc(title=f"Speed: {room.river_speed}")
 
-        svg.add(marker)
+        g.add(marker)
 
 def extract_bits(number, k, p):   
     return ( ((1 << k) - 1)  &  (number >> (p-1) ) )

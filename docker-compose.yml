@@ -61,9 +61,8 @@ services:
     depends_on:
       - sneezy-db
     restart: always
-    volumes:
-      - ./webmap:/code
-      - ./sneezymud/lib/zonefiles:/sneezymud/lib/zonefiles
+    # volumes:
+    #   - ./webmap:/code
 
 volumes:
   sneezydb:

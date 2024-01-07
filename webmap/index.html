@@ -86,7 +86,10 @@
         maxZ = 0;
         minZ = 0;
 
-        function updateLayers(zone, zlevel) {
+        function updateLayers() {
+            zone = selectedZone
+            zlevel = selectedZlevel
+
             console.log("layerselect: zone " + zone + ", zlevel " + zlevel)
             if (showTPConnections) {
                 $(".portalpath").css("display", "block")
@@ -97,32 +100,30 @@
             }
 
             if (zone == null && zlevel == null) {
-                $(".mapelement").css("visibility", "visible")
-                $(".zoneextent").css("visibility", "hidden")
+                $(".zonelevel").css("visibility", "visible")
             } else if (zone == null) {
-                $(".mapelement").css("visibility", "hidden")
-                $(".mapelement.zlevel" + zlevel).css("visibility", "visible")
+                $(".zonelevel").css("visibility", "hidden")
+                $(".zonelevel.level" + zlevel).css("visibility", "visible")
             } else if (zlevel == null) {
                 // show only current zone if hideOtherZone = true
                 if (hideOtherZones) {
-                    $(".mapelement").css("visibility", "hidden")
-                    $(".mapelement.zone" + zone).css("visibility", "visible")
-                    $(".zoneextent").css("visibility", "hidden")
+                    $(".zonelevel").css("visibility", "hidden")
+                    $(".zonelevel.zone" + zone).css("visibility", "visible")
                 } else {
-                    $(".mapelement").css("visibility", "visible")
-                    $(".zoneextent").css("visibility", "hidden")
+                    $(".zonelevel").css("visibility", "visible")
                 }
             } else {
 
                 if (hideOtherZones) {
-                    $(".mapelement").css("visibility", "hidden")
-                    $(".mapelement.zone" + zone + ".zlevel" + zlevel).css("visibility", "visible")
+                    $(".zonelevel").css("visibility", "hidden")
+                    $(".zonelevel.zone" + zone + ".level" + zlevel).css("visibility", "visible")
                 } else {
-                    $(".mapelement").css("visibility", "hidden")
-                    $(".mapelement.zlevel" + zlevel).css("visibility", "visible")
+                    $(".zonelevel").css("visibility", "hidden")
+                    $(".zonelevel.level" + zlevel).css("visibility", "visible")
                 }
 
             }
+            $(".zoneextent").css("visibility", "hidden")
 
         }
 
@@ -138,7 +139,7 @@
             }
             $('#zlevelselect option[value="' + zlevel + '"]').prop('selected', true);
             selectedZlevel = zlevel
-            updateLayers(selectedZone, selectedZlevel)
+            updateLayers()
 
         }
 
@@ -233,7 +234,7 @@
                     // console.log(zones)
 
                     // load up default on map open
-                    updateLayers(selectedZone, selectedZlevel)
+                    updateLayers()
 
                     // set up controls
 
@@ -242,7 +243,7 @@
                     $("#zltogreset").click(function () {
                         $('#zlevelselect option[value="' + "all" + '"]').prop('selected', true);
                         selectedZlevel = null;
-                        updateLayers(selectedZone, selectedZlevel)
+                        updateLayers()
                     });
                     // up one zlevel
                     $("#zlevelup").click(function () {
@@ -282,7 +283,7 @@
                                 } else {
                                     selectedZlevel = this.value;
                                 }
-                                updateLayers(selectedZone, selectedZlevel)
+                                updateLayers()
                                 return;
                             }
                         });
@@ -296,7 +297,7 @@
                         $('#zoneselect option[value="' + "all" + '"]').prop('selected', true);
                         selectedZlevel = null;
                         selectedZone = null;
-                        updateLayers(selectedZone, selectedZlevel)
+                        updateLayers()
                     });
 
                     $("<option id='zonetog" + "all" + "' value='" + "all" + "'>" + "All" + "</option>").appendTo("#zoneselect")
@@ -311,7 +312,7 @@
                                     //console.log("option selected: " + this.value)
                                     selectedZone = this.value;
                                     selectedZlevel = null
-                                    updateLayers(selectedZone, selectedZlevel)
+                                    updateLayers()
                                     $(".zoneextent").css("visibility", "hidden")
                                     $("#zoneextent" + selectedZone + ".zoneextent").css("visibility", "visible")
                                     target = $("#zoneextent" + selectedZone)[0]
@@ -331,13 +332,13 @@
                     // show portal and teleport connections
                     $('#portaltoggle').change(function () {
                         showTPConnections = this.checked
-                        updateLayers(selectedZone, selectedZlevel)
+                        updateLayers()
                     });
 
                     // hide other zones on zoom
                     $('#zonetoggle').change(function () {
                         hideOtherZones = this.checked
-                        updateLayers(selectedZone, selectedZlevel)
+                        updateLayers()
                     });
 
                     // pull the zone data and assign the zone names to the dropdown menu

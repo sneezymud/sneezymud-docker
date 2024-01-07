@@ -11,7 +11,7 @@ def parse_zonefiles():
 
     for file in os.listdir(path_to_zonefiles):
             cur_file = open(path_to_zonefiles / file,'r', encoding='utf-8', errors='ignore')
-           # print(cur_file)
+            # print(cur_file)
 
             lines = cur_file.readlines()
             lines = [[x for x in line.split()] for line in lines]
