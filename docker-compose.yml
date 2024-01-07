@@ -52,6 +52,19 @@ services:
       - sneezy-db
     restart: always
 
+  webmap:
+    container_name: sneezy-webmap
+    build:
+      context: webmap
+    ports:
+      - "5002:5000"
+    depends_on:
+      - sneezy-db
+    restart: always
+    volumes:
+      - ./webmap:/code
+      - ./sneezymud/lib/zonefiles:/sneezymud/lib/zonefiles
+
 volumes:
   sneezydb:
   sneezy-lib:

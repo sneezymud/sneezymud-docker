@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SneezyMUD Web Map</title>
+    <link rel="stylesheet" type="text/css" href="./static/css/milligram.min.css">
+    <link rel="stylesheet" type="text/css" href="./static/css/jquery.svg.css">
+    <link rel="stylesheet" type="text/css" href="./static/css/sneezymap.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"
+        integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="./static/js/jquery.svg.min.js"></script>
+    <script src="./static/js/svg-pan-zoom.min.js"></script>
+    <!--
+        <script type="text/javascript" src="https://livejs.com/live.js"></script>
+    -->
+</head>
+
+<body>
+
+    <svg id="map"></svg>
+    <div id="controls">
+        <div class="container">
+            <h5>z-Levels</h5>
+            <div class="row">
+                <div class="column column-100"><button id="zltogreset" class="button-small button-span">All
+                        z-Levels</button>
+                </div>
+            </div>
+            <div class="row">
+                <div class="column column-25"><button id="zlevelup" class="button-small button-span button-svg">
+                        <svg xmlns="http://www.w3.org/2000/svg" height="16" width="14" style="fill:white"
+                            viewBox="0 0 448 512"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.-->
+                            <path
+                                d="M256 80c0-17.7-14.3-32-32-32s-32 14.3-32 32V224H48c-17.7 0-32 14.3-32 32s14.3 32 32 32H192V432c0 17.7 14.3 32 32 32s32-14.3 32-32V288H400c17.7 0 32-14.3 32-32s-14.3-32-32-32H256V80z" />
+                        </svg>
+                    </button></div>
+                <div class="column column-50"><select id="zlevelselect" name="zlevelselect" class="drop-small"></select>
+                </div>
+                <div class="column column-25"><button id="zleveldown" class="button-small button-span button-svg">
+                        <svg xmlns="http://www.w3.org/2000/svg" height="16" width="14" style="fill:white"
+                            viewBox="0 0 448 512"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.-->
+                            <path
+                                d="M432 256c0 17.7-14.3 32-32 32L48 288c-17.7 0-32-14.3-32-32s14.3-32 32-32l352 0c17.7 0 32 14.3 32 32z" />
+                        </svg>
+                    </button></div>
+            </div>
+            <h5>Zones</h5>
+
+            <div class="row">
+                <div class="column column-100"><button id="zonetogreset" class="button-small">All Zones</button></div>
+            </div>
+
+            <div class="row">
+                <div class="column column-100"><select id="zoneselect" name="zoneselect" class="drop-small"></select>
+                </div>
+            </div>
+            <h5>Settings</h5>
+
+            <div class="row">
+                <div class="column column-100">
+                    <input class="toggle" type="checkbox" id="portaltoggle" />
+                    <label for="portaltoggle" class="label-inline">Portal/Teleport connections</label>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="column column-100">
+                    <input class="toggle" type="checkbox" id="zonetoggle" />
+                    <label for="zonetoggle" class="label-inline">Hide other zones</label>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+
+
+        selectedZone = null;
+        selectedZlevel = 0;
+        showTPConnections = false
+        hideOtherZones = false
+
+        maxZ = 0;
+        minZ = 0;
+
+        function updateLayers(zone, zlevel) {
+            console.log("layerselect: zone " + zone + ", zlevel " + zlevel)
+            if (showTPConnections) {
+                $(".portalpath").css("display", "block")
+                $(".teleportpath").css("display", "block")
+            } else {
+                $(".portalpath").css("display", "none")
+                $(".teleportpath").css("display", "none")
+            }
+
+            if (zone == null && zlevel == null) {
+                $(".mapelement").css("visibility", "visible")
+                $(".zoneextent").css("visibility", "hidden")
+            } else if (zone == null) {
+                $(".mapelement").css("visibility", "hidden")
+                $(".mapelement.zlevel" + zlevel).css("visibility", "visible")
+            } else if (zlevel == null) {
+                // show only current zone if hideOtherZone = true
+                if (hideOtherZones) {
+                    $(".mapelement").css("visibility", "hidden")
+                    $(".mapelement.zone" + zone).css("visibility", "visible")
+                    $(".zoneextent").css("visibility", "hidden")
+                } else {
+                    $(".mapelement").css("visibility", "visible")
+                    $(".zoneextent").css("visibility", "hidden")
+                }
+            } else {
+
+                if (hideOtherZones) {
+                    $(".mapelement").css("visibility", "hidden")
+                    $(".mapelement.zone" + zone + ".zlevel" + zlevel).css("visibility", "visible")
+                } else {
+                    $(".mapelement").css("visibility", "hidden")
+                    $(".mapelement.zlevel" + zlevel).css("visibility", "visible")
+                }
+
+            }
+
+        }
+
+        function setZLevel(zlevel) {
+            if (zlevel == null) {
+                // all zlevels
+                selectedZlevel = zlevel
+            }
+            if (zlevel > maxZ) {
+                zlevel = maxZ
+            } else if (zlevel < minZ) {
+                zlevel = minZ
+            }
+            $('#zlevelselect option[value="' + zlevel + '"]').prop('selected', true);
+            selectedZlevel = zlevel
+            updateLayers(selectedZone, selectedZlevel)
+
+        }
+
+        $(document).ready(function () {
+            fetch('./static/data/map.svg')
+                .then(response => response.text())
+                .then(svgData => {
+                    const svgElement = document.getElementById('map');
+                    svgElement.innerHTML = svgData;
+
+                    const panZoomMap = svgPanZoom('#map', {
+                        zoomEnabled: true,
+                        controlIconsEnabled: true,
+                        maxZoom: 20
+
+                    });
+                    // set up our initial pan/zoom
+                    panZoomMap.panBy({ x: -0, y: 75 })
+                    panZoomMap.zoom(4)
+
+                    // code for panning and zooming the map to a specific element
+                    // ref: https://stackoverflow.com/questions/52021913/svg-pan-zoom-pan-zoom-to-any-object
+                    function customPanByZoomAtEnd(amount, endZoomLevel, animationTime) { // {x: 1, y: 2}
+                        if (typeof animationTime == "undefined") {
+                            animationTime = 300; // ms
+                        }
+                        var animationStepTime = 15 // one frame per 30 ms
+                            , animationSteps = animationTime / animationStepTime
+                            , animationStep = 0
+                            , intervalID = null
+                            , stepX = amount.x / animationSteps
+                            , stepY = amount.y / animationSteps;
+
+                        intervalID = setInterval(function () {
+                            if (animationStep++ < animationSteps) {
+                                panZoomMap.panBy({ x: stepX, y: stepY })
+                            } else {
+                                // Cancel interval
+                                if (typeof endZoomLevel != "undefined") {
+                                    var viewPort = $(".svg-pan-zoom_viewport")[0];
+                                    viewPort.style.transition = "all " + animationTime / 1000 + "s ease";
+                                    panZoomMap.zoom(endZoomLevel);
+                                    setTimeout(function () {
+                                        viewPort.style.transition = "none";
+                                        $("svg")[0].style.pointerEvents = "all"; // re-enable the pointer events after auto-panning/zooming.
+                                        panZoomMap.enablePan();
+                                        panZoomMap.enableZoom();
+                                        panZoomMap.enableControlIcons();
+                                        panZoomMap.enableDblClickZoom();
+                                        panZoomMap.enableMouseWheelZoom();
+                                    }, animationTime + 50);
+                                }
+                                clearInterval(intervalID)
+                            }
+                        }, animationStepTime)
+                    }
+
+                    function panToElem(targetElem) {
+
+                        var initialSizes = panZoomMap.getSizes();
+                        var initialLoc = panZoomMap.getPan();
+                        var initialBounds = targetElem.getBoundingClientRect();
+                        var initialZoom = panZoomMap.getZoom();
+                        var initialCX = initialBounds.x + (initialBounds.width / 2);
+                        var initialCY = initialBounds.y + (initialBounds.height / 2);
+
+                        var dX = (initialSizes.width / 2) - initialCX;
+                        var dY = (initialSizes.height / 2) - initialCY;
+
+                        customPanByZoomAtEnd({ x: dX, y: dY }, initialZoom, 700);
+                    }
+
+                    // load and sort the zlevels and zones on the map - we use this to populate the controls
+                    mapElements = document.getElementById('map').querySelectorAll('*')
+                    zlevelset = new Set();
+                    zoneset = new Set();
+                    for (const child of mapElements) {
+                        const classes = child.classList;
+                        for (const className of classes) {
+                            if (className.substring(0, 4) == "zone") {
+                                zoneset.add(parseInt(className.slice(4)));
+                            } else if (className.substring(0, 6) == "zlevel") {
+                                zlevelset.add(parseInt(className.slice(6)));
+                            }
+                        }
+                    }
+
+                    let zlevels = [...zlevelset].sort((a, b) => a - b);
+                    let zones = [...zoneset].sort((a, b) => a - b);
+
+                    // console.log(zlevels)
+                    // console.log(zones)
+
+                    // load up default on map open
+                    updateLayers(selectedZone, selectedZlevel)
+
+                    // set up controls
+
+                    // zlevel controls
+                    // show all
+                    $("#zltogreset").click(function () {
+                        $('#zlevelselect option[value="' + "all" + '"]').prop('selected', true);
+                        selectedZlevel = null;
+                        updateLayers(selectedZone, selectedZlevel)
+                    });
+                    // up one zlevel
+                    $("#zlevelup").click(function () {
+                        if (selectedZlevel == null) {
+                            selectedZlevel = 0
+                        } else {
+                            selectedZlevel = Number(selectedZlevel) + 1;
+                        }
+                        setZLevel(selectedZlevel)
+                    });
+                    // down one zlevel
+                    $("#zleveldown").click(function () {
+                        if (selectedZlevel == null) {
+                            selectedZlevel = 0
+                        } else {
+                            selectedZlevel = Number(selectedZlevel) - 1;
+                        }
+                        setZLevel(selectedZlevel)
+                    });
+
+                    // add 'all' option to dropdown
+                    $("<option id='zltog" + "all" + "' value='" + "all" + "'>" + "All" + "</option>").appendTo("#zlevelselect")
+
+                    for (const zlevel of zlevels) {
+                        if (minZ > zlevel) {
+                            minZ = zlevel
+                        } else if (maxZ < zlevel) {
+                            maxZ = zlevel
+                        }
+                        $("<option id='zltog" + zlevel + "' value='" + zlevel + "'>" + zlevel + "</option>").appendTo("#zlevelselect")
+                        $("#zlevelselect").on('change', function (e) {
+                            if (e.handled !== true) {
+                                e.handled = true;
+                                //console.log("option selected: " + this.value)
+                                if (this.value == 'all') {
+                                    selectedZlevel = null;
+                                } else {
+                                    selectedZlevel = this.value;
+                                }
+                                updateLayers(selectedZone, selectedZlevel)
+                                return;
+                            }
+                        });
+                    }
+
+                    $('#zlevelselect option[value="0"]').prop('selected', true);
+
+                    // zone controls
+
+                    $("#zonetogreset").click(function () {
+                        $('#zoneselect option[value="' + "all" + '"]').prop('selected', true);
+                        selectedZlevel = null;
+                        selectedZone = null;
+                        updateLayers(selectedZone, selectedZlevel)
+                    });
+
+                    $("<option id='zonetog" + "all" + "' value='" + "all" + "'>" + "All" + "</option>").appendTo("#zoneselect")
+
+                    for (const zone of zones) {
+                        if (!isNaN(zone)) {
+                            $("<option id='zonetog" + zone + "' value='" + zone + "'>" + zone + "</option>").appendTo("#zoneselect")
+
+                            $("#zoneselect").on('change', function (e) {
+                                if (e.handled !== true) {
+                                    e.handled = true;
+                                    //console.log("option selected: " + this.value)
+                                    selectedZone = this.value;
+                                    selectedZlevel = null
+                                    updateLayers(selectedZone, selectedZlevel)
+                                    $(".zoneextent").css("visibility", "hidden")
+                                    $("#zoneextent" + selectedZone + ".zoneextent").css("visibility", "visible")
+                                    target = $("#zoneextent" + selectedZone)[0]
+                                    if (this.value != 'all') {
+                                        panToElem(target);
+                                    }
+                                    $("#zoneextent" + selectedZone).css("visibility", "hidden")
+
+                                    $('#zlevelselect option[value="' + "all" + '"]').prop('selected', true);
+                                    return;
+                                }
+                            });
+                        }
+                    }
+
+                    // other settings
+                    // show portal and teleport connections
+                    $('#portaltoggle').change(function () {
+                        showTPConnections = this.checked
+                        updateLayers(selectedZone, selectedZlevel)
+                    });
+
+                    // hide other zones on zoom
+                    $('#zonetoggle').change(function () {
+                        hideOtherZones = this.checked
+                        updateLayers(selectedZone, selectedZlevel)
+                    });
+
+                    // pull the zone data and assign the zone names to the dropdown menu
+                    fetch('./static/data/zones.json')
+                        .then((response) => response.json())
+                        .then(zone_json => {
+                            //console.log(zone_json)
+                            Object.keys(zone_json).forEach(zone_nr => {
+                                zone_split = zone_json[zone_nr].name.split(' - ')
+                                zone_name = zone_split[zone_split.length - 1]
+                                zone_name = zone_name.split('(')[0]
+                                $("#zonetog" + zone_nr).html(zone_nr + ": " + zone_name)
+                            });
+
+                        });
+
+                });
+
+
+        });
+    </script>
+
+</body>
+
+</html>
