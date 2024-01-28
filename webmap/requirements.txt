@@ -1,0 +1,6 @@
+flask
+mysql-connector-python-rf
+pymysql
+ipdb
+peewee
+svgwrite

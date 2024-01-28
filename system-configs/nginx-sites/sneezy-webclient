@@ -35,6 +35,10 @@ server {
 		proxy_pass http://localhost:5001/;
 	}
 
+	location /webmap/  {
+		proxy_pass http://localhost:5002/;
+	}
+
 	location /ws  {
 		proxy_pass http://localhost:7901;
 		proxy_http_version 1.1;
