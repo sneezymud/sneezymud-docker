@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   sneezy-db:
     image: sneezymud/sneezy-db:57

@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   sneezy-db:
     build:
@@ -19,15 +17,15 @@ services:
       - "/bin/sh"
       - "-c"
       - |
-        scons -j`nproc` -Q olevel=0 sanitize=1 fortify=1 check sneezy && ./sneezy
+        scons -j`nproc` -Q olevel=0 sanitize=1 debug=1 sneezy && ./sneezy
     container_name: sneezy
     cap_add:
       - SYS_PTRACE
     ports:
-        - "7900:7900"
+      - "7900:7900"
     restart: always
     volumes:
-      - sneezy-mutable:/home/sneezy/lib/mutable
+      - sneezy-mutable:/sneezymud-docker/sneezymud/lib/mutable
       - .:/sneezymud-docker/
 
   buildertools:
@@ -35,9 +33,9 @@ services:
     build:
       context: web
     ports:
-        - "5001:5000"
+      - "5001:5000"
     depends_on:
-        - sneezy-db
+      - sneezy-db
     restart: always
 
   websockify:
@@ -49,7 +47,7 @@ services:
     ports:
       - "7901:7901"
     depends_on:
-        - sneezy
+      - sneezy
     restart: always
 
   webclient:
@@ -57,9 +55,9 @@ services:
     build:
       context: webclient
     ports:
-        - "8080:80"
+      - "8080:80"
     depends_on:
-        - websockify
+      - websockify
     restart: always
 
 volumes:
