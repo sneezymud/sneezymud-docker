@@ -1,0 +1,14 @@
+services:
+  sneezy-db:
+    image: sneezymud/sneezy-db:57
+
+  sneezy:
+    image: sneezymud/sneezymud:latest
+    volumes:
+      - sneezy-mutable:/home/sneezy/lib/mutable
+
+  buildertools:
+    image: sneezymud/sneezymud-buildertools:59
+
+  webclient:
+    image: sneezymud/webclient:60

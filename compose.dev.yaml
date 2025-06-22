@@ -1,0 +1,32 @@
+services:
+  sneezy-db:
+    build:
+      context: services/db
+
+  sneezy:
+    build:
+      context: services/sneezymud
+      dockerfile: dev.Dockerfile
+    command:
+      - "/bin/sh"
+      - "-c"
+      - |
+        scons -j`nproc` -Q olevel=0 sanitize=1 debug=1 sneezy && ./sneezy
+    volumes:
+      - .:/sneezymud-docker/
+      - sneezy-mutable:/sneezymud-docker/sneezymud/lib/mutable
+
+  # Change the profiles for these services to enabled if you need
+  # them during development for some reason
+  buildertools:
+    build:
+      context: services/buildertools
+    profiles: ["disabled"]
+
+  websockify:
+    profiles: ["disabled"]
+
+  webclient:
+    build:
+      context: services/webclient
+    profiles: ["disabled"]
