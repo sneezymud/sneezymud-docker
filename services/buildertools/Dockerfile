@@ -1,4 +1,4 @@
-FROM python:3.6
+FROM python:3
 ARG UID=1000
 ADD . /code
 WORKDIR /code
@@ -6,4 +6,4 @@ RUN chown -R 1000 /code
 RUN pip install -r requirements.txt
 RUN useradd -ms /bin/bash -u $UID sneezy
 USER sneezy
-CMD python main.py
+CMD ["python", "main.py"]

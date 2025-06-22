@@ -1,6 +1,6 @@
 [submodule "sneezymud"]
-	path = sneezymud
+	path = services/sneezymud
 	url = https://github.com/sneezymud/sneezymud
-[submodule "nginx/connectificator"]
-	path = webclient/connectificator
+[submodule "connectificator"]
+	path = services/webclient/connectificator
 	url = https://github.com/cizra/connectificator

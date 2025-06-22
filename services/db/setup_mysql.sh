@@ -8,7 +8,7 @@ for db in immortal sneezy; do
 		[ -d "/home/sneezy/_Setup-data/sql_$phase/$db" ] || continue
 		for sql in /home/sneezy/_Setup-data/sql_$phase/$db/*.sql; do
 			echo "loading '$sql'"
-			mysql -u sneezy --password=password $db < $sql
+			mariadb -u sneezy --password=password $db < $sql
 		done
 	done
 done
