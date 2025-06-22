@@ -2,58 +2,152 @@
 
 A Docker Compose configuration for easy, containerized deployment of SneezyMUD and its related services and/or developing against the SneezyMUD codebase.
 
+## Quick Start
+
+### Production Server
+
+1. Install Docker & git, ensure they're available via CLI
+
+2. Configure firewall
+    - Allow all outgoing traffic
+    - Block all incoming traffic
+    - Open incoming ports 22, 80, 443, 7900, 7901, 8080, and 5001
+
+3. Clone and navigate to repo:
+
+   ```bash
+   git clone --config core.autocrlf=input https://github.com/sneezymud/sneezymud-docker
+   cd sneezymud-docker
+   ```
+
+4. Init database container (first time only):
+
+   ```bash
+   docker compose -f compose.yaml -f compose.prod.yaml up sneezy-db
+   # Wait for database to finish loading data, then Ctrl+C to stop container
+   ```
+
+5. Start all services in background:
+
+   ```bash
+   docker compose -f compose.yaml -f compose.prod.yaml up -d
+   ```
+
+6. Connect to the game
+
+   - Telnet/MUD client: `<server_IP>:7900`
+   - Web client: Navigate to `http://<server_IP>:8080` in a browser
+
+### Development
+
+1. Install Docker & git on your local machine, ensure they're available via CLI
+
+2. Clone repo to local machine:
+
+    ```bash
+    git clone --config core.autocrlf=input --recursive https://github.com/sneezymud/sneezymud-docker
+    ```
+
+3. Open `sneezymud-docker/services/sneezymud` directory in IDE of choice and develop as normal
+
+4. When ready to compile and test changes, run the following command from the `sneezymud-docker` directory:
+
+    ```bash
+    docker compose -f compose.yaml -f compose.dev.yaml up -d
+    ```
+
+5. Connect and test in-game:
+
+   - Telnet/MUD client: `localhost:7900`
+   - Web browser: Navigate to `http://localhost:8080`
+
+For detailed instructions, see sections below.
+
+## Project Structure
+
+The repository is organized as follows:
+
+- `compose.yaml` - Base Docker Compose configuration shared between environments
+- `compose.prod.yaml` - Production environment overrides and image specifications
+- `compose.dev.yaml` - Development environment overrides with local builds
+- `/services` - All service implementations and configurations
+  - `/db` - Database service
+    - `init.sql` - Database initialization script
+    - `my.cnf` - MySQL configuration
+    - `setup_mysql.sh` - Database setup script
+  - `/sneezymud` - Git submodule containing the main SneezyMUD codebase
+    - `Dockerfile` - Production build configuration
+    - `dev.Dockerfile` - Development build configuration
+  - `/buildertools` - Builder tools web interface (Flask application)
+  - `/webclient` - Web client service
+    - `/connectificator` - Git submodule containing the Connectificator web client
+- `/scripts` - Helper scripts and utilities
+  - `/backups` - Automated backup system setup and management
+    - `init-backups.sh` - Initialize, remove, or reconfigure backup system
+  - `/nginx` - nginx configuration helpers
+    - `init-nginx.sh` - Initialize or remove a fully-featured HTTPS configuration for nginx
+  - `/tintin++` - TinTin++-related configuration files
+
+### Service Components
+
+- **sneezy-db**: MySQL database storing game world data, player information, and builder content
+- **sneezy**: Main game server accepting direct telnet connections on port 7900
+- **websockify**: Proxy service converting WebSocket connections to TCP for web client compatibility
+- **webclient**: Browser-based MUD client (Connectificator) served via nginx
+- **buildertools**: Flask-based web interface for area, mob, and object creation/editing
+
+All services communicate through the shared database, with the web client connecting through the websockify proxy to maintain compatibility with traditional MUD protocols.
+
 ## Creating/Managing A Production Server
 
 ### Server Requirements
 
-When using Docker the host server can technically run any OS that Docker supports. That said, some flavor of Linux will likely provide the best results unless you have a specific reason to use something else. This README assumes you're using Linux.
+When using Docker the host server can run any OS that Docker supports. That said, some flavor of Linux will likely provide the best results unless you have a specific reason to use something else. This README assumes you're using Linux.
 
 Hosting on a physical server should work fine, but a cloud provider will probably be the easiest and most reliable method.
 
 Most cloud server providers' lowest tiers will meet the requirements for running Sneezy decently these days, but some bare minimum specs to look for would be:
 
-* 2+ CPU cores of 4 GHz or faster
-* 8+ GB of RAM
-* 20+ GB of disk space
-* Static IP address
+- 2+ CPU cores of 4 GHz or faster
+- 8+ GB of RAM
+- 20+ GB of disk space
+- Static IP address
 
 > [!TIP]
-> Finding a provider that offers servers with solid-state hard drives is **highly recommended**. With a traditional platter drive you'll likely have noticeable game lag when periods of file I/O occur.
+> Finding a provider that offers servers with solid-state hard drives is **highly recommended**. Without, you'll likely have noticeable game lag when periods of file I/O occur.
 
 ### Server Configuration
 
-* Make sure the OS and packages are updated/upgraded
-  * For example, on Debian/Ubuntu: `sudo apt update && sudo apt upgrade -y`
+- Connect to your server as a user with `sudo` privileges
 
-* Set up user accounts with SSH access and sudo permissions for anyone who will be involved in maintaining the server
+- Make sure the OS and packages are updated/upgraded
+  - For example, on Debian/Ubuntu: `sudo apt update && sudo apt upgrade -y`
 
-* If you have a custom domain name (hopefully you do), create an `A` record through your domain registrar's DNS management console pointing the domain to your server's static IP
+- Set up additional user accounts with SSH access and sudo permissions for anyone who will be involved in maintaining the server
 
-* Enable and configure a firewall of your choice (for example, `ufw` on Ubuntu)
-  * You'll likely want allow all outgoing traffic, and block all incoming traffic.
-  * Then explicitly allow incoming traffic to ports:
-    * 22 (SSH)
-    * 80 (HTTP)
-    * 443 (HTTPS)
-    * 7900 (SneezyMUD)
-    * 7901 (Websocket)
-    * 8080 (Webclient)
-    * 5001 (Web builder tools interface)
+- If you have a custom domain name (hopefully you do), create an `A` record through your domain registrar's DNS management console pointing the domain to your server's static IP
 
-* Install [Docker Engine](https://docs.docker.com/engine/install/)
+- Enable and configure a firewall of your choice (for example, `ufw` on Ubuntu)
+  - A good starting point is to allow all outgoing traffic, block all incoming traffic, then then explicitly allow incoming traffic to ports:
+    - 22 (SSH)
+    - 80 (HTTP)
+    - 443 (HTTPS)
+    - 7900 (SneezyMUD)
+    - 7901 (Websocket)
+    - 8080 (Webclient)
+    - 5001 (Web builder tools interface)
 
 > [!WARNING]
-> Don't use the default docker package provided by your distro's package manager. It's often outdated and can cause issues. Follow the official Docker installation instructions linked above.
+> Don't use the default `docker` package provided by your distro's package manager. It's often outdated and can cause issues. Follow the official Docker installation instructions linked below.
 
 > [!IMPORTANT]
-> Make sure to follow the [post-installation instructions](https://docs.docker.com/engine/install/linux-postinstall/)
+> Make sure to follow Docker's [post-installation instructions](https://docs.docker.com/engine/install/linux-postinstall/)
 
-* Install [git](https://git-scm.com/downloads)
+- Install [Docker Engine](https://docs.docker.com/engine/install/)
 
-> [!NOTE]
-> If installed through your distro's package manager the version will potentially be quite a bit older than the latest version, but will most likely still work fine for these purposes.
+- Install [git](https://git-scm.com/downloads/linux)
 
-* Clone this repo to your home directory:
+- Clone this repo to your home directory:
 
   ```bash
   cd ~
@@ -72,62 +166,105 @@ Most cloud server providers' lowest tiers will meet the requirements for running
 > cd ~/sneezymud-docker
 > ```
 
-> [!IMPORTANT]
-> On the initial run on a freshly configured server, start only the `sneezy-db` container first to ensure the database is seeded:
+> [!TIP]
+> (Optional but recommended)
+> Run the `add_compose_aliases.sh` script to add some Docker Compose aliases to your `~/.bash_aliases` file for convenience:
 >
 > ```bash
-> docker compose run sneezy-db
+> ./scripts/convenience/add_compose_aliases.sh
+> # Example usage
+> # Start all services in production mode
+> dcp up -d
+> # Start all services in development mode
+> dcd up -d
 > ```
 >
-> Once it's done loading the SQL files, shut that run down (via `ctrl-c`) and start all the services together as described below.
-
-Once the server is properly configured, run the game and other services by starting the containers:
-
-```bash
-docker compose up -d
-```
-
-#### Commonly Used Commands
-
-View game logs live as they occur:
-
-```bash
-docker compose logs sneezy -f
-```
-
-Stop all containers:
-
-```bash
-docker compose down
-```
-
-Check container status:
-
-```bash
-docker ps
-```
-
-### Handling Code Updates
-
-When code changes are merged to the `master` branch of the [main SneezyMUD repo](https://github.com/sneezymud/sneezymud) a new Docker image will automatically be built and pushed to Docker Hub.
+> See the script contents for full list of aliases and what they do
 
 > [!IMPORTANT]
-> These changes won't be reflected in-game until the new image is pulled down to the server and the Sneezy container is restarted.
+> **First-time setup only:** On a fresh server, initialize the database before starting all services:
+>
+> ```bash
+> docker compose -f compose.yaml -f compose.prod.yaml up sneezy-db
+> # Wait for database to finish loading data, then Ctrl+C to stop container
+> ```
 
-* Pull the latest image down from Docker Hub:
+- Run the game and other services by starting all containers in the background:
 
   ```bash
-  docker pull sneezymud/sneezymud:latest
+  docker compose -f compose.yaml -f compose.prod.yaml up -d
   ```
 
-* Restart just the Sneezy container using the new image:
+## Accessing Services
 
-  ```bash
-  docker compose up -d --force-recreate --no-deps sneezy
-  ```
+### Game
+
+- **Telnet**: `your-server:7900` (any MUD client: MUSHclient, Mudlet, TinTin++)
+- **Web Browser**: `http://your-server:8080` (Connectificator web client)
+
+### Builder Tools Web Interface
+
+- **Web Browser**: `http://your-server:5001`
+
+## Helpful Commands
+
+> [!NOTE]
+> All `docker compose` commands must be executed from the `~/sneezymud-docker` directory
+
+```bash
+# View live game logs as they happen
+docker logs sneezy -f
+
+# Find crash stack traces
+# Adjust `-B` and `-A` values to increase/decrease context as needed
+docker logs sneezy 2>&1 | grep "ERROR: Address" -B 5 -A 50
+
+# Start interactive shell inside a container
+docker exec -it <container> /bin/bash
+
+# Access the mariaDb shell in the `sneezy-db` container to query the live databases
+docker exec -it sneezy-db /bin/bash mariadb -u sneezy -p<password>
+
+# Run `sneezy` container with overridden command to keep container running without game
+# starting. This is useful for accessing the Docker volume contents or examining the
+# container filesystem in certain situations - for instance, when game is in a crash
+# loop, or if you need to make sure no one can log in and modify the mutable files
+# while you back up or restore them.
+docker compose -f compose.yaml -f compose.prod.yaml run sneezy "tail -f /dev/null"
+
+# Stop all containers
+docker compose -f compose.yaml -f compose.prod.yaml down
+
+# Check container status
+docker ps
+
+# Pull latest code changes and re-start game container
+docker pull sneezymud/sneezymud:latest
+docker compose -f compose.yaml -f compose.prod.yaml up -d --force-recreate --no-deps sneezy
+```
 
 > [!WARNING]
-> Restarting the container will immediately end the running Sneezy process without saving anything, so make sure all players are logged out and the game world is properly saved before doing so.
+> Restarting containers immediately ends the running game process. Ensure all players are logged out and the game world is saved before updating.
+
+### Code Updates
+
+New Docker images are automatically built when code changes are merged to the [main SneezyMUD repo](https://github.com/sneezymud/sneezymud). See "Updates & Maintenance" above for update commands.
+
+## Automated Backup System
+
+For production servers it's highly recommended to set up automated backups of your important game data. This repo includes a script to help with this. See [`scripts/backups/README.md`](scripts/backups/README.md) for more information.
+
+> [!IMPORTANT]
+> The backup script only saves the backups to the server itself, which is much better than nothing but could still result in data loss in the event of a server failure. It's recommended to configure a secondary backup service that copies the backups to another location as well, but that's outside the scope of the script.
+
+## HTTPS Setup with Nginx
+
+For production servers, you may want to set up HTTPS to provide secure, encrypted connections and cleaner URLs for your web services. This repo includes a script that automatically configures Nginx as a reverse proxy with SSL certificates from Let's Encrypt. The script will prompt for your domain name and email, then automatically set up HTTPS with certificate auto-renewal.
+
+> [!TIP]
+> This is optional - the game and web services work fine without HTTPS, but many modern browsers show warnings for unencrypted connections.
+
+See [`scripts/nginx/README.md`](scripts/nginx/README.md) for more information.
 
 ## Developing Using Docker
 
@@ -138,15 +275,15 @@ Developing against the main SneezyMUD codebase using Docker is a bit different t
 
 This repo comes pre-configured to support this workflow, via:
 
-1. Having the [main SneezyMUD repo](https://github.com/sneezymud/sneezymud) configured as a git submodule of this repo (the `sneezymud` subdirectory)
-2. Defining a separate Docker Compose file (`docker-compose-compile.yml`) for use during development, which does the following:
-   * Bind mounts the `sneezymud` subdirectory into the `sneezy` container
-   * Uses the Dockerfile located at `docker/Dockerfile-dev` to build the `sneezy` container locally
-   * Configures the `sneezy` container to compile the code contained in the bind mounted `sneezymud` directory and then run the resulting binary
+1. Having the [main SneezyMUD repo](https://github.com/sneezymud/sneezymud) configured as a git submodule of this repo (the `services/sneezymud` subdirectory)
+2. Defining a separate Docker Compose file (`compose.dev.yaml`) for use during development, which does the following:
+   - Bind mounts the `services/sneezymud` subdirectory into the `sneezy` container
+   - Uses the Dockerfile located at `services/sneezymud/Dockerfile` to build the `sneezy` container locally
+   - Configures the `sneezy` container to compile the code contained in the bind mounted `services/sneezymud` directory and then run the resulting binary
 
 This ensures that any changes made to the code on the host machine are immediately reflected in the container, and will be re-compiled and re-run automatically when the container is restarted.
 
-### Setup
+### Development Setup
 
 > [!NOTE]
 > You'll want to do this on your own, local machine (not the server), and it should work on any OS that Docker supports.
@@ -154,13 +291,13 @@ This ensures that any changes made to the code on the host machine are immediate
 > [!IMPORTANT]
 > You'll need Docker Engine or Docker Desktop and git installed on your local machine (see instructions for the production server above)
 
-* Clone the repo and required submodules:
+- Clone the repo and required submodules:
 
   ```bash
   git clone --config core.autocrlf=input --recursive https://github.com/sneezymud/sneezymud-docker
   ```
 
-* Update the `sneezymud` submodule to pull down any new commits and ensure you're developing against the most recent changes:
+- Update the `services/sneezymud` submodule to pull down any new commits and ensure you're developing against the most recent changes:
 
   ```bash
   git submodule update --remote
@@ -168,31 +305,32 @@ This ensures that any changes made to the code on the host machine are immediate
 
 ### Workflow
 
-Now simply open the `sneezymud` subdirectory in your IDE of choice and develop as you normally would.
+Open the `services/sneezymud` subdirectory in your IDE of choice. Modify code and use git as you normally would.
 
-When ready to compile and test changes, start the containers using Docker Compose, targeting the `docker-compose-compile.yml` file:
+When ready to compile and test changes, start the containers using Docker Compose:
 
-  ```bash
-  docker compose -f docker-compose-compile.yml up -d
-  ```
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml up -d
+```
 
 If the containers are already running and you want to re-compile the code, simply restart the `sneezy` container:
 
   ```bash
-  docker compose -f docker-compose-compile.yml up --force-recreate --no-deps sneezy
+  docker compose -f compose.yaml -f compose.dev.yaml up --force-recreate --no-deps sneezy
+  # Consider adding an alias for this command to your ~/.bash_aliases file
   ```
 
 Then connect to the game via whatever client you normally use at `localhost:7900`.
 
 > [!TIP]
-> The only two containers *required* for the game to successfully run are `sneezy` and `sneezy-db`. If you don't need to test or develop against the others, you can simply comment those container definitions out in the `docker-compose-compile.yml` file to simplify and speed things up a bit.
+> The only two containers *required* for the game to successfully run are `sneezy` and `sneezy-db`. If you don't need to test or develop against the others, you can simply comment those container definitions out in the `compose.dev.yaml` file to simplify and speed things up a bit.
 
 ### Debugging
 
 To debug using `gdb` inside the `sneezy` container, run the container with the following command:
 
   ```bash
-  docker compose -f docker-compose-compile.yml run sneezy gdb -ex run ./sneezy
+  docker compose -f compose.yaml -f compose.dev.yaml run sneezy gdb -ex run ./sneezy
   ```
 
 This will run the most recently compiled binary inside `gdb`, allowing you to set breakpoints, step through code, etc.

@@ -1,38 +1,25 @@
+# Common configuration shared between production and development
 services:
   sneezy-db:
-    image: sneezymud/sneezy-db:57
     container_name: sneezy-db
     volumes:
       - sneezydb:/var/lib/mysql
     restart: always
 
   sneezy:
+    container_name: sneezy
     depends_on:
       - sneezy-db
-    image: sneezymud/sneezymud:latest
-    container_name: sneezy
     cap_add:
       - SYS_PTRACE
     ports:
       - "7900:7900"
     restart: always
-    volumes:
-      - sneezy-mutable:/home/sneezy/lib/mutable
 
   buildertools:
     container_name: sneezy-buildertools
-    image: sneezymud/sneezymud-buildertools:59
     ports:
       - "5001:5000"
-    depends_on:
-      - sneezy-db
-    restart: always
-
-  webclient:
-    container_name: sneezy-webclient
-    image: sneezymud/webclient:60
-    ports:
-      - "8080:80"
     depends_on:
       - sneezy-db
     restart: always
@@ -46,7 +33,15 @@ services:
     ports:
       - "7901:7901"
     depends_on:
-      - sneezy-db
+      - sneezy
+    restart: always
+
+  webclient:
+    container_name: sneezy-webclient
+    ports:
+      - "8080:80"
+    depends_on:
+      - websockify
     restart: always
 
 volumes:
