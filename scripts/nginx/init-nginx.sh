@@ -618,16 +618,7 @@ undo_setup() {
     rm -f /etc/nginx/sites-enabled/sneezy-nginx
     rm -f /etc/nginx/sites-available/sneezy-nginx
 
-    # Clean up any old configuration files from previous versions
-    rm -f /etc/nginx/sites-enabled/redirect-to-https
-    rm -f /etc/nginx/sites-enabled/sneezy-webclient
-    rm -f /etc/nginx/sites-enabled/sneezy-http
-    rm -f /etc/nginx/sites-available/redirect-to-https
-    rm -f /etc/nginx/sites-available/sneezy-webclient
-    rm -f /etc/nginx/sites-available/sneezy-http
-
-    # Clean up renewal hooks (old cron job and new hook)
-    rm -f /etc/cron.d/certbot-renewal
+    # Clean up renewal hook and domain registry
     rm -f /etc/letsencrypt/renewal-hooks/deploy/nginx-reload.sh
     rm -f "$DOMAINS_FILE"
 
