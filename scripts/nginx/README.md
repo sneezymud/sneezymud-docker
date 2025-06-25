@@ -1,6 +1,6 @@
 # SneezyMUD Nginx Setup
 
-Automatically sets up HTTPS for your SneezyMUD server.
+Automatically sets up HTTPS for your SneezyMUD server and manages multiple domains.
 
 ## Do I Need This?
 
@@ -32,28 +32,91 @@ This script gives you:
 
 ## How To Use
 
+### Initial Setup
+
 1. **Run the script**:
 
    ```bash
-   cd /path/to/sneezymud-docker/scripts/nginx
-   sudo ./init-nginx.sh
+   sudo ./scripts/nginx/init-nginx.sh
    ```
 
 2. **Enter when prompted**:
    - Your domain name (e.g., `sneezymud.com`)
-   - Email address (Let's Encrypt uses this for renewal failure warnings - use a real email if possible, but `admin@yourdomain.com` works too)
+     - If you have multiple domains, just pick one for now. You can add the rest later through the management menu.
+   - Email address
+     - Let's Encrypt uses this for renewal failure warnings - use a real email if possible, but `admin@yourdomain.com` works too if you don't care about renewal warnings or are planning to check renewal status manually
 
-3. **Done!** The script will:
-   - Set up HTTP first (for SSL certificate validation)
-   - Get SSL certificates from Let's Encrypt
-   - Switch to HTTPS automatically
+Once the required info is provided, the script will:
 
-### Options
+- Set up HTTP first (for SSL certificate validation)
+- Get SSL certificates from Let's Encrypt
+- Switch to HTTPS automatically
+
+### Managing Multiple Domains
+
+After initial setup, running the script again will show a management menu. This allows you to:
+
+- **Add domains**: Add additional domains
+- **Remove domains**: Remove domains you no longer need
+- **Update services**: Apply changes from services.json
+- **Reconfigure**: Start over with fresh setup
+- **Remove setup**: Completely remove nginx configuration
+
+### Managing Services
+
+Services are configured through the `services.json` file in this directory. To add or modify services:
+
+1. **Update the Docker Compose configuration** (add or remove a service definition)
+2. **Update `services.json`** with the new service configuration
+3. **Apply changes**: `sudo ./init-nginx.sh --update-services`
+
+#### Example: Adding a service for a web application at port 3000
+
+1. Add to `compose.yaml`:
+
+   ```yaml
+   webmap:
+     container_name: sneezy-webapp
+     image: your-webapp-image
+     ports:
+       - "3000:3000"
+     restart: always
+   ```
+
+2. Add to `services.json`:
+
+   ```json
+   {
+     "name": "webapp",
+     "path": "/webapp/",
+     "port": 3000,
+     "type": "http",
+     "description": "Example Web App"
+   }
+   ```
+
+3. Apply: `sudo ./init-nginx.sh --update-services`
+
+The service will automatically be available at `https://yourdomain.com/webapp/` on all configured domains.
+
+### Command Line Options
 
 ```bash
-sudo ./init-nginx.sh          # Set up HTTPS
-sudo ./init-nginx.sh --undo   # Remove setup
-sudo ./init-nginx.sh --help   # Show help
+sudo ./init-nginx.sh                        # Initial setup or management menu
+sudo ./init-nginx.sh --add-domain DOMAIN    # Add domain directly
+sudo ./init-nginx.sh --remove-domain DOMAIN # Remove domain directly
+sudo ./init-nginx.sh --undo                 # Remove entire setup
+sudo ./init-nginx.sh --help                 # Show help
+```
+
+**Examples:**
+
+```bash
+# Add a second domain to existing setup
+sudo ./init-nginx.sh --add-domain <new-domain>
+
+# Remove a domain
+sudo ./init-nginx.sh --remove-domain <old-domain>
 ```
 
 ## Troubleshooting

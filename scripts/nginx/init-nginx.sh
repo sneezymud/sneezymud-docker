@@ -1,34 +1,225 @@
 #!/bin/bash
 #
-# SneezyMUD Nginx Setup - Simple HTTPS setup for SneezyMUD
+# SneezyMUD Nginx Setup - Simple HTTPS setup and domain management for SneezyMUD
 #
 set -e
 
 info() { echo "→ $1"; }
 success() { echo "✓ $1"; }
 error() { echo "✗ $1" >&2; exit 1; }
+warn() { echo "⚠ $1" >&2; }
 
-if [[ "${1:-}" == "--undo" ]]; then
-    UNDO_MODE=true
-elif [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-    echo "SneezyMUD Nginx Setup"
-    echo "Usage: sudo $0 [--undo]"
-    exit 0
-else
-    UNDO_MODE=false
-fi
+# Store domain list separately to enable domain management operations
+DOMAINS_FILE="/etc/nginx/sneezy-domains.txt"
+
+OPERATION=""
+TARGET_DOMAIN=""
+SERVICE_NAME=""
+SERVICE_PATH=""
+SERVICE_TARGET=""
+SERVICE_TYPE=""
+
+case "${1:-}" in
+    "--undo")
+        OPERATION="undo"
+        ;;
+    "--add-domain")
+        OPERATION="add"
+        TARGET_DOMAIN="${2:-}"
+        [[ -n "$TARGET_DOMAIN" ]] || error "Domain name required: $0 --add-domain example.com"
+        ;;
+    "--remove-domain")
+        OPERATION="remove"
+        TARGET_DOMAIN="${2:-}"
+        [[ -n "$TARGET_DOMAIN" ]] || error "Domain name required: $0 --remove-domain example.com"
+        ;;
+    "--update-services")
+        OPERATION="update-services"
+        ;;
+    "--list-services")
+        OPERATION="list-services"
+        ;;
+    "--service-status")
+        OPERATION="service-status"
+        ;;
+    "--help"|"-h")
+        echo "SneezyMUD Nginx Setup, Domain and Service Management"
+        echo "Usage:"
+        echo "  sudo $0                          # Initial setup or management menu"
+        echo "  sudo $0 --add-domain DOMAIN      # Add domain to existing setup"
+        echo "  sudo $0 --remove-domain DOMAIN   # Remove domain from setup"
+        echo "  sudo $0 --update-services        # Update nginx config from services.json"
+        echo "  sudo $0 --list-services          # List configured services"
+        echo "  sudo $0 --service-status         # Check service status"
+        echo "  sudo $0 --undo                   # Remove entire setup"
+        echo "  sudo $0 --help                   # Show this help"
+        echo ""
+        echo "Service Management Workflow:"
+        echo "  1. Add/remove service from Docker Compose"
+        echo "  2. Update scripts/nginx/services.json"
+        echo "  3. Run: sudo $0 --update-services"
+        exit 0
+        ;;
+    "")
+        OPERATION="auto"
+        ;;
+    *)
+        error "Unknown option: $1. Use --help for usage information."
+        ;;
+esac
 
 [[ $EUID -eq 0 ]] || error "Must run with sudo"
 command -v apt-get &> /dev/null || error "Requires Ubuntu/Debian"
+
+# Install jq dependency for JSON processing - avoids requiring manual installation
+if ! command -v jq &> /dev/null; then
+    info "Installing jq for service management"
+    apt-get update -qq
+    apt-get install -y jq
+fi
+
+detect_existing_setup() {
+    # Both domain registry and nginx config must exist for management operations
+    [[ -f "$DOMAINS_FILE" ]] && [[ -f "/etc/nginx/sites-available/sneezy-nginx" ]]
+}
+
+load_domains() {
+    if [[ -f "$DOMAINS_FILE" ]]; then
+        cat "$DOMAINS_FILE"
+    fi
+}
+
+save_domains() {
+    local domains=("$@")
+    # Store one domain per line for easy parsing and management
+    printf "%s\n" "${domains[@]}" > "$DOMAINS_FILE"
+}
+
+validate_domain() {
+    local domain="$1"
+    # Prevent common user input errors that would cause SSL certificate failures
+    [[ "$domain" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]] || error "Invalid domain format: $domain"
+}
 
 get_config() {
     if [[ -z "${DOMAIN_NAME:-}" ]]; then
         read -p "Domain name: " DOMAIN_NAME
     fi
+    validate_domain "$DOMAIN_NAME"
+
     if [[ -z "${EMAIL:-}" ]]; then
         read -p "Email for Let's Encrypt: " EMAIL
     fi
     [[ -n "$DOMAIN_NAME" && -n "$EMAIL" ]] || error "Domain and email required"
+}
+
+get_email_config() {
+    if [[ -z "${EMAIL:-}" ]]; then
+        read -p "Email for Let's Encrypt: " EMAIL
+    fi
+    [[ -n "$EMAIL" ]] || error "Email required"
+}
+
+
+load_services() {
+    local script_dir="$(dirname "${BASH_SOURCE[0]}")"
+    local services_file="$script_dir/services.json"
+
+    if [[ -f "$services_file" ]]; then
+        cat "$services_file"
+    else
+        error "Services file not found: $services_file"
+    fi
+}
+
+update_services_from_repo() {
+    local script_dir="$(dirname "${BASH_SOURCE[0]}")"
+    local services_file="$script_dir/services.json"
+
+    if [[ ! -f "$services_file" ]]; then
+        error "Services file not found: $services_file"
+    fi
+
+    info "Updating nginx configuration from services.json"
+
+    # Validate JSON to prevent nginx configuration corruption
+    if ! jq empty "$services_file" 2>/dev/null; then
+        error "Invalid JSON in services file: $services_file"
+    fi
+
+    # Apply changes immediately if nginx is already configured
+    if detect_existing_setup; then
+        local domains=($(load_domains))
+        update_nginx_config "${domains[@]}"
+        test_setup
+    else
+        error "No existing nginx setup found. Run initial setup first: sudo $0"
+    fi
+
+    success "Nginx configuration updated from services.json"
+}
+
+
+
+
+
+list_services() {
+    local services_json=$(load_services)
+
+    echo
+    echo "SneezyMUD Nginx Service Configuration"
+    echo "====================================="
+    echo
+
+
+    local http_services=$(echo "$services_json" | jq -r '.services[] | select(.type == "http") | "\(.name)|\(.path)|\(.port)|\(.description)"')
+    local websocket_services=$(echo "$services_json" | jq -r '.services[] | select(.type == "websocket") | "\(.name)|\(.path)|\(.port)|\(.description)"')
+
+    if [[ -n "$http_services" ]]; then
+        echo "HTTP Services:"
+        while IFS='|' read -r name path port desc; do
+            printf "  %-12s %-12s → %-25s (%s)\n" "$name" "$path" "localhost:$port" "$desc"
+        done <<< "$http_services"
+        echo
+    fi
+
+    if [[ -n "$websocket_services" ]]; then
+        echo "WebSocket Services:"
+        while IFS='|' read -r name path port desc; do
+            printf "  %-12s %-12s → %-25s (%s)\n" "$name" "$path" "localhost:$port" "$desc"
+        done <<< "$websocket_services"
+        echo
+    fi
+
+    if [[ -z "$core_services" && -z "$websocket_services" && -z "$optional_services" ]]; then
+        echo "No services configured."
+        echo
+    fi
+}
+
+service_status() {
+    local services_json=$(load_services)
+
+    echo
+    echo "SneezyMUD Service Status Check"
+    echo "=============================="
+    echo
+
+
+    if ! detect_existing_setup; then
+        echo "❌ Nginx not configured. Run initial setup first."
+        return 1
+    fi
+
+
+    echo "$services_json" | jq -r '.services[] | "\(.name)|\(.port)"' | while IFS='|' read -r name port; do
+        if timeout 2 bash -c "echo >/dev/tcp/localhost/$port" 2>/dev/null; then
+            printf "✓ %-12s localhost:%-5s (reachable)\n" "$name" "$port"
+        else
+            printf "❌ %-12s localhost:%-5s (unreachable)\n" "$name" "$port"
+        fi
+    done
+    echo
 }
 
 install_packages() {
@@ -39,46 +230,75 @@ install_packages() {
     success "Packages installed"
 }
 
-create_initial_config() {
-    info "Creating initial HTTP configuration"
+generate_service_locations() {
+    local services_json=$(load_services)
 
-    cat > /etc/nginx/sites-available/sneezy-http << EOF
-server {
-    listen 80;
-    server_name $DOMAIN_NAME;
+    # Sort services by path length (descending) to ensure proper nginx location matching
+    echo "$services_json" | jq -r '.services | sort_by(.path | length) | reverse | .[] | "\(.path)|\(.port)|\(.type)"' | while IFS='|' read -r path port type; do
+        local target="http://localhost:$port"
+        # Match nginx proxy_pass behavior for trailing slashes
+        if [[ "$path" != "/" && "$path" =~ /$ ]]; then
+            target="$target/"
+        fi
 
-    location /.well-known/acme-challenge/ {
-        root /var/www/letsencrypt;
-    }
-
-    location / {
-        proxy_pass http://localhost:8080;
-        proxy_set_header Host \$host;
-    }
-
-    location /build/ {
-        proxy_pass http://localhost:5001/;
-        proxy_set_header Host \$host;
-    }
-
-    location /ws {
-        proxy_pass http://localhost:7901;
+        if [[ "$type" == "websocket" ]]; then
+            cat << EOF
+    location $path {
+        proxy_pass $target;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "Upgrade";
         proxy_set_header Host \$host;
     }
+
+EOF
+        else
+            cat << EOF
+    location $path {
+        proxy_pass $target;
+        proxy_set_header Host \$host;
+    }
+
+EOF
+        fi
+    done
+}
+
+create_initial_config() {
+    local domains=("$@")
+    local server_names=$(printf "%s " "${domains[@]}")
+
+    info "Creating initial HTTP configuration"
+
+    cat > /etc/nginx/sites-available/sneezy-nginx << EOF
+server {
+    listen 80;
+    server_name ${server_names%;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+    }
+
+$(generate_service_locations)
 }
 EOF
 
-    ln -sf /etc/nginx/sites-available/sneezy-http /etc/nginx/sites-enabled/
+    ln -sf /etc/nginx/sites-available/sneezy-nginx /etc/nginx/sites-enabled/
     rm -f /etc/nginx/sites-enabled/default
 
     success "Initial HTTP configuration created"
 }
 
 get_ssl() {
-    info "Getting SSL certificate"
+    local domains=("$@")
+    local domain_args=""
+
+    # Multi-domain certificates reduce complexity vs separate certs per domain
+    for domain in "${domains[@]}"; do
+        domain_args="$domain_args -d $domain"
+    done
+
+    info "Getting SSL certificate for: ${domains[*]}"
     mkdir -p /var/www/letsencrypt
     chown www-data:www-data /var/www/letsencrypt
 
@@ -86,62 +306,52 @@ get_ssl() {
 
     if certbot certonly --webroot -w /var/www/letsencrypt \
        --email "$EMAIL" --agree-tos --no-eff-email \
-       --domains "$DOMAIN_NAME" --non-interactive; then
+       $domain_args --non-interactive; then
         success "SSL certificate obtained"
     else
-        error "SSL certificate failed - check that $DOMAIN_NAME points to this server"
+        error "SSL certificate failed - check that domains point to this server: ${domains[*]}"
     fi
 }
 
 create_https_config() {
+    local domains=("$@")
+    local server_names=$(printf "%s " "${domains[@]}")
+    # Certbot stores multi-domain certificates under the first domain's directory
+    local primary_domain="${domains[0]}"
+
     info "Creating HTTPS configuration"
 
-    cat > /etc/nginx/sites-available/redirect-to-https << EOF
+    cat > /etc/nginx/sites-available/sneezy-nginx << EOF
+# HTTP server - redirect to HTTPS (except ACME challenges)
 server {
     listen 80;
-    server_name $DOMAIN_NAME;
+    server_name ${server_names%;
     location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
     location / { return 301 https://\$host\$request_uri; }
 }
-EOF
 
-    cat > /etc/nginx/sites-available/sneezy-webclient << EOF
+# HTTPS server - all services
 server {
     listen 443 ssl;
-    server_name $DOMAIN_NAME;
+    server_name ${server_names%;
 
-    ssl_certificate /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/$primary_domain/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$primary_domain/privkey.pem;
 
-    location / {
-        proxy_pass http://localhost:8080;
-        proxy_set_header Host \$host;
-    }
-
-    location /build/ {
-        proxy_pass http://localhost:5001/;
-        proxy_set_header Host \$host;
-    }
-
-    location /ws {
-        proxy_pass http://localhost:7901;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "Upgrade";
-        proxy_set_header Host \$host;
-    }
+$(generate_service_locations)
 }
 EOF
 
-    rm -f /etc/nginx/sites-enabled/sneezy-http
-    ln -sf /etc/nginx/sites-available/redirect-to-https /etc/nginx/sites-enabled/
-    ln -sf /etc/nginx/sites-available/sneezy-webclient /etc/nginx/sites-enabled/
+    # Replace the HTTP-only config with the combined HTTP/HTTPS config
+    rm -f /etc/nginx/sites-enabled/sneezy-nginx
+    ln -sf /etc/nginx/sites-available/sneezy-nginx /etc/nginx/sites-enabled/
 
     success "HTTPS configuration created"
 }
 
 setup_renewal() {
     info "Setting up certificate renewal"
+    # Check twice daily and reload nginx only if renewal succeeds
     cat > /etc/cron.d/certbot-renewal << 'EOF'
 0 */12 * * * root certbot renew --quiet && systemctl reload nginx
 EOF
@@ -157,23 +367,222 @@ test_setup() {
 }
 
 show_results() {
+    local domains=("$@")
     echo
     echo "✓ SneezyMUD Nginx setup complete!"
-    echo "  Your site: https://$DOMAIN_NAME"
+    for domain in "${domains[@]}"; do
+        echo "  Your site: https://$domain"
+    done
     echo "  Certificates renew automatically"
     echo
+}
+show_management_menu() {
+    # Interactive menu for users who prefer guided operations over command-line flags
+    local current_domains=($(load_domains))
+
+    echo
+    echo "SneezyMUD Nginx Domain Management"
+    echo "================================="
+    echo
+    echo "Currently configured domains:"
+    if [[ ${#current_domains[@]} -eq 0 ]]; then
+        echo "  (none)"
+    else
+        for domain in "${current_domains[@]}"; do
+            echo "  • $domain"
+        done
+    fi
+    echo
+    echo "Options:"
+    echo "  1) Add domain"
+    echo "  2) Remove domain"
+    echo "  3) Update services from repository"
+    echo "  4) List services"
+    echo "  5) Service status"
+    echo "  6) Reconfigure (re-run initial setup)"
+    echo "  7) Remove entire setup"
+    echo "  8) Exit"
+    echo
+
+    while true; do
+        read -p "Choose option (1-8): " choice
+        case $choice in
+            1) add_domain_interactive; break ;;
+            2) remove_domain_interactive; break ;;
+            3) update_services_from_repo; break ;;
+            4) list_services; break ;;
+            5) service_status; break ;;
+            6) reconfigure_setup; break ;;
+            7) undo_setup; break ;;
+            8) echo "Exiting."; exit 0 ;;
+            *) echo "Invalid choice. Please enter 1-8." ;;
+        esac
+    done
+}
+
+add_domain_interactive() {
+    echo
+    read -p "Domain name to add: " new_domain
+    validate_domain "$new_domain"
+    get_email_config
+    add_domain "$new_domain"
+}
+
+remove_domain_interactive() {
+    local current_domains=($(load_domains))
+
+    if [[ ${#current_domains[@]} -eq 0 ]]; then
+        error "No domains configured"
+    fi
+
+    # Removing the last domain would leave nginx in a broken state, so offer full removal instead
+    if [[ ${#current_domains[@]} -eq 1 ]]; then
+        echo
+        warn "This is the last domain. Removing it will disable the entire setup."
+        read -p "Continue? (y/N): " confirm
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            undo_setup
+        else
+            echo "Cancelled."
+        fi
+        return
+    fi
+
+    echo
+    echo "Select domain to remove:"
+    for i in "${!current_domains[@]}"; do
+        echo "  $((i+1))) ${current_domains[i]}"
+    done
+    echo
+
+    while true; do
+        read -p "Choose domain (1-${#current_domains[@]}): " choice
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [[ $choice -ge 1 ]] && [[ $choice -le ${#current_domains[@]} ]]; then
+            local domain_to_remove="${current_domains[$((choice-1))]}"
+            remove_domain "$domain_to_remove"
+            break
+        else
+            echo "Invalid choice. Please enter a number between 1 and ${#current_domains[@]}."
+        fi
+    done
+}
+
+
+
+add_domain() {
+    local new_domain="$1"
+    local current_domains=($(load_domains))
+
+    # Prevent duplicate domains which would cause certificate errors
+    for domain in "${current_domains[@]}"; do
+        if [[ "$domain" == "$new_domain" ]]; then
+            error "Domain $new_domain is already configured"
+        fi
+    done
+
+    info "Adding domain: $new_domain"
+
+    current_domains+=("$new_domain")
+    save_domains "${current_domains[@]}"
+
+    # Certificate must be regenerated to include the new domain
+    update_certificates "${current_domains[@]}"
+    update_nginx_config "${current_domains[@]}"
+    test_setup
+
+    success "Domain $new_domain added successfully"
+    show_results "${current_domains[@]}"
+}
+
+remove_domain() {
+    local domain_to_remove="$1"
+    local current_domains=($(load_domains))
+    local new_domains=()
+
+
+    for domain in "${current_domains[@]}"; do
+        if [[ "$domain" != "$domain_to_remove" ]]; then
+            new_domains+=("$domain")
+        fi
+    done
+
+    if [[ ${#new_domains[@]} -eq ${#current_domains[@]} ]]; then
+        error "Domain $domain_to_remove not found in current configuration"
+    fi
+
+    info "Removing domain: $domain_to_remove"
+
+    save_domains "${new_domains[@]}"
+
+    # Certificate must be regenerated to exclude the removed domain
+    update_certificates "${new_domains[@]}"
+    update_nginx_config "${new_domains[@]}"
+    test_setup
+
+    success "Domain $domain_to_remove removed successfully"
+    show_results "${new_domains[@]}"
+}
+
+update_certificates() {
+    local domains=("$@")
+
+    if [[ ${#domains[@]} -eq 0 ]]; then
+        return
+    fi
+
+    info "Updating SSL certificates"
+
+    # Nginx must be stopped to avoid port conflicts during certificate renewal
+    systemctl stop nginx
+
+    get_ssl "${domains[@]}"
+}
+
+update_nginx_config() {
+    local domains=("$@")
+
+    if [[ ${#domains[@]} -eq 0 ]]; then
+        return
+    fi
+
+    info "Updating nginx configuration"
+    create_https_config "${domains[@]}"
+}
+
+reconfigure_setup() {
+    echo
+    warn "This will reconfigure the entire nginx setup."
+    read -p "Continue? (y/N): " confirm
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        # Clean slate approach is simpler than trying to preserve partial state
+        rm -f "$DOMAINS_FILE"
+        undo_setup
+        echo
+        info "Starting fresh setup"
+        get_config
+        initial_setup "$DOMAIN_NAME"
+    else
+        echo "Cancelled."
+    fi
 }
 
 undo_setup() {
     info "Removing Nginx setup"
 
+    # Remove current configuration files
+    rm -f /etc/nginx/sites-enabled/sneezy-nginx
+    rm -f /etc/nginx/sites-available/sneezy-nginx
+
+    # Clean up any old configuration files from previous versions
     rm -f /etc/nginx/sites-enabled/redirect-to-https
     rm -f /etc/nginx/sites-enabled/sneezy-webclient
     rm -f /etc/nginx/sites-enabled/sneezy-http
     rm -f /etc/nginx/sites-available/redirect-to-https
     rm -f /etc/nginx/sites-available/sneezy-webclient
     rm -f /etc/nginx/sites-available/sneezy-http
+
     rm -f /etc/cron.d/certbot-renewal
+    rm -f "$DOMAINS_FILE"
 
     # Restore default Nginx behavior
     if [[ -f /etc/nginx/sites-available/default ]]; then
@@ -184,16 +593,59 @@ undo_setup() {
     success "Nginx setup removed"
 }
 
-if [[ "$UNDO_MODE" == true ]]; then
-    undo_setup
-else
-    info "Starting SneezyMUD Nginx setup"
-    get_config
+initial_setup() {
+    local domain="$1"
+
+    info "Starting SneezyMUD Nginx setup for: $domain"
+
     install_packages
-    create_initial_config
-    get_ssl
-    create_https_config
+    create_initial_config "$domain"
+    get_ssl "$domain"
+    create_https_config "$domain"
     setup_renewal
     test_setup
-    show_results
-fi
+
+    # Enable domain management for future operations
+    save_domains "$domain"
+
+    show_results "$domain"
+}
+
+# Route to appropriate operation based on current system state and user intent
+case "$OPERATION" in
+    "undo")
+        undo_setup
+        ;;
+    "add")
+        if ! detect_existing_setup; then
+            error "No existing setup found. Run initial setup first: sudo $0"
+        fi
+        validate_domain "$TARGET_DOMAIN"
+        get_email_config
+        add_domain "$TARGET_DOMAIN"
+        ;;
+    "remove")
+        if ! detect_existing_setup; then
+            error "No existing setup found"
+        fi
+        remove_domain "$TARGET_DOMAIN"
+        ;;
+    "update-services")
+        update_services_from_repo
+        ;;
+    "list-services")
+        list_services
+        ;;
+    "service-status")
+        service_status
+        ;;
+    "auto")
+        if detect_existing_setup; then
+            show_management_menu
+        else
+            info "No existing setup detected - starting initial setup"
+            get_config
+            initial_setup "$DOMAIN_NAME"
+        fi
+        ;;
+esac
