@@ -12,6 +12,18 @@ DB_PASSWORD="password"
 TEMP_DIR=""
 SAFETY_BACKUP_SCRIPT="/usr/local/bin/sneezy-backup.sh"
 
+# Docker and container configuration
+COMPOSE_CMD="docker compose -f compose.yaml -f compose.prod.yaml"
+CONTAINER_SNEEZY="sneezy"
+CONTAINER_SNEEZY_DB="sneezy-db"
+CONTAINER_SNEEZY_MONITOR="sneezy-monitor"
+CONTAINER_SNEEZY_RESTORE="sneezy-restore"
+
+# Timing configuration
+DB_STARTUP_TIMEOUT=30
+MONITOR_STARTUP_WAIT=10
+DATABASES="sneezy immortal"
+
 cleanup() {
     if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
         info "Cleaning up temporary files"
@@ -21,6 +33,22 @@ cleanup() {
 
 # Ensure cleanup happens even if script fails
 trap cleanup EXIT
+
+# Helper functions
+is_container_running() {
+    local container_name="$1"
+    docker ps --format "{{.Names}}" | grep -q "^${container_name}$"
+}
+
+mysql_exec() {
+    local cmd="$1"
+    local database="${2:-}"
+    if [[ -n "$database" ]]; then
+        docker exec sneezy-db mysql -u "$DB_USER" -p"$DB_PASSWORD" -e "$cmd" "$database"
+    else
+        docker exec sneezy-db mysql -u "$DB_USER" -p"$DB_PASSWORD" -e "$cmd"
+    fi
+}
 
 show_help() {
     cat << EOF
@@ -89,9 +117,9 @@ get_backup_file() {
 }
 
 stop_monitor_service() {
-    if docker ps --format "{{.Names}}" | grep -q "^sneezy-monitor$"; then
+    if is_container_running "$CONTAINER_SNEEZY_MONITOR"; then
         info "Stopping sneezy-monitor service to prevent interference during restore"
-        docker compose -f compose.yaml -f compose.prod.yaml stop sneezy-monitor || {
+        $COMPOSE_CMD stop "$CONTAINER_SNEEZY_MONITOR" || {
             error "Failed to stop sneezy-monitor service - cannot safely proceed with restore"
         }
         success "Monitor service stopped"
@@ -105,16 +133,16 @@ start_monitor_service() {
     # This leverages the monitor's built-in logic for image updates, volume permissions,
     # error handling, and Discord notifications
     info "Starting sneezy-monitor service - it will automatically restart the game container"
-    docker compose -f compose.yaml -f compose.prod.yaml up -d sneezy-monitor || {
+    $COMPOSE_CMD up -d "$CONTAINER_SNEEZY_MONITOR" || {
         error "Failed to start sneezy-monitor service - game will not restart automatically"
     }
 
     # Give monitor a moment to detect and start the container
     info "Waiting for monitor to detect and restart the game container..."
-    sleep 10
+    sleep "$MONITOR_STARTUP_WAIT"
 
     # Verify the game container is running
-    if docker ps --format "{{.Names}}" | grep -q "^sneezy$"; then
+    if is_container_running "$CONTAINER_SNEEZY"; then
         success "Monitor service started and game container is running"
     else
         warning "Monitor started but game container not yet running - check monitor logs if needed"
@@ -124,15 +152,15 @@ start_monitor_service() {
 stop_game_safely() {
     info "Safely stopping the game"
 
-    if docker ps --format "{{.Names}}" | grep -q "^sneezy$"; then
+    if is_container_running "$CONTAINER_SNEEZY"; then
         # Must stop game process before database restore to prevent corruption
         info "Stopping sneezy container to prevent data corruption"
-        docker compose -f compose.yaml -f compose.prod.yaml stop sneezy
+        $COMPOSE_CMD stop "$CONTAINER_SNEEZY"
     fi
 
     # Keep container alive without starting game to allow file operations
     info "Starting container in safe mode"
-    docker compose -f compose.yaml -f compose.prod.yaml run -d --name sneezy-restore sneezy tail -f /dev/null
+    $COMPOSE_CMD run -d --name "$CONTAINER_SNEEZY_RESTORE" "$CONTAINER_SNEEZY" tail -f /dev/null
 
     success "Game safely stopped, container running in safe mode"
 }
@@ -149,7 +177,15 @@ extract_backup() {
 
     # Ensure backup contains expected structure before proceeding
     [[ -f "$TEMP_DIR/dbdump.sql" ]] || error "Database dump not found in backup"
-    [[ -d "$TEMP_DIR/mutable" ]] || error "Mutable directory not found in backup"
+
+    # Older backups contained the entire lib folder, so allow for both possibilities
+    [[ -d "$TEMP_DIR/mutable" || -d "$TEMP_DIR/lib/mutable" ]] || error "Mutable directory not found in backup"
+
+    if [[ -d "$TEMP_DIR/mutable" ]]; then
+        MUTABLE_DIR="$TEMP_DIR/mutable"
+    else
+        MUTABLE_DIR="$TEMP_DIR/lib/mutable"
+    fi
 
     success "Backup extracted successfully"
 }
@@ -157,18 +193,18 @@ extract_backup() {
 restore_database() {
     info "Restoring database"
 
-    if ! docker ps --format "{{.Names}}" | grep -q "^sneezy-db$"; then
+    if ! is_container_running "$CONTAINER_SNEEZY_DB"; then
         info "Starting database container"
-        docker compose -f compose.yaml -f compose.prod.yaml up -d sneezy-db
+        $COMPOSE_CMD up -d "$CONTAINER_SNEEZY_DB"
 
         # Database needs time to initialize before accepting connections
         info "Waiting for database to be ready"
-        for i in {1..30}; do
-            if docker exec sneezy-db mysqladmin ping -u "$DB_USER" -p"$DB_PASSWORD" --silent; then
+        for i in $(seq 1 $DB_STARTUP_TIMEOUT); do
+            if docker exec "$CONTAINER_SNEEZY_DB" mysqladmin ping -u "$DB_USER" -p"$DB_PASSWORD" --silent; then
                 break
             fi
-            if [[ $i -eq 30 ]]; then
-                error "Database failed to start within 30 seconds"
+            if [[ $i -eq $DB_STARTUP_TIMEOUT ]]; then
+                error "Database failed to start within $DB_STARTUP_TIMEOUT seconds"
             fi
             sleep 1
         done
@@ -176,37 +212,36 @@ restore_database() {
 
     # Must drop existing tables to avoid conflicts with backup data
     info "Clearing existing database tables"
-    for database in sneezy immortal; do
-        tables=$(docker exec sneezy-db mysql -u "$DB_USER" -p"$DB_PASSWORD" -e "SHOW TABLES" "$database" 2>/dev/null | tail -n +2 || true)
+    for database in $DATABASES; do
+        tables=$(mysql_exec "SHOW TABLES" "$database" 2>/dev/null | tail -n +2 || true)
 
         if [[ -n "$tables" ]]; then
             while IFS= read -r table; do
-                [[ -n "$table" ]] && docker exec sneezy-db mysql -u "$DB_USER" -p"$DB_PASSWORD" -e "DROP TABLE \`$table\`" "$database"
+                [[ -n "$table" ]] && mysql_exec "DROP TABLE \`$table\`" "$database"
             done <<< "$tables"
         fi
     done
 
     info "Importing database dump"
-    docker exec -i sneezy-db mysql -u "$DB_USER" -p"$DB_PASSWORD" < "$TEMP_DIR/dbdump.sql" || error "Failed to import database dump"
+    docker exec -i "$CONTAINER_SNEEZY_DB" mysql -u "$DB_USER" -p"$DB_PASSWORD" < "$TEMP_DIR/dbdump.sql" || error "Failed to import database dump"
 
     success "Database restored successfully"
 }
 
 restore_game_files() {
     info "Restoring game files"
-
-    docker exec sneezy-restore rm -rf /home/sneezy/lib/mutable || error "Failed to remove existing mutable directory"
-    docker cp "$TEMP_DIR/mutable" sneezy-restore:/home/sneezy/lib/ || error "Failed to copy mutable directory"
+    docker exec "$CONTAINER_SNEEZY_RESTORE" rm -rf /home/sneezy/lib/mutable || error "Failed to remove existing mutable directory"
+    docker cp "$MUTABLE_DIR" "$CONTAINER_SNEEZY_RESTORE":/home/sneezy/lib/ || error "Failed to copy mutable directory"
 
     # Container processes run as sneezy user, so files must be owned correctly
-    docker exec sneezy-restore chown -R sneezy:sneezy /home/sneezy/lib/mutable || error "Failed to set ownership on restored files"
+    docker exec "$CONTAINER_SNEEZY_RESTORE" chown -R sneezy:sneezy /home/sneezy/lib/mutable || error "Failed to set ownership on restored files"
 
     success "Game files restored successfully"
 }
 
 cleanup_restore_container() {
     info "Cleaning up restore container"
-    docker stop sneezy-restore && docker rm sneezy-restore
+    docker stop "$CONTAINER_SNEEZY_RESTORE" && docker rm "$CONTAINER_SNEEZY_RESTORE"
     success "Restore container cleaned up"
 }
 
