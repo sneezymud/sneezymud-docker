@@ -273,7 +273,7 @@ create_initial_config() {
     cat > /etc/nginx/sites-available/sneezy-nginx << EOF
 server {
     listen 80;
-    server_name ${server_names%;
+    server_name ${server_names% };
 
     location /.well-known/acme-challenge/ {
         root /var/www/letsencrypt;
@@ -285,6 +285,10 @@ EOF
 
     ln -sf /etc/nginx/sites-available/sneezy-nginx /etc/nginx/sites-enabled/
     rm -f /etc/nginx/sites-enabled/default
+
+    # Test and reload nginx to apply the new configuration before SSL certificate request
+    nginx -t || error "Nginx configuration invalid"
+    systemctl reload nginx || error "Nginx reload failed"
 
     success "Initial HTTP configuration created"
 }
@@ -304,6 +308,23 @@ get_ssl() {
 
     systemctl start nginx
 
+    # Use --webroot plugin instead of --nginx plugin for certificate acquisition
+    #
+    # Reasoning:
+    #
+    # This script manages multiple services (webclient, buildertools, websockets) and
+    # allows you to add/remove domains and update service configurations on the fly.
+    # The --nginx plugin would automatically modify our nginx configs, which would:
+    #
+    # - Break when you add/remove domains (--add-domain, --remove-domain commands)
+    # - Conflict when you update services (--update-services from services.json)
+    # - Make the --undo feature unpredictable (can't cleanly remove unknown changes)
+    # - Interfere with our custom websocket and HTTP service routing
+    #
+    # With --webroot we get reliable domain and service management that works
+    # predictably every time.
+    #
+    # Trade-off: We handle nginx reloads ourselves (see setup_renewal function)
     if certbot certonly --webroot -w /var/www/letsencrypt \
        --email "$EMAIL" --agree-tos --no-eff-email \
        $domain_args --non-interactive; then
@@ -325,7 +346,7 @@ create_https_config() {
 # HTTP server - redirect to HTTPS (except ACME challenges)
 server {
     listen 80;
-    server_name ${server_names%;
+    server_name ${server_names% };
     location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
     location / { return 301 https://\$host\$request_uri; }
 }
@@ -333,7 +354,7 @@ server {
 # HTTPS server - all services
 server {
     listen 443 ssl;
-    server_name ${server_names%;
+    server_name ${server_names% };
 
     ssl_certificate /etc/letsencrypt/live/$primary_domain/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$primary_domain/privkey.pem;
@@ -346,16 +367,40 @@ EOF
     rm -f /etc/nginx/sites-enabled/sneezy-nginx
     ln -sf /etc/nginx/sites-available/sneezy-nginx /etc/nginx/sites-enabled/
 
+    # Test and reload nginx to apply the HTTPS configuration
+    nginx -t || error "Nginx HTTPS configuration invalid"
+    systemctl reload nginx || error "Nginx reload failed"
+
     success "HTTPS configuration created"
 }
 
 setup_renewal() {
-    info "Setting up certificate renewal"
-    # Check twice daily and reload nginx only if renewal succeeds
-    cat > /etc/cron.d/certbot-renewal << 'EOF'
-0 */12 * * * root certbot renew --quiet && systemctl reload nginx
+    info "Configuring certificate renewal"
+
+    # Modern Certbot automatically sets up a systemd timer for certificate renewal,
+    # but since we use the --webroot plugin (see explanation above), Certbot does NOT
+    # automatically reload nginx after renewal, meaning nginx would continue to serve
+    # the old expired certificates from memory for a while after a successful renewal.
+    #
+    # Certbot automatically executes any executable scripts in /etc/letsencrypt/renewal-hooks/deploy/
+    # after a successful renewal, so we add a simple script there to ensure the
+    # nginx config is reloaded after renewal to pick up the new certificates.
+
+    # Remove any existing hook to ensure clean installation and avoid duplicates
+    if [[ -f /etc/letsencrypt/renewal-hooks/deploy/nginx-reload.sh ]]; then
+        rm -f /etc/letsencrypt/renewal-hooks/deploy/nginx-reload.sh
+    fi
+
+    mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+    cat > /etc/letsencrypt/renewal-hooks/deploy/nginx-reload.sh << 'EOF'
+#!/bin/bash
+# This hook runs after successful certificate renewal to ensure nginx
+# picks up the new certificates from disk instead of serving expired ones from memory
+systemctl reload nginx
 EOF
-    success "Auto-renewal configured"
+    chmod +x /etc/letsencrypt/renewal-hooks/deploy/nginx-reload.sh
+
+    success "Auto-renewal configured (using Certbot's built-in timer + nginx reload hook)"
 }
 
 test_setup() {
@@ -581,7 +626,9 @@ undo_setup() {
     rm -f /etc/nginx/sites-available/sneezy-webclient
     rm -f /etc/nginx/sites-available/sneezy-http
 
+    # Clean up renewal hooks (old cron job and new hook)
     rm -f /etc/cron.d/certbot-renewal
+    rm -f /etc/letsencrypt/renewal-hooks/deploy/nginx-reload.sh
     rm -f "$DOMAINS_FILE"
 
     # Restore default Nginx behavior
