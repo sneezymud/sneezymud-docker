@@ -86,6 +86,44 @@ get_backup_file() {
     echo "$backup_file"
 }
 
+stop_monitor_service() {
+    info "Temporarily stopping sneezy-monitor service"
+
+    if docker ps --format "{{.Names}}" | grep -q "^sneezy-monitor$"; then
+        # Stop monitor to prevent interference during restore process
+        info "Stopping sneezy-monitor to prevent automatic restarts during restore"
+        docker compose -f compose.yaml -f compose.prod.yaml stop sneezy-monitor || {
+            error "Failed to stop sneezy-monitor service - cannot safely proceed with restore"
+        }
+        success "Monitor service stopped"
+    else
+        info "Monitor service not running, skipping stop"
+    fi
+}
+
+start_monitor_service() {
+    info "Starting sneezy-monitor service to handle game restart"
+
+    # Start monitor which will automatically detect the missing container and restart it
+    # This leverages the monitor's built-in logic for image updates, volume permissions,
+    # error handling, and Discord notifications
+    info "Starting sneezy-monitor - it will automatically restart the game container"
+    docker compose -f compose.yaml -f compose.prod.yaml up -d sneezy-monitor || {
+        error "Failed to start sneezy-monitor service - game will not restart automatically"
+    }
+
+    # Give monitor a moment to detect and start the container
+    info "Waiting for monitor to detect and restart the game container..."
+    sleep 10
+
+    # Verify the game container is running
+    if docker ps --format "{{.Names}}" | grep -q "^sneezy$"; then
+        success "Monitor service started and game container is running"
+    else
+        warning "Monitor started but game container not yet running - check monitor logs if needed"
+    fi
+}
+
 stop_game_safely() {
     info "Safely stopping the game"
 
@@ -178,20 +216,13 @@ restore_game_files() {
     success "Game files restored successfully"
 }
 
-restart_game() {
-    info "Restarting the game"
+cleanup_restore_container() {
+    info "Cleaning up restore container"
 
     info "Stopping restore container"
     docker stop sneezy-restore && docker rm sneezy-restore
 
-    # Always pull latest to ensure security updates and bug fixes
-    info "Pulling latest SneezyMUD image"
-    docker pull sneezymud/sneezymud:latest || warning "Failed to pull latest image, using existing"
-
-    info "Starting game with latest configuration"
-    docker compose -f compose.yaml -f compose.prod.yaml up -d --force-recreate --no-deps sneezy || error "Failed to restart game"
-
-    success "Game restarted successfully"
+    success "Restore container cleaned up"
 }
 
 create_safety_backup() {
@@ -241,7 +272,10 @@ main() {
         exit 0
     fi
 
-    # Stop game first to ensure data consistency for safety backup
+    # Stop monitor first to prevent interference during restore
+    stop_monitor_service
+
+    # Stop game to ensure data consistency for safety backup
     stop_game_safely
 
     if [[ "$create_backup" == true ]]; then
@@ -249,11 +283,14 @@ main() {
     fi
     restore_database
     restore_game_files
-    restart_game
+    cleanup_restore_container
+
+    # Start monitor which will automatically handle restarting the game
+    start_monitor_service
 
     echo
     success "Backup restore completed successfully!"
-    info "Game should be running with restored data"
+    info "Monitor service is now managing the game container with restored data"
 }
 
 main "$@"
