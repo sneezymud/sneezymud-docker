@@ -29,6 +29,13 @@ cleanup() {
         info "Cleaning up temporary files"
         rm -rf "$TEMP_DIR"
     fi
+
+    # Clean up any leftover restore container from failed runs
+    if docker ps -a --format "{{.Names}}" | grep -q "^${CONTAINER_SNEEZY_RESTORE}$"; then
+        info "Cleaning up leftover restore container"
+        docker stop "$CONTAINER_SNEEZY_RESTORE" 2>/dev/null || true
+        docker rm "$CONTAINER_SNEEZY_RESTORE" 2>/dev/null || true
+    fi
 }
 
 # Ensure cleanup happens even if script fails
@@ -40,13 +47,13 @@ is_container_running() {
     docker ps --format "{{.Names}}" | grep -q "^${container_name}$"
 }
 
-mysql_exec() {
+mariadb_exec() {
     local cmd="$1"
     local database="${2:-}"
     if [[ -n "$database" ]]; then
-        docker exec sneezy-db mysql -u "$DB_USER" -p"$DB_PASSWORD" -e "$cmd" "$database"
+        docker exec "$CONTAINER_SNEEZY_DB" mariadb -u "$DB_USER" -p"$DB_PASSWORD" -e "$cmd" "$database"
     else
-        docker exec sneezy-db mysql -u "$DB_USER" -p"$DB_PASSWORD" -e "$cmd"
+        docker exec "$CONTAINER_SNEEZY_DB" mariadb -u "$DB_USER" -p"$DB_PASSWORD" -e "$cmd"
     fi
 }
 
@@ -86,8 +93,10 @@ validate_requirements() {
     info "Validating requirements"
 
     [[ $EUID -eq 0 ]] || error "Must run with sudo"
-    command -v docker &> /dev/null || error "Requires Docker"
-    systemctl is-active --quiet docker || error "Docker not running"
+
+    if ! docker info &> /dev/null; then
+        error "Docker is not installed, not running, or not accessible"
+    fi
 
     [[ -f "compose.yaml" ]] || error "compose.yaml not found - run from sneezymud-docker directory"
     [[ -f "compose.prod.yaml" ]] || error "compose.prod.yaml not found - run from sneezymud-docker directory"
@@ -200,7 +209,7 @@ restore_database() {
         # Database needs time to initialize before accepting connections
         info "Waiting for database to be ready"
         for i in $(seq 1 $DB_STARTUP_TIMEOUT); do
-            if docker exec "$CONTAINER_SNEEZY_DB" mysqladmin ping -u "$DB_USER" -p"$DB_PASSWORD" --silent; then
+            if docker exec "$CONTAINER_SNEEZY_DB" mariadb-admin ping -u "$DB_USER" -p"$DB_PASSWORD" --silent; then
                 break
             fi
             if [[ $i -eq $DB_STARTUP_TIMEOUT ]]; then
@@ -210,31 +219,29 @@ restore_database() {
         done
     fi
 
-    # Must drop existing tables to avoid conflicts with backup data
-    info "Clearing existing database tables"
+    # Must clear existing databases to avoid conflicts with backup data
+    info "Clearing existing databases"
     for database in $DATABASES; do
-        tables=$(mysql_exec "SHOW TABLES" "$database" 2>/dev/null | tail -n +2 || true)
-
-        if [[ -n "$tables" ]]; then
-            while IFS= read -r table; do
-                [[ -n "$table" ]] && mysql_exec "DROP TABLE \`$table\`" "$database"
-            done <<< "$tables"
-        fi
+        mariadb_exec "DROP DATABASE IF EXISTS \`$database\`"
+        mariadb_exec "CREATE DATABASE \`$database\`"
     done
 
-    info "Importing database dump"
-    docker exec -i "$CONTAINER_SNEEZY_DB" mysql -u "$DB_USER" -p"$DB_PASSWORD" < "$TEMP_DIR/dbdump.sql" || error "Failed to import database dump"
+    info "Importing database dump (might take a while...)"
+    docker exec -i "$CONTAINER_SNEEZY_DB" mariadb -u "$DB_USER" -p"$DB_PASSWORD" < "$TEMP_DIR/dbdump.sql" || error "Failed to import database dump"
 
     success "Database restored successfully"
 }
 
 restore_game_files() {
     info "Restoring game files"
-    docker exec "$CONTAINER_SNEEZY_RESTORE" rm -rf /home/sneezy/lib/mutable || error "Failed to remove existing mutable directory"
-    docker cp "$MUTABLE_DIR" "$CONTAINER_SNEEZY_RESTORE":/home/sneezy/lib/ || error "Failed to copy mutable directory"
+
+    # Clear contents of mutable directory (including hidden files) and copy backup contents in
+    # Don't remove the directory itself as it's a mount point
+    docker exec --user root "$CONTAINER_SNEEZY_RESTORE" sh -c 'rm -rf /home/sneezy/lib/mutable/* /home/sneezy/lib/mutable/.[!.]* 2>/dev/null || true'
+    docker cp "$MUTABLE_DIR/." "$CONTAINER_SNEEZY_RESTORE":/home/sneezy/lib/mutable/ || error "Failed to copy mutable directory contents"
 
     # Container processes run as sneezy user, so files must be owned correctly
-    docker exec "$CONTAINER_SNEEZY_RESTORE" chown -R sneezy:sneezy /home/sneezy/lib/mutable || error "Failed to set ownership on restored files"
+    docker exec --user root "$CONTAINER_SNEEZY_RESTORE" chown -R sneezy:sneezy /home/sneezy/lib/mutable || error "Failed to set ownership on restored files"
 
     success "Game files restored successfully"
 }
