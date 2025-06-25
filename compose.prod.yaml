@@ -6,9 +6,25 @@ services:
     image: sneezymud/sneezymud:latest
     volumes:
       - sneezy-mutable:/home/sneezy/lib/mutable
+    restart: "no"
 
   buildertools:
     image: sneezymud/sneezymud-buildertools:59
 
   webclient:
     image: sneezymud/webclient:60
+
+  sneezy-monitor:
+    container_name: sneezy-monitor
+    build:
+      context: services/monitor
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/workspace
+    environment:
+      - CONTAINER_NAME=sneezy
+      - IMAGE_NAME=sneezymud/sneezymud:latest
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+    restart: always
+    depends_on:
+      - sneezy-db
