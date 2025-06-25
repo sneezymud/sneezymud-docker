@@ -1,0 +1,25 @@
+{
+  "services": [
+    {
+      "name": "webclient",
+      "path": "/",
+      "port": 8080,
+      "type": "http",
+      "description": "Main web client"
+    },
+    {
+      "name": "buildertools",
+      "path": "/build/",
+      "port": 5001,
+      "type": "http",
+      "description": "Builder tools interface"
+    },
+    {
+      "name": "websockify",
+      "path": "/ws",
+      "port": 7901,
+      "type": "websocket",
+      "description": "WebSocket proxy for game connection"
+    }
+  ]
+}
