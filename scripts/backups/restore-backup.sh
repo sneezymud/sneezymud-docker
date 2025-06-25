@@ -72,7 +72,9 @@ get_backup_file() {
 
     if [[ -z "$backup_file" ]]; then
         backup_file="$DEFAULT_BACKUP_DIR/latest.tar.xz"
-        info "No backup file specified, using latest: $backup_file"
+        info "Using latest backup: $backup_file" >&2
+    else
+        info "Using specified backup: $backup_file" >&2
     fi
 
     # Support both relative and absolute paths for user convenience
@@ -87,11 +89,8 @@ get_backup_file() {
 }
 
 stop_monitor_service() {
-    info "Temporarily stopping sneezy-monitor service"
-
     if docker ps --format "{{.Names}}" | grep -q "^sneezy-monitor$"; then
-        # Stop monitor to prevent interference during restore process
-        info "Stopping sneezy-monitor to prevent automatic restarts during restore"
+        info "Stopping sneezy-monitor service to prevent interference during restore"
         docker compose -f compose.yaml -f compose.prod.yaml stop sneezy-monitor || {
             error "Failed to stop sneezy-monitor service - cannot safely proceed with restore"
         }
@@ -102,12 +101,10 @@ stop_monitor_service() {
 }
 
 start_monitor_service() {
-    info "Starting sneezy-monitor service to handle game restart"
-
     # Start monitor which will automatically detect the missing container and restart it
     # This leverages the monitor's built-in logic for image updates, volume permissions,
     # error handling, and Discord notifications
-    info "Starting sneezy-monitor - it will automatically restart the game container"
+    info "Starting sneezy-monitor service - it will automatically restart the game container"
     docker compose -f compose.yaml -f compose.prod.yaml up -d sneezy-monitor || {
         error "Failed to start sneezy-monitor service - game will not restart automatically"
     }
@@ -178,19 +175,14 @@ restore_database() {
     fi
 
     # Must drop existing tables to avoid conflicts with backup data
-    info "Dropping existing tables"
+    info "Clearing existing database tables"
     for database in sneezy immortal; do
-        info "Processing database: $database"
-
         tables=$(docker exec sneezy-db mysql -u "$DB_USER" -p"$DB_PASSWORD" -e "SHOW TABLES" "$database" 2>/dev/null | tail -n +2 || true)
 
         if [[ -n "$tables" ]]; then
             while IFS= read -r table; do
                 [[ -n "$table" ]] && docker exec sneezy-db mysql -u "$DB_USER" -p"$DB_PASSWORD" -e "DROP TABLE \`$table\`" "$database"
             done <<< "$tables"
-            info "Dropped tables from $database database"
-        else
-            info "No tables found in $database database"
         fi
     done
 
@@ -203,14 +195,10 @@ restore_database() {
 restore_game_files() {
     info "Restoring game files"
 
-    info "Removing existing mutable directory"
     docker exec sneezy-restore rm -rf /home/sneezy/lib/mutable || error "Failed to remove existing mutable directory"
-
-    info "Copying restored mutable directory"
     docker cp "$TEMP_DIR/mutable" sneezy-restore:/home/sneezy/lib/ || error "Failed to copy mutable directory"
 
     # Container processes run as sneezy user, so files must be owned correctly
-    info "Setting proper ownership on restored files"
     docker exec sneezy-restore chown -R sneezy:sneezy /home/sneezy/lib/mutable || error "Failed to set ownership on restored files"
 
     success "Game files restored successfully"
@@ -218,10 +206,7 @@ restore_game_files() {
 
 cleanup_restore_container() {
     info "Cleaning up restore container"
-
-    info "Stopping restore container"
     docker stop sneezy-restore && docker rm sneezy-restore
-
     success "Restore container cleaned up"
 }
 
@@ -245,12 +230,12 @@ main() {
     fi
 
     info "Starting SneezyMUD backup restore"
+    echo
 
     validate_requirements
 
     local backup_file
     backup_file=$(get_backup_file "$1")
-    info "Using backup file: $backup_file"
 
     # Validate backup contents before stopping game to minimize downtime
     extract_backup "$backup_file"
@@ -272,20 +257,24 @@ main() {
         exit 0
     fi
 
-    # Stop monitor first to prevent interference during restore
+    echo
+    info "=== STOPPING SERVICES ==="
     stop_monitor_service
-
-    # Stop game to ensure data consistency for safety backup
     stop_game_safely
 
     if [[ "$create_backup" == true ]]; then
+        echo
         create_safety_backup
     fi
+
+    echo
+    info "=== RESTORING DATA ==="
     restore_database
     restore_game_files
     cleanup_restore_container
 
-    # Start monitor which will automatically handle restarting the game
+    echo
+    info "=== RESTARTING SERVICES ==="
     start_monitor_service
 
     echo
