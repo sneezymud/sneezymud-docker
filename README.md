@@ -250,6 +250,14 @@ docker compose -f compose.yaml -f compose.prod.yaml up -d --force-recreate --no-
 
 New Docker images are automatically built when code changes are merged to the [main SneezyMUD repo](https://github.com/sneezymud/sneezymud). See "Updates & Maintenance" above for update commands.
 
+## Automatic Updates
+
+Using the production `compose.prod.yaml` file enables automatic Docker image updates that trigger when the game server shuts down via the `sneezy-monitor` container.
+
+A Discord webhook can optionally be configured via `.env` file to receive notifications when the game is updated.
+
+See [docs/AUTO-UPDATES.md](docs/AUTO-UPDATES.md) for more info.
+
 ## Automated Backup System
 
 For production servers it's highly recommended to set up automated backups of your important game data. This repo includes a script to help with this. See [`scripts/backups/README.md`](scripts/backups/README.md) for more information.
