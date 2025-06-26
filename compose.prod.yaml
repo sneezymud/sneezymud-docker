@@ -6,6 +6,7 @@ services:
     image: sneezymud/sneezymud:latest
     volumes:
       - sneezy-mutable:/home/sneezy/lib/mutable
+      - ./discord.cfg:/home/sneezy/code/discord.cfg
     restart: "no"
 
   buildertools:
