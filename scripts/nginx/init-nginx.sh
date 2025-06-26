@@ -58,6 +58,9 @@ case "${1:-}" in
         echo "  1. Add/remove service from Docker Compose"
         echo "  2. Update scripts/nginx/services.json"
         echo "  3. Run: sudo $0 --update-services"
+        echo ""
+        echo "Backup API Configuration:"
+        echo "  Set BACKUP_API_KEY in .env file to enable /sneezybackups/ endpoint"
         exit 0
         ;;
     "")
@@ -159,10 +162,6 @@ update_services_from_repo() {
     success "Nginx configuration updated from services.json"
 }
 
-
-
-
-
 list_services() {
     local services_json=$(load_services)
 
@@ -233,6 +232,26 @@ install_packages() {
 generate_service_locations() {
     local services_json=$(load_services)
 
+    # Load .env file if it exists
+    if [[ -f ".env" ]]; then
+        source .env
+    fi
+
+    local backup_api_key="${BACKUP_API_KEY:-}"
+
+    # Generate backup API endpoint if API key is configured
+    if [[ -n "$backup_api_key" ]]; then
+        cat << EOF
+    location /sneezybackups/ {
+        alias /opt/backups/sneezy/;
+        if (\$arg_api_key != "$backup_api_key") {
+            return 403;
+        }
+    }
+
+EOF
+    fi
+
     # Sort services by path length (descending) to ensure proper nginx location matching
     echo "$services_json" | jq -r '.services | sort_by(.path | length) | reverse | .[] | "\(.path)|\(.port)|\(.type)"' | while IFS='|' read -r path port type; do
         local target="http://localhost:$port"
@@ -296,13 +315,22 @@ EOF
 get_ssl() {
     local domains=("$@")
     local domain_args=""
+    local expand_flag=""
 
     # Multi-domain certificates reduce complexity vs separate certs per domain
     for domain in "${domains[@]}"; do
         domain_args="$domain_args -d $domain"
     done
 
-    info "Getting SSL certificate for: ${domains[*]}"
+    # Check if there are existing certificates - if so, use --expand to add domains
+    # to the existing certificate without prompting
+    if [[ -d "/etc/letsencrypt/live" ]] && [[ -n "$(ls -A /etc/letsencrypt/live/ 2>/dev/null)" ]]; then
+        expand_flag="--expand"
+        info "Expanding existing SSL certificate for: ${domains[*]}"
+    else
+        info "Getting SSL certificate for: ${domains[*]}"
+    fi
+
     mkdir -p /var/www/letsencrypt
     chown www-data:www-data /var/www/letsencrypt
 
@@ -327,7 +355,7 @@ get_ssl() {
     # Trade-off: We handle nginx reloads ourselves (see setup_renewal function)
     if certbot certonly --webroot -w /var/www/letsencrypt \
        --email "$EMAIL" --agree-tos --no-eff-email \
-       $domain_args --non-interactive; then
+       $domain_args $expand_flag --non-interactive; then
         success "SSL certificate obtained"
     else
         error "SSL certificate failed - check that domains point to this server: ${domains[*]}"
