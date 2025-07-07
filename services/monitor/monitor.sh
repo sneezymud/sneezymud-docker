@@ -7,22 +7,25 @@
 #
 set -e
 
-CONTAINER_NAME="${CONTAINER_NAME:-sneezy}"
-IMAGE_NAME="${IMAGE_NAME:-sneezymud/sneezymud:latest}"
-CHECK_INTERVAL=5
-# Force project name to ensure containers are created in the correct compose project
-UP_CMD="docker-compose -f compose.yaml -f compose.prod.yaml -p sneezymud-docker up -d --force-recreate --no-deps sneezy"
-# Stores previous image ID to enable rollback when updates fail
+# Configuration
+readonly CONTAINER_NAME="${CONTAINER_NAME:-sneezy}"
+readonly IMAGE_NAME="${IMAGE_NAME:-sneezymud/sneezymud:latest}"
+readonly CHECK_INTERVAL=5
+readonly MONITOR_CONTAINER_NAME="${MONITOR_CONTAINER_NAME:-sneezy-monitor}"
+
+# Global state for rollback functionality
 PREVIOUS_IMAGE_ID=""
 
+# Logging functions with consistent timestamp format
 info() { echo "→ $(date '+%Y-%m-%d %H:%M:%S') $1"; }
 success() { echo "✓ $(date '+%Y-%m-%d %H:%M:%S') $1"; }
 error() { echo "✗ $(date '+%Y-%m-%d %H:%M:%S') $1" >&2; }
 
+# Sends Discord notification if webhook URL is configured
+# Failures are silently ignored to prevent monitor disruption
 send_discord_notification() {
     local message="$1"
     if [ -n "$DISCORD_WEBHOOK_URL" ]; then
-        # Suppress output to avoid cluttering logs with curl responses
         curl -X POST "$DISCORD_WEBHOOK_URL" \
              -H "Content-Type: application/json" \
              -d "{\"content\": \"$message\"}" \
@@ -30,6 +33,7 @@ send_discord_notification() {
     fi
 }
 
+# Container state checking functions
 is_container_running() {
     docker ps --filter "name=$CONTAINER_NAME" --filter "status=running" --format "{{.Names}}" | grep -q "^$CONTAINER_NAME$"
 }
@@ -46,6 +50,8 @@ get_container_status() {
     fi
 }
 
+# Checks for image updates and preserves previous version for rollback
+# Returns 0 if update available, 1 if current image is latest
 check_for_image_update() {
     info "Checking for image updates"
 
@@ -54,11 +60,14 @@ check_for_image_update() {
         current_image_id=$(docker inspect "$CONTAINER_NAME" --format='{{.Image}}' 2>/dev/null || echo "")
     fi
 
-    # Preserve current image ID before pulling to enable rollback if new image fails
+    # Store current latest image ID before pulling - enables rollback if new version fails
     local current_latest_id=$(docker inspect "$IMAGE_NAME" --format='{{.Id}}' 2>/dev/null || echo "")
 
     info "Pulling latest image: $IMAGE_NAME"
-    docker pull "$IMAGE_NAME" >/dev/null 2>&1
+    if ! docker pull "$IMAGE_NAME" >/dev/null 2>&1; then
+        error "Failed to pull latest image"
+        return 1
+    fi
 
     local latest_image_id=$(docker inspect "$IMAGE_NAME" --format='{{.Id}}' 2>/dev/null || echo "")
 
@@ -72,26 +81,28 @@ check_for_image_update() {
     fi
 }
 
+# Rolls back to previous image version by re-tagging
+# Critical for recovery when new image versions fail to start properly
 rollback_image() {
     if [ -n "$PREVIOUS_IMAGE_ID" ]; then
         info "Rolling back to previous image: ${PREVIOUS_IMAGE_ID:0:12}"
-        # Restore previous image by re-tagging it as :latest
-        docker tag "$PREVIOUS_IMAGE_ID" "$IMAGE_NAME" 2>/dev/null || {
+        if docker tag "$PREVIOUS_IMAGE_ID" "$IMAGE_NAME" 2>/dev/null; then
+            success "Successfully rolled back to previous image"
+            return 0
+        else
             error "Failed to rollback image - previous image may have been removed"
             return 1
-        }
-        success "Successfully rolled back to previous image"
-        return 0
+        fi
     else
         error "No previous image available for rollback"
         return 1
     fi
 }
 
+# Ensures volume ownership matches container user to prevent permission errors
+# SneezyMUD container runs as UID 1000, but Docker volumes default to root
 fix_volume_permissions() {
     info "Ensuring sneezy-mutable volume has correct ownership"
-    # Docker volumes default to root ownership, but sneezy container runs as UID 1000
-    # This prevents filesystem permission errors during game startup
     docker run --rm \
         -v sneezymud-docker_sneezy-mutable:/mnt \
         alpine:latest \
@@ -100,6 +111,7 @@ fix_volume_permissions() {
     }
 }
 
+# Removes existing container to ensure clean state for recreation
 remove_existing_container() {
     if container_exists; then
         info "Removing existing container"
@@ -107,23 +119,56 @@ remove_existing_container() {
     fi
 }
 
-execute_compose_command() {
-    cd /workspace
-    eval "${UP_CMD}"
+# Detects host project directory to resolve Docker-in-Docker bind mount path issues
+# When monitor runs docker-compose from inside container, relative paths in compose files
+# must be resolved relative to host filesystem, not container filesystem
+get_host_project_directory() {
+    docker inspect "$MONITOR_CONTAINER_NAME" \
+        --format '{{ range .Mounts }}{{ if eq .Destination "/workspace" }}{{ .Source }}{{ end }}{{ end }}' \
+        2>/dev/null || echo ""
 }
 
+# Executes docker compose with proper path resolution for bind mounts
+# Uses host project directory for path resolution while accessing compose files from container
+execute_compose_command() {
+    cd /workspace || {
+        error "Failed to change to workspace directory"
+        return 1
+    }
+
+    local host_project_dir=$(get_host_project_directory)
+
+    if [ -n "$host_project_dir" ]; then
+        # Critical: Use host path for --project-directory to resolve bind mounts correctly
+        # but access compose files from /workspace where monitor can read them
+        docker compose \
+            --project-directory "$host_project_dir" \
+            -f /workspace/compose.yaml \
+            -f /workspace/compose.prod.yaml \
+            -p sneezymud-docker \
+            up -d --force-recreate --no-deps sneezy
+    else
+        error "Unable to detect host project directory - bind mounts may not work correctly"
+        return 1
+    fi
+}
+
+# Centralized container startup with all necessary preparation steps
+# Ensures consistent setup across all container start scenarios
 start_container_with_prep() {
     remove_existing_container
     fix_volume_permissions
     execute_compose_command
 }
 
+# Starts container and validates it's running properly
+# Includes startup delay to allow container initialization
 start_and_validate_container() {
     local success_msg="${1:-Container started successfully}"
     local failure_msg="${2:-Failed to start container}"
 
     if execute_compose_command; then
-        # Allow container time to initialize before checking status
+        # Container needs time to initialize before status check is reliable
         sleep 3
         if is_container_running; then
             success "$success_msg"
@@ -135,6 +180,7 @@ start_and_validate_container() {
     return 1
 }
 
+# Recreates container with latest image - used during updates
 recreate_container() {
     info "Recreating container with latest image"
     remove_existing_container
@@ -143,6 +189,31 @@ recreate_container() {
     start_and_validate_container "Container recreated and started successfully" "Failed to start container"
 }
 
+# Handles rollback scenario when new image fails to start
+# Ensures service availability by falling back to known-good version
+handle_rollback_scenario() {
+    error "Failed to recreate container with new image - rolling back to previous version"
+    send_discord_notification "❌ SneezyMUD update failed - rolling back to previous version"
+
+    if rollback_image; then
+        info "Attempting to start container with previous image"
+        remove_existing_container
+
+        if execute_compose_command; then
+            success "Successfully started container with previous image"
+            send_discord_notification "✅ SneezyMUD rollback successful - running previous version"
+        else
+            error "Failed to start container even with previous image"
+            send_discord_notification "❌ SneezyMUD rollback failed - manual intervention required"
+        fi
+    else
+        error "Rollback failed - manual intervention required"
+        send_discord_notification "❌ SneezyMUD rollback failed - manual intervention required"
+    fi
+}
+
+# Main restart handler - checks for updates and manages rollback on failure
+# Prioritizes service availability over running latest version
 handle_container_restart() {
     info "Container stopped - checking for updates"
 
@@ -154,24 +225,7 @@ handle_container_restart() {
             success "Container updated and restarted successfully"
             send_discord_notification "✅ SneezyMUD updated to latest version successfully!"
         else
-            error "Failed to recreate container with new image - rolling back to previous version"
-            send_discord_notification "❌ SneezyMUD update failed - rolling back to previous version"
-
-            if rollback_image; then
-                info "Attempting to start container with previous image"
-                remove_existing_container
-
-                if execute_compose_command; then
-                    success "Successfully started container with previous image"
-                    send_discord_notification "✅ SneezyMUD rollback successful - running previous version"
-                else
-                    error "Failed to start container even with previous image"
-                    send_discord_notification "❌ SneezyMUD rollback failed - manual intervention required"
-                fi
-            else
-                error "Rollback failed - manual intervention required"
-                send_discord_notification "❌ SneezyMUD rollback failed - manual intervention required"
-            fi
+            handle_rollback_scenario
         fi
     else
         info "No updates available - restarting with current image"
@@ -179,6 +233,7 @@ handle_container_restart() {
     fi
 }
 
+# Ensures container is running, handling both missing and stopped states
 ensure_container_running() {
     if ! is_container_running; then
         if container_exists; then
@@ -192,7 +247,8 @@ ensure_container_running() {
     fi
 }
 
-main() {
+# Initializes monitor and displays configuration
+initialize_monitor() {
     info "Starting SneezyMUD container monitor"
     info "Monitoring container: $CONTAINER_NAME"
     info "Check interval: ${CHECK_INTERVAL}s"
@@ -202,29 +258,30 @@ main() {
     else
         info "Discord notifications disabled (no webhook URL configured)"
     fi
+}
 
-    ensure_container_running
-
+# Main monitoring loop - detects state changes to trigger appropriate actions
+# Uses state tracking to avoid unnecessary operations on stable containers
+run_monitoring_loop() {
     local was_running=false
     if is_container_running; then
         was_running=true
         info "Container is currently running"
     fi
 
-    # Main monitoring loop - detects container state changes to trigger updates
     while true; do
-        sleep $CHECK_INTERVAL
+        sleep "$CHECK_INTERVAL"
 
         local is_running=false
         if is_container_running; then
             is_running=true
         fi
 
-        # Container stopped - check for updates and restart
+        # State transition: running -> stopped (normal restart scenario)
         if [ "$was_running" = true ] && [ "$is_running" = false ]; then
             info "Container stopped - triggering restart with update check"
             handle_container_restart
-        # Container failed to start or crashed - ensure it's running
+        # State: stopped -> stopped (failure recovery scenario)
         elif [ "$was_running" = false ] && [ "$is_running" = false ]; then
             info "Container should be running but isn't - ensuring it's started"
             ensure_container_running
@@ -234,6 +291,14 @@ main() {
     done
 }
 
+# Main entry point
+main() {
+    initialize_monitor
+    ensure_container_running
+    run_monitoring_loop
+}
+
+# Graceful shutdown handling
 trap 'info "Monitor shutting down"; exit 0' SIGTERM SIGINT
 
 main
