@@ -59,6 +59,28 @@ From then on you'll have to manage the game container manually. To re-enable aut
 docker compose -f compose.yaml -f compose.prod.yaml up -d sneezy-monitor
 ```
 
+## Crash Log Preservation
+
+The monitor service automatically preserves container logs before recreating the sneezy container, primarily to make crash logs available for debugging purposes. Logs get rotated automatically to prevent disk space issues, retaining the most recent 20 log files. This number can be changed by modifying `monitor.sh` and recreating the monitor container.
+
+### Viewing Archived Logs
+
+Crash logs are stored in `/var/tmp/sneezymud-logs/` on the host server via bind mount and can be accessed with standard commands:
+
+```bash
+# List all available log archives
+ls -la /var/tmp/sneezymud-logs/
+
+# View the most recent log file
+ls -t /var/tmp/sneezymud-logs/sneezy-*.log | head -1 | xargs cat
+
+# View a specific log file by timestamp
+cat /var/tmp/sneezymud-logs/sneezy-20250107-143022.log
+
+# Search for specific errors across all logs
+grep -r "segmentation fault" /var/tmp/sneezymud-logs/
+```
+
 ## Technical Details
 
 The monitor service runs in a privileged container with access to the Docker socket, allowing it to manage other containers. It uses Docker-in-Docker techniques to:
@@ -67,5 +89,6 @@ The monitor service runs in a privileged container with access to the Docker soc
 - Pull new Docker images and compare versions
 - Handle bind mount path resolution for configuration files
 - Provide rollback capabilities when updates fail
+- Archive container logs before recreation to preserve crash information
 
 For implementation details, see the `monitor.sh` script in this directory.

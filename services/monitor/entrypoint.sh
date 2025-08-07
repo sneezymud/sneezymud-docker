@@ -40,6 +40,23 @@ adduser monitor "$DOCKER_GROUP" 2>/dev/null || true
 
 echo "✓ Docker socket access configured"
 
+# Ensure log directory exists with proper ownership
+echo "→ Configuring log directory access..."
+LOG_DIR="${LOG_ARCHIVE_DIR:-/logs}"
+
+# Create the directory if it doesn't exist
+if [ ! -d "$LOG_DIR" ]; then
+    echo "→ Creating log directory: $LOG_DIR"
+    mkdir -p "$LOG_DIR"
+fi
+
+# Ensure proper ownership (monitor user UID 1000)
+echo "→ Setting log directory ownership to monitor user"
+chown 1000:1000 "$LOG_DIR"
+chmod 755 "$LOG_DIR"
+
+echo "✓ Log directory access configured"
+
 # Switch to monitor user and run the monitor script
 echo "→ Starting monitor as user 'monitor'..."
 exec su -c "/usr/local/bin/monitor.sh" monitor
