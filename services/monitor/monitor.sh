@@ -12,6 +12,8 @@ readonly CONTAINER_NAME="${CONTAINER_NAME:-sneezy}"
 readonly IMAGE_NAME="${IMAGE_NAME:-sneezymud/sneezymud:latest}"
 readonly CHECK_INTERVAL=5
 readonly MONITOR_CONTAINER_NAME="${MONITOR_CONTAINER_NAME:-sneezy-monitor}"
+readonly LOG_ARCHIVE_DIR="${LOG_ARCHIVE_DIR:-/logs}"
+readonly MAX_LOG_FILES="${MAX_LOG_FILES:-20}"
 
 # Global state for rollback functionality
 PREVIOUS_IMAGE_ID=""
@@ -111,9 +113,70 @@ fix_volume_permissions() {
     }
 }
 
+# Saves container logs to timestamped archive file before removal
+# Critical for preserving crash logs that would otherwise be lost
+save_container_logs() {
+    if ! container_exists; then
+        return 0
+    fi
+
+    # Ensure log directory exists
+    mkdir -p "$LOG_ARCHIVE_DIR" || {
+        error "Failed to create log archive directory: $LOG_ARCHIVE_DIR"
+        return 1
+    }
+
+    local timestamp=$(date '+%Y%m%d-%H%M%S')
+    local log_file="$LOG_ARCHIVE_DIR/sneezy-${timestamp}.log"
+
+    info "Saving container logs to ${log_file##*/}"
+
+    # Save logs with error handling - don't fail if logs are empty or inaccessible
+    # Use touch to test write permissions first
+    if ! touch "$log_file" 2>/dev/null; then
+        error "Cannot write to log directory: $LOG_ARCHIVE_DIR (check permissions)"
+        return 1
+    fi
+
+    if docker logs "$CONTAINER_NAME" > "$log_file" 2>&1; then
+        # Only keep the file if it has content (more than just whitespace)
+        if [ -s "$log_file" ] && grep -q '[^[:space:]]' "$log_file" 2>/dev/null; then
+            success "Container logs saved ($(wc -l < "$log_file") lines)"
+            rotate_old_logs
+        else
+            # Remove empty or whitespace-only log files
+            rm -f "$log_file"
+            info "No meaningful logs to save"
+        fi
+    else
+        error "Failed to save container logs"
+        rm -f "$log_file"
+        return 1
+    fi
+}
+
+# Removes old log files to prevent disk space issues
+# Keeps the most recent MAX_LOG_FILES files based on modification time
+rotate_old_logs() {
+    local log_count=$(find "$LOG_ARCHIVE_DIR" -name "sneezy-*.log" -type f | wc -l)
+
+    if [ "$log_count" -gt "$MAX_LOG_FILES" ]; then
+        local files_to_remove=$((log_count - MAX_LOG_FILES))
+        info "Rotating logs: removing $files_to_remove old files (keeping $MAX_LOG_FILES most recent)"
+
+        # Remove oldest files, keeping the most recent MAX_LOG_FILES
+        find "$LOG_ARCHIVE_DIR" -name "sneezy-*.log" -type f -printf '%T@ %p\n' | \
+            sort -n | \
+            head -n "$files_to_remove" | \
+            cut -d' ' -f2- | \
+            xargs rm -f
+    fi
+}
+
 # Removes existing container to ensure clean state for recreation
 remove_existing_container() {
     if container_exists; then
+        save_container_logs
         info "Removing existing container"
         docker rm "$CONTAINER_NAME" 2>/dev/null || true
     fi
@@ -252,6 +315,7 @@ initialize_monitor() {
     info "Starting SneezyMUD container monitor"
     info "Monitoring container: $CONTAINER_NAME"
     info "Check interval: ${CHECK_INTERVAL}s"
+    info "Log archive directory: $LOG_ARCHIVE_DIR (keeping $MAX_LOG_FILES files)"
 
     if [ -n "$DISCORD_WEBHOOK_URL" ]; then
         info "Discord notifications enabled for updates"

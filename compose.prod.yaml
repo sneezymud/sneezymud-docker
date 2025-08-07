@@ -29,6 +29,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - .:/workspace
+      - /var/tmp/sneezymud-logs:/logs
     environment:
       - CONTAINER_NAME=sneezy
       - IMAGE_NAME=sneezymud/sneezymud:latest
