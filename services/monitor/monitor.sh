@@ -5,7 +5,7 @@
 # Monitors the sneezy container and automatically pulls/applies image updates
 # when the container stops, ensuring minimal downtime and seamless updates
 #
-set -e
+set -eo pipefail
 
 # Configuration
 readonly CONTAINER_NAME="${CONTAINER_NAME:-sneezy}"
@@ -25,9 +25,9 @@ LAST_FAILED_IMAGE_ID=""  # Track failed images to avoid retry loops
 SKIP_IMAGE_PULL=false    # Skip pull after rollback to prevent loop
 
 # Logging functions with consistent timestamp format
-info() { echo "→ $(date '+%Y-%m-%d %H:%M:%S') $1"; }
-success() { echo "✓ $(date '+%Y-%m-%d %H:%M:%S') $1"; }
-error() { echo "✗ $(date '+%Y-%m-%d %H:%M:%S') $1" >&2; }
+info() { echo "→ $(date '+%F %T') $1"; }
+success() { echo "✓ $(date '+%F %T') $1"; }
+error() { echo "✗ $(date '+%F %T') $1" >&2; }
 
 # Sends Discord notification if webhook URL is configured
 # Failures are silently ignored to prevent monitor disruption

@@ -1,6 +1,6 @@
-FROM python:3
+FROM python:3-slim
 ARG UID=1000
-ADD . /code
+COPY . /code
 WORKDIR /code
 RUN chown -R 1000 /code
 RUN pip install -r requirements.txt
