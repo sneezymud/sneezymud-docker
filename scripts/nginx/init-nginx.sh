@@ -14,10 +14,6 @@ DOMAINS_FILE="/etc/nginx/sneezy-domains.txt"
 
 OPERATION=""
 TARGET_DOMAIN=""
-SERVICE_NAME=""
-SERVICE_PATH=""
-SERVICE_TARGET=""
-SERVICE_TYPE=""
 
 case "${1:-}" in
     "--undo")
@@ -152,7 +148,8 @@ update_services_from_repo() {
 
     # Apply changes immediately if nginx is already configured
     if detect_existing_setup; then
-        local domains=($(load_domains))
+        local domains=()
+        mapfile -t domains < <(load_domains)
         update_nginx_config "${domains[@]}"
         test_setup
     else
@@ -190,7 +187,7 @@ list_services() {
         echo
     fi
 
-    if [[ -z "$core_services" && -z "$websocket_services" && -z "$optional_services" ]]; then
+    if [[ -z "$http_services" && -z "$websocket_services" ]]; then
         echo "No services configured."
         echo
     fi
@@ -451,7 +448,8 @@ show_results() {
 }
 show_management_menu() {
     # Interactive menu for users who prefer guided operations over command-line flags
-    local current_domains=($(load_domains))
+    local current_domains=()
+    mapfile -t current_domains < <(load_domains)
 
     echo
     echo "SneezyMUD Nginx Domain Management"
@@ -502,7 +500,8 @@ add_domain_interactive() {
 }
 
 remove_domain_interactive() {
-    local current_domains=($(load_domains))
+    local current_domains=()
+    mapfile -t current_domains < <(load_domains)
 
     if [[ ${#current_domains[@]} -eq 0 ]]; then
         error "No domains configured"
@@ -544,7 +543,8 @@ remove_domain_interactive() {
 
 add_domain() {
     local new_domain="$1"
-    local current_domains=($(load_domains))
+    local current_domains=()
+    mapfile -t current_domains < <(load_domains)
 
     # Prevent duplicate domains which would cause certificate errors
     for domain in "${current_domains[@]}"; do
@@ -569,7 +569,8 @@ add_domain() {
 
 remove_domain() {
     local domain_to_remove="$1"
-    local current_domains=($(load_domains))
+    local current_domains=()
+    mapfile -t current_domains < <(load_domains)
     local new_domains=()
 
 
@@ -655,7 +656,11 @@ undo_setup() {
         ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
     fi
 
-    nginx -t && systemctl reload nginx
+    if nginx -t; then
+        systemctl reload nginx || warn "Nginx reload failed - you may need to restart nginx manually"
+    else
+        warn "Nginx config test failed - you may need to fix the configuration manually"
+    fi
     success "Nginx setup removed"
 }
 

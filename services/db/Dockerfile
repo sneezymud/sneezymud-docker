@@ -1,11 +1,11 @@
-FROM alpine:latest AS git
+FROM alpine:3 AS git
 RUN apk update && apk add git
 RUN adduser -Du 1000 sneezy
 USER sneezy
 WORKDIR /home/sneezy
 RUN git clone --depth 1 https://github.com/sneezymud/sneezymud
 
-FROM mariadb:lts
+FROM mariadb:12
 ENV MYSQL_ROOT_PASSWORD="111111"
 ENV MYSQL_USER=sneezy
 ENV MYSQL_PASSWORD=password

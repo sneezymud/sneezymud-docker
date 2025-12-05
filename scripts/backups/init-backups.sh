@@ -25,12 +25,14 @@ systemctl is-active --quiet docker || error "Docker not running"
 get_config() {
     BACKUPS_USER="${BACKUPS_USER:-sneezy-backups}"
     BACKUPS_DIR="${BACKUPS_DIR:-/opt/backups/sneezy}"
+    RETENTION_DAYS="${RETENTION_DAYS:-30}"
 
     # Use SneezyMUD Docker defaults
     DB_USER="${DB_USER:-sneezy}"
     DB_PASSWORD="${DB_PASSWORD:-password}"
 
     info "Using backup directory: $BACKUPS_DIR"
+    info "Using retention period: $RETENTION_DAYS days"
     info "Using database credentials: $DB_USER (set DB_USER/DB_PASSWORD env vars to override)"
 }
 
@@ -66,12 +68,12 @@ FILENAME="sneezy-backup-\$(date +'%Y%m%d-%H%M%S').tar"
 LOW_PRIORITY="ionice -c idle nice -n19"
 
 # Check that required containers are running
-if ! docker ps --format "{{.Names}}" | grep -q "sneezy-db"; then
+if ! docker ps --format "{{.Names}}" | grep -qx "sneezy-db"; then
     echo "ERROR: sneezy-db container is not running" >&2
     exit 1
 fi
 
-if ! docker ps --format "{{.Names}}" | grep -q "sneezy"; then
+if ! docker ps --format "{{.Names}}" | grep -qx "sneezy"; then
     echo "ERROR: sneezy container is not running" >&2
     exit 1
 fi
@@ -91,7 +93,7 @@ fi
 ln -sf "\${FILENAME}.xz" "$BACKUPS_DIR/latest.tar.xz"
 rm -f /tmp/dbdump.sql
 
-find $BACKUPS_DIR -name "sneezy-backup-*.tar.xz" -type f -mtime +30 -delete
+find $BACKUPS_DIR -name "sneezy-backup-*.tar.xz" -type f -mtime +$RETENTION_DAYS -delete
 EOF
 
     chmod 755 /usr/local/bin/sneezy-backup.sh

@@ -17,7 +17,7 @@ WORKDIR /workspace
 
 # Basic health check for reliability
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD pgrep -f monitor.sh || exit 1
+  CMD exec pgrep -f monitor.sh
 
 # Run as root initially so we can modify groups
 ENTRYPOINT ["/entrypoint.sh"]
