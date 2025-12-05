@@ -45,6 +45,41 @@ The system will now send notifications for:
 > [!TIP]
 > The game container itself handles notifications for normal shutdowns and restarts. The monitor only notifies about image updates.
 
+## Crash Reporting
+
+The monitor can automatically detect crashes and send detailed reports to a separate Discord channel. When a crash is detected, it sends a summary message with the relevant crash details attached as a file.
+
+### Detected Crash Types
+
+- **AddressSanitizer errors** - Memory issues like heap-use-after-free, buffer overflows, etc.
+- **Assertion failures** - Code assertions that failed, resulting in `Aborted (core dumped)`
+- **Segmentation faults** - Low-level crashes caught by the OS
+
+### Configuration
+
+To enable crash reporting to a dedicated channel:
+
+```bash
+# In your .env file:
+DISCORD_CRASH_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_CRASH_WEBHOOK_URL_HERE
+```
+
+Crash reports are only sent if `DISCORD_CRASH_WEBHOOK_URL` is configured.
+
+### What Gets Reported
+
+The crash report includes:
+- Crash type (e.g., `heap-use-after-free`, `Assertion failure`, `Segmentation fault`)
+- Location/message (for AddressSanitizer and assertion failures)
+- Context: the last 5 lines of game log before the crash occurred
+- File attachment with full crash details (ASAN stack traces, etc.)
+
+### Detection Notes
+
+- Only explicitly detected crash types trigger reports (AddressSanitizer, assertion failures, segmentation faults)
+- Single-line crash logs are ignored (typically retry noise with no useful debugging context)
+- Normal shutdowns and other exit reasons do not trigger crash reports
+
 ## Manual Control
 
 If you need to disable automatic restarts for some reason, just stop the monitor service:
@@ -61,7 +96,7 @@ docker compose -f compose.yaml -f compose.prod.yaml up -d sneezy-monitor
 
 ## Crash Log Preservation
 
-The monitor service automatically preserves container logs before recreating the sneezy container, primarily to make crash logs available for debugging purposes. Logs get rotated automatically to prevent disk space issues, retaining the most recent 20 log files. This number can be changed by modifying `monitor.sh` and recreating the monitor container.
+The monitor service automatically preserves container logs before recreating the sneezy container, primarily to make crash logs available for debugging purposes. Logs are automatically pruned after 60 days to prevent disk space issues while ensuring recent crash logs remain available even during frequent restarts. The retention period can be configured via the `LOG_RETENTION_DAYS` environment variable.
 
 ### Viewing Archived Logs
 

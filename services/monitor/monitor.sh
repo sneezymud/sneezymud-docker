@@ -13,10 +13,11 @@ readonly IMAGE_NAME="${IMAGE_NAME:-sneezymud/sneezymud:latest}"
 readonly CHECK_INTERVAL=5
 readonly MONITOR_CONTAINER_NAME="${MONITOR_CONTAINER_NAME:-sneezy-monitor}"
 readonly LOG_ARCHIVE_DIR="${LOG_ARCHIVE_DIR:-/logs}"
-readonly MAX_LOG_FILES="${MAX_LOG_FILES:-20}"
+readonly LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-60}"
 readonly STARTUP_VALIDATION_DELAY="${STARTUP_VALIDATION_DELAY:-15}"  # Seconds to wait before checking container status
 readonly STARTUP_RETRY_ATTEMPTS="${STARTUP_RETRY_ATTEMPTS:-3}"      # Number of startup attempts before rollback
 readonly STARTUP_RETRY_DELAY="${STARTUP_RETRY_DELAY:-10}"           # Seconds between retry attempts
+readonly DISCORD_CRASH_WEBHOOK_URL="${DISCORD_CRASH_WEBHOOK_URL:-}" # Separate webhook for crash reports
 
 # Global state for rollback functionality
 PREVIOUS_IMAGE_ID=""
@@ -37,6 +38,43 @@ send_discord_notification() {
              -H "Content-Type: application/json" \
              -d "{\"content\": \"$message\"}" \
              >/dev/null 2>&1 || true
+    fi
+}
+
+# Sends crash notification to Discord with optional file attachment
+# Only sends if DISCORD_CRASH_WEBHOOK_URL is explicitly configured
+send_crash_notification() {
+    local message="$1"
+    local attachment_content="$2"
+
+    if [ -z "$DISCORD_CRASH_WEBHOOK_URL" ]; then
+        return 0
+    fi
+
+    info "Sending crash report to Discord"
+
+    if [ -n "$attachment_content" ]; then
+        # Create temporary file for attachment
+        local temp_file=$(mktemp /tmp/crash-report-XXXXXX.txt)
+        echo "$attachment_content" > "$temp_file"
+
+        curl -X POST "$DISCORD_CRASH_WEBHOOK_URL" \
+             -F "payload_json={\"content\": \"$message\"}" \
+             -F "file=@$temp_file;filename=crash-details.txt" \
+             >/dev/null 2>&1 || {
+            error "Failed to send crash notification to Discord"
+            rm -f "$temp_file"
+            return 1
+        }
+        rm -f "$temp_file"
+    else
+        curl -X POST "$DISCORD_CRASH_WEBHOOK_URL" \
+             -H "Content-Type: application/json" \
+             -d "{\"content\": \"$message\"}" \
+             >/dev/null 2>&1 || {
+            error "Failed to send crash notification to Discord"
+            return 1
+        }
     fi
 }
 
@@ -160,6 +198,7 @@ save_container_logs() {
         # Only keep the file if it has content (more than just whitespace)
         if [ -s "$log_file" ] && grep -q '[^[:space:]]' "$log_file" 2>/dev/null; then
             success "Container logs saved ($(wc -l < "$log_file") lines)"
+            detect_and_report_crash "$log_file"
             rotate_old_logs
         else
             # Remove empty or whitespace-only log files
@@ -173,21 +212,92 @@ save_container_logs() {
     fi
 }
 
-# Removes old log files to prevent disk space issues
-# Keeps the most recent MAX_LOG_FILES files based on modification time
+# Detects crashes in log file and reports to Discord
+# Only reports AddressSanitizer errors, assertion failures, and segmentation faults
+detect_and_report_crash() {
+    local log_file="$1"
+
+    # Skip if file doesn't exist or is empty
+    if [ ! -s "$log_file" ]; then
+        return 0
+    fi
+
+    local crash_type=""
+    local crash_location=""
+    local crash_context=""
+    local crash_details=""
+    local context_lines=5
+    local line_count=$(wc -l < "$log_file")
+
+    # Check for AddressSanitizer crash
+    if grep -q "ERROR: AddressSanitizer:" "$log_file" 2>/dev/null; then
+        # Extract crash type and location from SUMMARY line
+        # Example: "SUMMARY: AddressSanitizer: heap-use-after-free code/sys/process.cc:202 in operator()"
+        local summary_line=$(grep "SUMMARY: AddressSanitizer:" "$log_file" | head -1)
+        if [ -n "$summary_line" ]; then
+            crash_type=$(echo "$summary_line" | sed 's/SUMMARY: AddressSanitizer: \([^ ]*\).*/\1/')
+            crash_location=$(echo "$summary_line" | sed 's/SUMMARY: AddressSanitizer: [^ ]* //')
+        else
+            crash_type="AddressSanitizer error"
+        fi
+        # Get context: lines before "ERROR: AddressSanitizer:"
+        crash_context=$(grep -B "$context_lines" "ERROR: AddressSanitizer:" "$log_file" | head -n "$context_lines")
+        # Get full ASAN output for attachment (from ERROR through SUMMARY, inclusive)
+        crash_details=$(sed -n '/ERROR: AddressSanitizer:/,/SUMMARY: AddressSanitizer:/p' "$log_file")
+    # Check for assertion failure (only if more than 1 line)
+    elif grep -q "Aborted (core dumped)" "$log_file" 2>/dev/null && [ "$line_count" -gt 1 ]; then
+        crash_type="Assertion failure"
+        # Extract assertion message if available
+        local assertion_line=$(grep "ASSERTION FAILED:" "$log_file" | head -1)
+        if [ -n "$assertion_line" ]; then
+            crash_location=$(echo "$assertion_line" | sed 's/.*ASSERTION FAILED: //')
+            # Get context: lines before "ASSERTION FAILED:" plus the crash lines
+            crash_context=$(grep -B "$context_lines" "ASSERTION FAILED:" "$log_file" | head -n "$context_lines")
+            # Include context + assertion + aborted for attachment
+            crash_details=$(grep -B "$context_lines" -A 1 "ASSERTION FAILED:" "$log_file")
+        fi
+    # Check for segmentation fault (only if more than 1 line)
+    elif grep -q "Segmentation fault" "$log_file" 2>/dev/null && [ "$line_count" -gt 1 ]; then
+        # Skip segfaults caused by database connection failure (infrastructure issue, not code bug)
+        if ! grep -q "Can't connect to MySQL server" "$log_file" 2>/dev/null; then
+            crash_type="Segmentation fault"
+            # Get context: lines before "Segmentation fault"
+            crash_context=$(grep -B "$context_lines" "Segmentation fault" "$log_file" | head -n "$context_lines")
+            # Include context + segfault line for attachment
+            crash_details=$(grep -B "$context_lines" "Segmentation fault" "$log_file")
+        fi
+    fi
+
+    # If no reportable crash detected, return silently
+    if [ -z "$crash_type" ]; then
+        return 0
+    fi
+
+    info "Crash detected: $crash_type"
+
+    # Build message for Discord
+    local message="💥 **Type:** $crash_type"
+    if [ -n "$crash_location" ]; then
+        message="$message\\n**Location:** $crash_location"
+    fi
+    if [ -n "$crash_context" ]; then
+        # Escape special characters for JSON and add code block
+        local escaped_context=$(echo "$crash_context" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\n' '~' | sed 's/~/\\n/g')
+        message="$message\\n**Context:**\\n\`\`\`\\n$escaped_context\\n\`\`\`"
+    fi
+
+    send_crash_notification "$message" "$crash_details"
+}
+
+# Removes log files older than LOG_RETENTION_DAYS to prevent disk space issues
+# Age-based pruning ensures recent crash logs are preserved even during frequent restarts
 rotate_old_logs() {
-    local log_count=$(find "$LOG_ARCHIVE_DIR" -name "sneezy-*.log" -type f | wc -l)
+    local old_files=$(find "$LOG_ARCHIVE_DIR" -name "sneezy-*.log" -type f -mtime +"$LOG_RETENTION_DAYS" 2>/dev/null)
 
-    if [ "$log_count" -gt "$MAX_LOG_FILES" ]; then
-        local files_to_remove=$((log_count - MAX_LOG_FILES))
-        info "Rotating logs: removing $files_to_remove old files (keeping $MAX_LOG_FILES most recent)"
-
-        # Remove oldest files, keeping the most recent MAX_LOG_FILES
-        find "$LOG_ARCHIVE_DIR" -name "sneezy-*.log" -type f -printf '%T@ %p\n' | \
-            sort -n | \
-            head -n "$files_to_remove" | \
-            cut -d' ' -f2- | \
-            xargs rm -f
+    if [ -n "$old_files" ]; then
+        local file_count=$(echo "$old_files" | wc -l)
+        info "Rotating logs: removing $file_count files older than $LOG_RETENTION_DAYS days"
+        echo "$old_files" | xargs rm -f
     fi
 }
 
@@ -382,7 +492,7 @@ initialize_monitor() {
     info "Check interval: ${CHECK_INTERVAL}s"
     info "Startup validation delay: ${STARTUP_VALIDATION_DELAY}s"
     info "Startup retry attempts: $STARTUP_RETRY_ATTEMPTS (${STARTUP_RETRY_DELAY}s between retries)"
-    info "Log archive directory: $LOG_ARCHIVE_DIR (keeping $MAX_LOG_FILES files)"
+    info "Log archive directory: $LOG_ARCHIVE_DIR (${LOG_RETENTION_DAYS}-day retention)"
 
     if [ -n "$DISCORD_WEBHOOK_URL" ]; then
         info "Discord notifications enabled for updates"
