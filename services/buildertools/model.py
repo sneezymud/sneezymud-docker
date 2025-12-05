@@ -1,5 +1,6 @@
 from main import db
-import crypt
+# crypt module removed in Python 3.13; legacycrypt provides drop-in compatibility
+import legacycrypt as crypt
 
 from flask_sqlalchemy import SQLAlchemy
 
@@ -25,15 +26,19 @@ def authenticate(username, password):
 
 
 def hasAssignedBlock(account):
-    return any(getOwnedVnums(getPlayerName(account.name)))
+    playerName = getPlayerName(account.name)
+    if not playerName:
+        return False
+    return any(getOwnedVnums(playerName))
 
 
 def getPlayerName(accountName):
-    return (Player.query
+    player = (Player.query
             .join(Wizdata, Wizdata.player_id == Player.id)
             .join(Account, Account.account_id == Player.account_id)
             .filter(Account.name == accountName)
-            .first().name)
+            .first())
+    return player.name if player else None
 
 def getWizdata(playerName):
     return (Wizdata.query
@@ -101,14 +106,14 @@ def checkVnum(vnum, name):
         return False
 
     wizdata = getWizdata(name)
-    
+
     inBlockA = wizdata.blockastart <= vnum and wizdata.blockaend >= vnum
     inBlockB = wizdata.blockbstart <= vnum and wizdata.blockbend >= vnum
 
     return inBlockA or inBlockB
-        
 
-class Zone(ImmortalModel):
+
+class Zone(SneezyModel):
     zone_nr = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
     zone_name = db.Column(db.String(255), unique=True, nullable=False)
     zone_enabled = db.Column(db.Integer)
