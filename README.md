@@ -285,7 +285,10 @@ To enable Discord integration:
 
 4. **Restart the game container** to load the new configuration
 
-The game will automatically use the configuration file when it starts. If no `discord.cfg` file is present, Discord features are disabled.
+The game will automatically use the configuration file when it starts.
+
+> [!IMPORTANT]
+> In production mode, the `discord.cfg` file **must exist** or the container will fail to start. If you don't want Discord notifications, simply create an empty file (`touch discord.cfg`) or copy the example file without adding webhook URLs.
 
 ## Automated Backup System
 

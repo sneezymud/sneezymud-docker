@@ -14,4 +14,4 @@ for db in immortal sneezy; do
 done
 
 echo Db setup done
-exit 1
+exit 0
