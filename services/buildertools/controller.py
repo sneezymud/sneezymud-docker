@@ -10,7 +10,7 @@ from sqlalchemy.sql import text
 from flask_wtf import FlaskForm
 from wtforms import StringField
 from wtforms.validators import DataRequired
-from wtforms.ext.sqlalchemy.orm import model_form
+from wtforms_sqlalchemy.orm import model_form
 
 # TODO: figure out how to lazily create objects
 # TODO: for every slightest action, this bloody thing causes a million DB requests.

@@ -1,8 +1,10 @@
 flask
 mysql-connector-python-rf
-sqlalchemy 
+sqlalchemy
 flask-sqlalchemy
 pymysql
 flask-login
 flask-wtf
+wtforms-sqlalchemy
 ipdb
+legacycrypt

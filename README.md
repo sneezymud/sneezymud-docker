@@ -9,9 +9,10 @@ A Docker Compose configuration for easy, containerized deployment of SneezyMUD a
 1. Install Docker & git, ensure they're available via CLI
 
 2. Configure firewall
-    - Allow all outgoing traffic
-    - Block all incoming traffic
-    - Open incoming ports 22, 80, 443, 7900, 7901, 8080, and 5001
+
+   - Allow all outgoing traffic
+   - Block all incoming traffic
+   - Open incoming ports 22, 80, 443, 7900, 7901, 8080, and 5001
 
 3. Clone and navigate to repo:
 
@@ -44,17 +45,17 @@ A Docker Compose configuration for easy, containerized deployment of SneezyMUD a
 
 2. Clone repo to local machine:
 
-    ```bash
-    git clone --config core.autocrlf=input --recursive https://github.com/sneezymud/sneezymud-docker
-    ```
+   ```bash
+   git clone --config core.autocrlf=input --recursive https://github.com/sneezymud/sneezymud-docker
+   ```
 
 3. Open `sneezymud-docker/services/sneezymud` directory in IDE of choice and develop as normal
 
 4. When ready to compile and test changes, run the following command from the `sneezymud-docker` directory:
 
-    ```bash
-    docker compose -f compose.yaml -f compose.dev.yaml up -d
-    ```
+   ```bash
+   docker compose -f compose.yaml -f compose.dev.yaml up -d
+   ```
 
 5. Connect and test in-game:
 
@@ -123,6 +124,7 @@ Most cloud server providers' lowest tiers will meet the requirements for running
 - Connect to your server as a user with `sudo` privileges
 
 - Make sure the OS and packages are updated/upgraded
+
   - For example, on Debian/Ubuntu: `sudo apt update && sudo apt upgrade -y`
 
 - Set up additional user accounts with SSH access and sudo permissions for anyone who will be involved in maintaining the server
@@ -309,7 +311,7 @@ See [`scripts/nginx/README.md`](scripts/nginx/README.md) for more information.
 ## Developing Using Docker
 
 > [!TIP]
-> For developing in WSL or Linux without using Docker, see [this guide](https://github.com/sneezymud/sneezymud/wiki/Setting-Up-A-Sneezy-Development-Environment-(non%E2%80%90Docker,-Linux-or-Windows-WSL)) in the Sneezy wiki
+> For developing in WSL or Linux without using Docker, see [this guide](<https://github.com/sneezymud/sneezymud/wiki/Setting-Up-A-Sneezy-Development-Environment-(non%E2%80%90Docker,-Linux-or-Windows-WSL)>) in the Sneezy wiki
 
 Developing against the main Sneezy codebase using Docker is a bit different than running a production instance, as you need to be able to make and test code changes immediately in a non-production environment.
 
@@ -350,6 +352,9 @@ This ensures that any changes made to the code on the host machine are immediate
 
 Open the `services/sneezymud` subdirectory in your IDE of choice. Modify code and use git as you normally would.
 
+> [!TIP]
+> Using the aliases created by the `add_compose_aliases.sh` script is highly recommended for convenience during development.
+
 When ready to compile and test changes, start the containers using Docker Compose:
 
 ```bash
@@ -358,22 +363,28 @@ docker compose -f compose.yaml -f compose.dev.yaml up -d
 
 If the containers are already running and you want to re-compile the code, simply restart the `sneezy` container:
 
-  ```bash
-  docker compose -f compose.yaml -f compose.dev.yaml up --force-recreate --no-deps sneezy
-  # Consider adding an alias for this command to your ~/.bash_aliases file
-  ```
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml up --force-recreate --no-deps sneezy
+```
 
 Then connect to the game via whatever client you normally use at `localhost:7900`.
 
 > [!TIP]
-> The only two containers *required* for the game to successfully run are `sneezy` and `sneezy-db`. If you don't need to test or develop against the others, you can simply comment those container definitions out in the `compose.dev.yaml` file to simplify and speed things up a bit.
+> The only two containers _required_ for the game to successfully run are `sneezy` and `sneezy-db`. If you don't need to test or develop against the others, you can simply comment those container definitions out in the `compose.dev.yaml` file to simplify and speed things up a bit.
 
 ### Debugging
 
-To debug using `gdb` inside the `sneezy` container, run the container with the following command:
+To debug using `gdb` inside the `sneezy` container, either run a new container with the following command:
 
-  ```bash
-  docker compose -f compose.yaml -f compose.dev.yaml run sneezy gdb -ex run ./sneezy
-  ```
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml run --remove-orphans --service-ports sneezy sh -c 'cd code && gdb -ex run ./sneezy'
+```
 
-This will run the most recently compiled binary inside `gdb`, allowing you to set breakpoints, step through code, etc.
+Or attach to a running container with:
+
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml exec sneezy gdb -p $(docker compose -f compose.yaml -f compose.dev.yaml exec sneezy pgrep -x sneezy)
+```
+
+> [!TIP]
+> The `add_compose_aliases.sh` script adds customizable aliases for these commands for convenience.
