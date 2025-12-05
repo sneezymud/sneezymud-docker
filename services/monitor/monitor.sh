@@ -14,9 +14,14 @@ readonly CHECK_INTERVAL=5
 readonly MONITOR_CONTAINER_NAME="${MONITOR_CONTAINER_NAME:-sneezy-monitor}"
 readonly LOG_ARCHIVE_DIR="${LOG_ARCHIVE_DIR:-/logs}"
 readonly MAX_LOG_FILES="${MAX_LOG_FILES:-20}"
+readonly STARTUP_VALIDATION_DELAY="${STARTUP_VALIDATION_DELAY:-15}"  # Seconds to wait before checking container status
+readonly STARTUP_RETRY_ATTEMPTS="${STARTUP_RETRY_ATTEMPTS:-3}"      # Number of startup attempts before rollback
+readonly STARTUP_RETRY_DELAY="${STARTUP_RETRY_DELAY:-10}"           # Seconds between retry attempts
 
 # Global state for rollback functionality
 PREVIOUS_IMAGE_ID=""
+LAST_FAILED_IMAGE_ID=""  # Track failed images to avoid retry loops
+SKIP_IMAGE_PULL=false    # Skip pull after rollback to prevent loop
 
 # Logging functions with consistent timestamp format
 info() { echo "→ $(date '+%Y-%m-%d %H:%M:%S') $1"; }
@@ -55,6 +60,13 @@ get_container_status() {
 # Checks for image updates and preserves previous version for rollback
 # Returns 0 if update available, 1 if current image is latest
 check_for_image_update() {
+    # Skip pull if we just rolled back to avoid retry loop
+    if [ "$SKIP_IMAGE_PULL" = true ]; then
+        info "Skipping image pull after recent rollback"
+        SKIP_IMAGE_PULL=false
+        return 1
+    fi
+
     info "Checking for image updates"
 
     local current_image_id=""
@@ -72,6 +84,12 @@ check_for_image_update() {
     fi
 
     local latest_image_id=$(docker inspect "$IMAGE_NAME" --format='{{.Id}}' 2>/dev/null || echo "")
+
+    # Don't try an image we know recently failed
+    if [ -n "$LAST_FAILED_IMAGE_ID" ] && [ "$latest_image_id" = "$LAST_FAILED_IMAGE_ID" ]; then
+        info "Latest image matches recently failed image (${latest_image_id:0:12}) - skipping update"
+        return 1
+    fi
 
     if [ "$current_image_id" != "$latest_image_id" ] && [ -n "$latest_image_id" ]; then
         info "New image available (current: ${current_image_id:0:12}, latest: ${latest_image_id:0:12})"
@@ -231,8 +249,10 @@ start_and_validate_container() {
     local failure_msg="${2:-Failed to start container}"
 
     if execute_compose_command; then
-        # Container needs time to initialize before status check is reliable
-        sleep 3
+        # Container needs more time to initialize before status check is reliable
+        info "Waiting ${STARTUP_VALIDATION_DELAY}s for container to initialize..."
+        sleep "$STARTUP_VALIDATION_DELAY"
+
         if is_container_running; then
             success "$success_msg"
             return 0
@@ -243,30 +263,70 @@ start_and_validate_container() {
     return 1
 }
 
-# Recreates container with latest image - used during updates
-recreate_container() {
-    info "Recreating container with latest image"
-    remove_existing_container
-    fix_volume_permissions
-    info "Starting container with latest image"
-    start_and_validate_container "Container recreated and started successfully" "Failed to start container"
+# Attempts to start container with retry logic
+# Returns 0 on success, 1 if all attempts fail
+start_container_with_retries() {
+    local attempt=1
+
+    while [ $attempt -le "$STARTUP_RETRY_ATTEMPTS" ]; do
+        if [ $attempt -gt 1 ]; then
+            info "Startup attempt $attempt of $STARTUP_RETRY_ATTEMPTS (waiting ${STARTUP_RETRY_DELAY}s before retry)"
+            sleep "$STARTUP_RETRY_DELAY"
+        else
+            info "Starting container (attempt $attempt of $STARTUP_RETRY_ATTEMPTS)"
+        fi
+
+        # Full cleanup on each attempt ensures no stale container state or volume
+        # permission issues persist between retries
+        remove_existing_container
+        fix_volume_permissions
+
+        if execute_compose_command; then
+            info "Waiting ${STARTUP_VALIDATION_DELAY}s for container to initialize..."
+            sleep "$STARTUP_VALIDATION_DELAY"
+
+            if is_container_running; then
+                success "Container started successfully on attempt $attempt"
+                return 0
+            else
+                error "Container failed to start on attempt $attempt"
+            fi
+        else
+            error "Failed to execute compose command on attempt $attempt"
+        fi
+
+        attempt=$((attempt + 1))
+    done
+
+    error "Container failed to start after $STARTUP_RETRY_ATTEMPTS attempts"
+    return 1
 }
 
 # Handles rollback scenario when new image fails to start
 # Ensures service availability by falling back to known-good version
 handle_rollback_scenario() {
+    local failed_image_id=$(docker inspect "$IMAGE_NAME" --format='{{.Id}}' 2>/dev/null || echo "")
+
     error "Failed to recreate container with new image - rolling back to previous version"
     send_discord_notification "❌ SneezyMUD update failed - rolling back to previous version"
 
-    if rollback_image; then
-        info "Attempting to start container with previous image"
-        remove_existing_container
+    # Track the failed image to prevent retry loops
+    if [ -n "$failed_image_id" ]; then
+        LAST_FAILED_IMAGE_ID="$failed_image_id"
+        info "Marking image ${failed_image_id:0:12} as failed to prevent retry loops"
+    fi
 
-        if execute_compose_command; then
+    if rollback_image; then
+        # Skip next image pull to avoid immediately retrying the failed image
+        SKIP_IMAGE_PULL=true
+
+        info "Attempting to start container with previous image"
+
+        if start_container_with_retries; then
             success "Successfully started container with previous image"
             send_discord_notification "✅ SneezyMUD rollback successful - running previous version"
         else
-            error "Failed to start container even with previous image"
+            error "Failed to start container even with previous image after $STARTUP_RETRY_ATTEMPTS attempts"
             send_discord_notification "❌ SneezyMUD rollback failed - manual intervention required"
         fi
     else
@@ -284,15 +344,20 @@ handle_container_restart() {
         info "Update available - recreating container with new image"
         send_discord_notification "🔄 SneezyMUD updating to latest version..."
 
-        if recreate_container; then
+        if start_container_with_retries; then
             success "Container updated and restarted successfully"
             send_discord_notification "✅ SneezyMUD updated to latest version successfully!"
+            # Clear failed image tracking on success
+            LAST_FAILED_IMAGE_ID=""
         else
             handle_rollback_scenario
         fi
     else
         info "No updates available - restarting with current image"
-        start_container_with_prep
+        if ! start_container_with_retries; then
+            error "Failed to restart container with current image after $STARTUP_RETRY_ATTEMPTS attempts"
+            send_discord_notification "❌ SneezyMUD failed to restart - manual intervention required"
+        fi
     fi
 }
 
@@ -315,6 +380,8 @@ initialize_monitor() {
     info "Starting SneezyMUD container monitor"
     info "Monitoring container: $CONTAINER_NAME"
     info "Check interval: ${CHECK_INTERVAL}s"
+    info "Startup validation delay: ${STARTUP_VALIDATION_DELAY}s"
+    info "Startup retry attempts: $STARTUP_RETRY_ATTEMPTS (${STARTUP_RETRY_DELAY}s between retries)"
     info "Log archive directory: $LOG_ARCHIVE_DIR (keeping $MAX_LOG_FILES files)"
 
     if [ -n "$DISCORD_WEBHOOK_URL" ]; then

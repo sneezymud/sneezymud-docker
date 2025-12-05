@@ -91,4 +91,33 @@ The monitor service runs in a privileged container with access to the Docker soc
 - Provide rollback capabilities when updates fail
 - Archive container logs before recreation to preserve crash information
 
+### Retry and Rollback Logic
+
+The monitor implements sophisticated retry logic to handle container startup issues (added October 2025):
+
+**Startup Configuration (environment variables with defaults):**
+
+- `STARTUP_VALIDATION_DELAY` (default: 15) - Seconds to wait before checking if container is running
+- `STARTUP_RETRY_ATTEMPTS` (default: 3) - Number of startup attempts before triggering rollback
+- `STARTUP_RETRY_DELAY` (default: 10) - Seconds between retry attempts
+
+**Update Flow:**
+
+1. Container stops (shutdown command or crash)
+2. Monitor checks Docker Hub for new image
+3. If update available, pulls new image and saves previous image ID
+4. Attempts to start container with up to 3 retries
+5. On success: clears failure tracking
+6. On failure: triggers automatic rollback
+
+**Rollback Protection:**
+
+- Failed image IDs are tracked to prevent retry loops
+- After rollback, next image pull is skipped to avoid immediate retry of failed image
+- Rollback itself uses same retry logic (3 attempts with delays)
+- Discord notifications sent at each major state transition
+
+This prevents scenarios where a slow-starting container triggers unnecessary rollbacks, while still protecting against genuinely broken images. The system prioritizes service availability over running the absolute latest version.
+
 For implementation details, see the `monitor.sh` script in this directory.
+
