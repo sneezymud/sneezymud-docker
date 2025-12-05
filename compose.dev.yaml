@@ -11,22 +11,25 @@ services:
       - "/bin/sh"
       - "-c"
       - |
-        scons -j`nproc` -Q olevel=0 sanitize=1 debug=1 sneezy && ./sneezy
+        cmake --preset dev-gcc && cmake --build --preset dev-gcc && cd code && ./sneezy
     volumes:
       - .:/sneezymud-docker/
-      - sneezy-mutable:/sneezymud-docker/sneezymud/lib/mutable
+      - sneezy-mutable:/sneezymud-docker/services/sneezymud/lib/mutable
+    environment:
+      - ASAN_OPTIONS=strict_string_checks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1
+      - UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
 
-  # Change the profiles for these services to enabled if you need
-  # them during development for some reason
+  # Change the profiles for these services to disabled if you don't
+  # need them during development
   buildertools:
     build:
       context: services/buildertools
-    profiles: ["disabled"]
+    profiles: ["enabled"]
 
   websockify:
-    profiles: ["disabled"]
+    profiles: ["enabled"]
 
   webclient:
     build:
       context: services/webclient
-    profiles: ["disabled"]
+    profiles: ["enabled"]

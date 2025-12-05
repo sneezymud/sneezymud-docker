@@ -4,12 +4,21 @@ services:
     container_name: sneezy-db
     volumes:
       - sneezydb:/var/lib/mysql
+    environment:
+      - MARIADB_AUTO_UPGRADE=1
     restart: always
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   sneezy:
     container_name: sneezy
     depends_on:
-      - sneezy-db
+      sneezy-db:
+        condition: service_healthy
     cap_add:
       - SYS_PTRACE
     ports:
@@ -21,7 +30,8 @@ services:
     ports:
       - "5001:5000"
     depends_on:
-      - sneezy-db
+      sneezy-db:
+        condition: service_healthy
     restart: always
 
   websockify:
