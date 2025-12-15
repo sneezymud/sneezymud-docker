@@ -1,9 +1,9 @@
 services:
   sneezy-db:
-    image: sneezymud/sneezy-db:57
+    image: ghcr.io/sneezymud/sneezy-db:latest
 
   sneezy:
-    image: sneezymud/sneezymud:latest
+    image: ghcr.io/sneezymud/sneezymud:latest
     volumes:
       - sneezy-mutable:/home/sneezy/lib/mutable
       - type: bind
@@ -17,15 +17,14 @@ services:
       - UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=0
 
   buildertools:
-    image: sneezymud/sneezymud-buildertools:59
+    image: ghcr.io/sneezymud/sneezymud-buildertools:latest
 
   webclient:
-    image: sneezymud/webclient:60
+    image: ghcr.io/sneezymud/webclient:latest
 
   sneezy-monitor:
     container_name: sneezy-monitor
-    build:
-      context: services/monitor
+    image: ghcr.io/sneezymud/sneezy-monitor:latest
     privileged: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -33,7 +32,7 @@ services:
       - /var/tmp/sneezymud-logs:/logs
     environment:
       - CONTAINER_NAME=sneezy
-      - IMAGE_NAME=sneezymud/sneezymud:latest
+      - IMAGE_NAME=ghcr.io/sneezymud/sneezymud:latest
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
     restart: always
     depends_on:

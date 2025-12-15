@@ -1,0 +1,27 @@
+name: Build webclient
+on:
+  push:
+    branches: ["master"]
+    paths: ["services/webclient/**", ".github/workflows/docker-webclient.yml", ".github/actions/docker-build/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-build-webclient-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/docker-build
+        with:
+          context: services/webclient
+          image-name: webclient
+          cache-scope: webclient
