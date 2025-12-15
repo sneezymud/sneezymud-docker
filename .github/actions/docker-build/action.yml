@@ -1,0 +1,36 @@
+name: "Build and Push Docker Image"
+description: "Builds and pushes a Docker image to GitHub Container Registry with caching"
+
+inputs:
+  context:
+    description: "Docker build context path"
+    required: true
+  image-name:
+    description: "Image name (e.g., sneezy-db)"
+    required: true
+  cache-scope:
+    description: "GitHub Actions cache scope name"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+
+    - uses: docker/setup-buildx-action@v3
+
+    - uses: docker/build-push-action@v5
+      with:
+        context: ${{ inputs.context }}
+        push: true
+        tags: |
+          ghcr.io/${{ github.repository_owner }}/${{ inputs.image-name }}:latest
+          ghcr.io/${{ github.repository_owner }}/${{ inputs.image-name }}:${{ github.sha }}
+        labels: |
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+        cache-from: type=gha,scope=${{ inputs.cache-scope }}
+        cache-to: type=gha,mode=max,scope=${{ inputs.cache-scope }}
