@@ -73,11 +73,18 @@ for entry in "${ALIASES[@]}"; do
     name_choice=${name_choice:-Y}
 
     if [[ "${name_choice,,}" == "n" ]]; then
-        read -p "Enter custom alias name: " custom_name
-        if [[ -z "$custom_name" ]]; then
-            echo "  No name provided, using default: ${default_name}"
-            custom_name="$default_name"
-        fi
+        while true; do
+            read -p "Enter custom alias name: " custom_name
+            if [[ -z "$custom_name" ]]; then
+                echo "  No name provided, using default: ${default_name}"
+                custom_name="$default_name"
+                break
+            elif [[ ! "$custom_name" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]; then
+                echo "  Invalid name. Use only letters, numbers, underscores, and dashes (must start with letter or underscore)."
+                continue
+            fi
+            break
+        done
     else
         custom_name="$default_name"
     fi
@@ -86,7 +93,7 @@ for entry in "${ALIASES[@]}"; do
     alias_names["$default_name"]="$custom_name"
 
     # Check if alias already exists
-    if grep -q "alias ${custom_name}=" ~/.bash_aliases 2>/dev/null; then
+    if grep -q "^alias ${custom_name}=" ~/.bash_aliases 2>/dev/null; then
         read -p "  Alias '${custom_name}' already exists. Overwrite? [y/N] " overwrite
         overwrite=${overwrite:-N}
         if [[ "${overwrite,,}" != "y" ]]; then
@@ -98,8 +105,15 @@ for entry in "${ALIASES[@]}"; do
             echo
             continue
         fi
-        # Remove existing alias
-        sed -i "/alias ${custom_name}=/d" ~/.bash_aliases
+        # Remove existing alias and its comment line
+        alias_line=$(grep -n "^alias ${custom_name}=" ~/.bash_aliases | cut -d: -f1)
+        if [[ -n "$alias_line" ]] && [[ "$alias_line" -gt 1 ]]; then
+            # Delete the comment line (above) and the alias line
+            sed -i "$((alias_line-1)),${alias_line}d" ~/.bash_aliases
+        else
+            # No comment line above, just delete the alias
+            sed -i "/^alias ${custom_name}=/d" ~/.bash_aliases
+        fi
     fi
 
     # Substitute alias references in the command
