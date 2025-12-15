@@ -11,7 +11,7 @@ services:
       - "/bin/sh"
       - "-c"
       - |
-        cmake --preset dev-gcc && cmake --build --preset dev-gcc && cd code && ./sneezy
+        cmake --preset dev-clang && cmake --build --preset dev-clang && cd code && ./sneezy
     volumes:
       - .:/sneezymud-docker/
       - sneezy-mutable:/sneezymud-docker/services/sneezymud/lib/mutable
