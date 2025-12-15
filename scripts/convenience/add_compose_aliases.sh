@@ -62,8 +62,9 @@ for entry in "${ALIASES[@]}"; do
 
     if [[ "${install_choice,,}" == "n" ]]; then
         echo "  Skipped."
-        # Still track the default name so dependent aliases can reference it
-        alias_names["$default_name"]="$default_name"
+        # Store the full command so dependent aliases still work even when
+        # this base alias is skipped
+        alias_names["$default_name"]="$display_command"
         echo
         continue
     fi
@@ -90,6 +91,10 @@ for entry in "${ALIASES[@]}"; do
         overwrite=${overwrite:-N}
         if [[ "${overwrite,,}" != "y" ]]; then
             echo "  Skipped."
+            # Store the full command so dependent aliases still work even when
+            # user declines to overwrite
+            final_command=$(substitute_refs "$command")
+            alias_names["$default_name"]="$final_command"
             echo
             continue
         fi
