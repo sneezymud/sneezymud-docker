@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM alpine:3.19
+FROM alpine:latest
 
 # Install dependencies with cache mount
 RUN --mount=type=cache,target=/var/cache/apk \
