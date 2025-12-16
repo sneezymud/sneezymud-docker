@@ -171,31 +171,19 @@ Most cloud server providers' lowest tiers will meet the requirements for running
 > ```
 
 > [!TIP]
-> (Optional but recommended)
-> Run the `add_compose_aliases.sh` script to add some Docker Compose aliases to your `~/.bash_aliases` file for convenience:
->
-> ```bash
-> ./scripts/convenience/add_compose_aliases.sh
-> # Example usage
-> # Start all services in production mode
-> dcp up -d
-> # Start all services in development mode
-> dcd up -d
-> ```
->
-> See the script contents for full list of aliases and what they do
+> Use `make help` to see all available commands. The Makefile provides convenient shortcuts for common Docker Compose operations.
 
 - **First-time setup only:** On a fresh server, initialize the database before starting all services:
 
   ```bash
-  docker compose -f compose.yaml -f compose.prod.yaml up sneezy-db
-  # Wait for database to finish loading data, then Ctrl+C to stop container
+  make prod-init-db
+  # Wait for "Db setup done" message, then Ctrl+C to stop container
   ```
 
 - Run the game and other services by starting all containers in the background:
 
   ```bash
-  docker compose -f compose.yaml -f compose.prod.yaml up -d
+  make prod-up
   ```
 
 > [!IMPORTANT]
@@ -219,39 +207,32 @@ Most cloud server providers' lowest tiers will meet the requirements for running
 ## Helpful Commands
 
 > [!NOTE]
-> All `docker compose` commands must be executed from the `~/sneezymud-docker` directory
+> Run `make help` to see all available commands. All commands must be executed from the `~/sneezymud-docker` directory.
 
 ```bash
-# View live game logs as they happen
-docker logs sneezy -f
+# View live game logs
+make logs
 
 # Find crash stack traces
-# Adjust `-B` and `-A` values to increase/decrease context as needed
-docker logs sneezy 2>&1 | grep "ERROR: Address" -B 5 -A 50
+make logs-crash
 
-# Start interactive shell inside a container
-docker exec -it <container> /bin/bash
+# Open shell in sneezy container
+make shell
 
-# Access the mariaDb shell in the `sneezy-db` container to query the live databases
-docker exec -it sneezy-db /bin/bash mariadb -u sneezy -p<password>
-
-# Run `sneezy` container with overridden command to keep container running without game
-# starting. This is useful for accessing the Docker volume contents or examining the
-# container filesystem in certain situations - for instance, when game is in a crash
-# loop, or if you need to make sure no one can log in and modify the mutable files
-# while you back up or restore them.
-docker compose -f compose.yaml -f compose.prod.yaml run sneezy "tail -f /dev/null"
-
-# Stop all containers
-docker compose -f compose.yaml -f compose.prod.yaml down
+# Open MariaDB shell
+make db-shell
 
 # Check container status
-docker ps
+make status
 
-# Pull latest code changes and re-start game container
-# In production mode, when the monitor service is running, you can accomplish this by simply using the in-game `shutdown` command as an imm.
-docker pull sneezymud/sneezymud:latest
-docker compose -f compose.yaml -f compose.prod.yaml up -d --force-recreate --no-deps sneezy
+# Stop all production containers
+make prod-down
+
+# Restart sneezy container (applies updates)
+make prod-restart
+
+# Run container without starting game (for maintenance/debugging)
+make prod-maintenance
 ```
 
 > [!WARNING]
@@ -352,19 +333,16 @@ This ensures that any changes made to the code on the host machine are immediate
 
 Open the `services/sneezymud` subdirectory in your IDE of choice. Modify code and use git as you normally would.
 
-> [!TIP]
-> Using the aliases created by the `add_compose_aliases.sh` script is highly recommended for convenience during development.
-
-When ready to compile and test changes, start the containers using Docker Compose:
+When ready to compile and test changes, start the containers:
 
 ```bash
-docker compose -f compose.yaml -f compose.dev.yaml up -d
+make dev-up
 ```
 
 If the containers are already running and you want to re-compile the code, simply restart the `sneezy` container:
 
 ```bash
-docker compose -f compose.yaml -f compose.dev.yaml up --force-recreate --no-deps sneezy
+make dev-rebuild
 ```
 
 Then connect to the game via whatever client you normally use at `localhost:7900`.
@@ -374,17 +352,14 @@ Then connect to the game via whatever client you normally use at `localhost:7900
 
 ### Debugging
 
-To debug using `gdb` inside the `sneezy` container, either run a new container with the following command:
+To debug using `gdb` inside the `sneezy` container, either run a new container with:
 
 ```bash
-docker compose -f compose.yaml -f compose.dev.yaml run --remove-orphans --service-ports sneezy sh -c 'cd code && gdb -ex run ./sneezy'
+make dev-debug
 ```
 
 Or attach to a running container with:
 
 ```bash
-docker compose -f compose.yaml -f compose.dev.yaml exec sneezy gdb -p $(docker compose -f compose.yaml -f compose.dev.yaml exec sneezy pgrep -x sneezy)
+make dev-attach
 ```
-
-> [!TIP]
-> The `add_compose_aliases.sh` script adds customizable aliases for these commands for convenience.
