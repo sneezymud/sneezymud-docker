@@ -6,7 +6,9 @@ RUN rm -rf /usr/share/nginx/html/*
 COPY ./connectificator /usr/share/nginx/html
 
 # Create index.html symlink (connectificator's main file is connectificator.html)
-RUN ln -s connectificator.html /usr/share/nginx/html/index.html
+# Create static/ symlink (HTML references static/*.js and static/*.css but files are in root)
+RUN ln -s connectificator.html /usr/share/nginx/html/index.html && \
+    ln -s . /usr/share/nginx/html/static
 
 # Expose port
 EXPOSE 80
