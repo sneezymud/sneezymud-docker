@@ -1,8 +1,12 @@
 # syntax=docker/dockerfile:1
 FROM nginx:1.25-alpine3.19
 
-# Copy static files
+# Remove default nginx content and copy connectificator files
+RUN rm -rf /usr/share/nginx/html/*
 COPY ./connectificator /usr/share/nginx/html
+
+# Create index.html symlink (connectificator's main file is connectificator.html)
+RUN ln -s connectificator.html /usr/share/nginx/html/index.html
 
 # Expose port
 EXPOSE 80
