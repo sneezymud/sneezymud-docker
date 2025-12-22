@@ -97,7 +97,7 @@ save_domains() {
 validate_domain() {
     local domain="$1"
     # Prevent common user input errors that would cause SSL certificate failures
-    [[ "$domain" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]] || error "Invalid domain format: $domain"
+    [[ "$domain" =~ ^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$ ]] || error "Invalid domain format: $domain"
 }
 
 get_config() {
