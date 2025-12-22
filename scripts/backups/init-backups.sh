@@ -78,7 +78,7 @@ if ! docker ps --format "{{.Names}}" | grep -qx "sneezy"; then
     exit 1
 fi
 
-\$LOW_PRIORITY docker exec sneezy-db mysqldump --single-transaction -u $DB_USER -p$DB_PASSWORD --databases sneezy immortal > /tmp/dbdump.sql
+\$LOW_PRIORITY docker exec sneezy-db mariadb-dump --single-transaction -u $DB_USER -p$DB_PASSWORD --databases sneezy immortal > /tmp/dbdump.sql
 \$LOW_PRIORITY docker exec sneezy tar -c --exclude='core' -C /home/sneezy/lib mutable > /tmp/"\${FILENAME}"
 \$LOW_PRIORITY tar -rf /tmp/"\${FILENAME}" -C /tmp dbdump.sql
 \$LOW_PRIORITY xz /tmp/"\${FILENAME}"
