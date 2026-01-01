@@ -34,6 +34,7 @@ services:
       - CONTAINER_NAME=sneezy
       - IMAGE_NAME=ghcr.io/sneezymud/sneezymud:latest
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+      - DISCORD_CRASH_WEBHOOK_URL=${DISCORD_CRASH_WEBHOOK_URL:-}
     restart: always
     depends_on:
       sneezy-db:

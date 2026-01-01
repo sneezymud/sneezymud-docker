@@ -54,8 +54,8 @@ send_crash_notification() {
     info "Sending crash report to Discord"
 
     if [ -n "$attachment_content" ]; then
-        # Create temporary file for attachment
-        local temp_file=$(mktemp /tmp/crash-report-XXXXXX.txt)
+        # Create temporary file for attachment (BusyBox mktemp requires X's at end)
+        local temp_file=$(mktemp /tmp/crash-report-XXXXXX)
         echo "$attachment_content" > "$temp_file"
 
         curl -X POST "$DISCORD_CRASH_WEBHOOK_URL" \
@@ -498,6 +498,12 @@ initialize_monitor() {
         info "Discord notifications enabled for updates"
     else
         info "Discord notifications disabled (no webhook URL configured)"
+    fi
+
+    if [ -n "$DISCORD_CRASH_WEBHOOK_URL" ]; then
+        info "Discord crash reporting enabled"
+    else
+        info "Discord crash reporting disabled (no crash webhook URL configured)"
     fi
 }
 
