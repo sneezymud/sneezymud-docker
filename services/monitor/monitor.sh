@@ -199,7 +199,8 @@ save_container_logs() {
         if [ -s "$log_file" ] && grep -q '[^[:space:]]' "$log_file" 2>/dev/null; then
             success "Container logs saved ($(wc -l < "$log_file") lines)"
             detect_and_report_crash "$log_file"
-            rotate_old_logs
+            # Log rotation disabled - manually manage log files for now
+            # rotate_old_logs
         else
             # Remove empty or whitespace-only log files
             rm -f "$log_file"
@@ -244,17 +245,18 @@ detect_and_report_crash() {
         crash_context=$(grep -B "$context_lines" "ERROR: AddressSanitizer:" "$log_file" | head -n "$context_lines")
         # Get full ASAN output for attachment (from ERROR through SUMMARY, inclusive)
         crash_details=$(sed -n '/ERROR: AddressSanitizer:/,/SUMMARY: AddressSanitizer:/p' "$log_file")
-    # Check for assertion failure (only if more than 1 line)
-    elif grep -q "Aborted (core dumped)" "$log_file" 2>/dev/null && [ "$line_count" -gt 1 ]; then
+    # Check for assertion failure - look for "ASSERTION FAILED:" directly
+    # Sneezy's custom mud_assert function logs "BUG: ASSERTION FAILED:" before
+    # abort, which doesn't include "Aborted (core dumped)"
+    elif grep -q "ASSERTION FAILED:" "$log_file" 2>/dev/null && [ "$line_count" -gt 1 ]; then
         crash_type="Assertion failure"
-        # Extract assertion message if available
-        local assertion_line=$(grep "ASSERTION FAILED:" "$log_file" | head -1)
+        local assertion_line=$(grep "ASSERTION FAILED:" "$log_file" | tail -1)
         if [ -n "$assertion_line" ]; then
             crash_location=$(echo "$assertion_line" | sed 's/.*ASSERTION FAILED: //')
-            # Get context: lines before "ASSERTION FAILED:" plus the crash lines
-            crash_context=$(grep -B "$context_lines" "ASSERTION FAILED:" "$log_file" | head -n "$context_lines")
-            # Include context + assertion + aborted for attachment
-            crash_details=$(grep -B "$context_lines" -A 1 "ASSERTION FAILED:" "$log_file")
+            # Get context: lines before "ASSERTION FAILED:"
+            crash_context=$(grep -B "$context_lines" "ASSERTION FAILED:" "$log_file" | tail -n "$context_lines")
+            # Include context + assertion for attachment
+            crash_details=$(grep -B "$context_lines" -A 1 "ASSERTION FAILED:" "$log_file" | tail -n "$((context_lines + 2))")
         fi
     # Check for segmentation fault (only if more than 1 line)
     elif grep -q "Segmentation fault" "$log_file" 2>/dev/null && [ "$line_count" -gt 1 ]; then
@@ -266,6 +268,12 @@ detect_and_report_crash() {
             # Include context + segfault line for attachment
             crash_details=$(grep -B "$context_lines" "Segmentation fault" "$log_file")
         fi
+    # Catch-all for other abort scenarios (standard assert(), library crashes, etc.)
+    elif grep -q "Aborted (core dumped)" "$log_file" 2>/dev/null && [ "$line_count" -gt 1 ]; then
+        crash_type="Aborted"
+        # Get context: lines before "Aborted"
+        crash_context=$(grep -B "$context_lines" "Aborted" "$log_file" | tail -n "$context_lines")
+        crash_details=$(grep -B "$context_lines" "Aborted" "$log_file")
     fi
 
     # If no reportable crash detected, return silently
