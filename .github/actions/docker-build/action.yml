@@ -26,7 +26,7 @@ runs:
     - uses: docker/build-push-action@v6
       with:
         context: ${{ inputs.context }}
-        push: true
+        push: ${{ github.ref == 'refs/heads/master' }}
         tags: |
           ghcr.io/${{ github.repository_owner }}/${{ inputs.image-name }}:latest
           ghcr.io/${{ github.repository_owner }}/${{ inputs.image-name }}:${{ github.sha }}

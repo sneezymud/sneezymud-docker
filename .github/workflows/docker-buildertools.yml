@@ -2,7 +2,7 @@ name: Build buildertools
 on:
   push:
     branches: ["master"]
-    paths: ["services/buildertools/**", ".github/workflows/docker-buildertools.yml", ".github/actions/docker-build/**"]
+    paths: ["services/buildertools/**"]
   workflow_dispatch:
 
 permissions:
@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
