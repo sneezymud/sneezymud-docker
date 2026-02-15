@@ -5,3 +5,4 @@ output/
 !.env.example
 .eslintcache
 *.tsbuildinfo
+.artifacts/
