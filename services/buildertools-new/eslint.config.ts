@@ -24,7 +24,7 @@ const e2eGlobs = ["**/{__tests__,tests}/e2e/**", "**/*.e2e?(.test).{ts,tsx}"];
 
 const config: Config = defineConfig([
   {
-    ignores: ["node_modules/**", "output/**"],
+    ignores: ["node_modules/**", "output/**", ".artifacts/**", "src/routeTree.gen.ts"],
   },
 
   {
@@ -188,6 +188,14 @@ const config: Config = defineConfig([
   {
     extends: [playwright.configs["flat/recommended"]],
     files: e2eGlobs,
+  },
+
+  // TanStack Router route files export both Route config and components
+  {
+    files: ["src/routes/**/*.tsx"],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
   },
 
   regExp.recommended,
