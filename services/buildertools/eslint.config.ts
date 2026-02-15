@@ -24,7 +24,12 @@ const e2eGlobs = ["**/{__tests__,tests}/e2e/**", "**/*.e2e?(.test).{ts,tsx}"];
 
 const config: Config = defineConfig([
   {
-    ignores: ["node_modules/**", "output/**", ".artifacts/**", "src/routeTree.gen.ts"],
+    ignores: [
+      "node_modules/**",
+      "output/**",
+      ".artifacts/**",
+      "src/routeTree.gen.ts",
+    ],
   },
 
   {

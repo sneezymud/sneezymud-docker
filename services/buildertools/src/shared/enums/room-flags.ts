@@ -1,0 +1,26 @@
+import type { BitfieldEntry } from "./types.ts";
+
+export const ROOM_FLAGS: BitfieldEntry[] = [
+  { bit: 0, label: "Always Lit" },
+  { bit: 1, label: "Death" },
+  { bit: 2, label: "No Mob" },
+  { bit: 3, label: "Indoors" },
+  { bit: 4, label: "Peaceful" },
+  { bit: 5, label: "No Steal" },
+  { bit: 6, label: "No Escape" },
+  { bit: 7, label: "No Magic" },
+  { bit: 8, label: "No Portal" },
+  { bit: 9, label: "Private" },
+  { bit: 10, label: "Silence" },
+  { bit: 11, label: "No Order" },
+  { bit: 12, label: "No Flee" },
+  { bit: 13, label: "Have to Walk" },
+  { bit: 14, label: "Arena" },
+  { bit: 15, label: "No Heal" },
+  { bit: 16, label: "Hospital" },
+  { bit: 17, label: "Save Room" },
+  { bit: 18, label: "No Autoformat" },
+  { bit: 19, label: "Being Edited" },
+  { bit: 20, label: "On Fire" },
+  { bit: 21, label: "Flooded" },
+];

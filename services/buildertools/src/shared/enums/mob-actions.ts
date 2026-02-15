@@ -1,0 +1,28 @@
+import type { BitfieldEntry } from "./types.ts";
+
+export const MOB_ACTIONS: BitfieldEntry[] = [
+  { bit: 0, label: "Strings Changed" },
+  { bit: 1, label: "Sentinel" },
+  { bit: 2, label: "Scavenger" },
+  { bit: 3, label: "Disguised" },
+  { bit: 4, label: "Nice Thief" },
+  { bit: 5, label: "Aggressive" },
+  { bit: 6, label: "Stay Zone" },
+  { bit: 7, label: "Wimpy" },
+  { bit: 8, label: "Annoying" },
+  { bit: 9, label: "Hateful" },
+  { bit: 10, label: "Afraid" },
+  { bit: 11, label: "Immortal" },
+  { bit: 12, label: "Hunting" },
+  { bit: 13, label: "Deadly" },
+  { bit: 14, label: "Polyself" },
+  { bit: 15, label: "Guardian" },
+  { bit: 16, label: "Skeleton" },
+  { bit: 17, label: "Zombie" },
+  { bit: 18, label: "Ghost" },
+  { bit: 19, label: "Diurnal" },
+  { bit: 20, label: "Nocturnal" },
+  { bit: 21, label: "Protector" },
+  { bit: 22, label: "Protectee" },
+  { bit: 23, label: "Hit by PK" },
+];
