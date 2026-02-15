@@ -60,7 +60,7 @@ export function EntityList({
       </div>
 
       <input
-        className="mb-4 w-full max-w-xs rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+        className="mb-4 w-full max-w-md rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500"
         onChange={(e) => {
           setSearch(e.target.value);
         }}
@@ -86,7 +86,7 @@ export function EntityList({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-zinc-700/50 text-left text-zinc-400">
-            <th className="px-3 py-2 font-medium">Vnum</th>
+            <th className="w-24 px-3 py-2 font-medium">Vnum</th>
             <th className="px-3 py-2 font-medium">Name</th>
           </tr>
         </thead>
@@ -121,7 +121,9 @@ export function EntityList({
       </table>
 
       <p className="mt-2 text-xs text-zinc-500">
-        {filtered.length} of {entities.length} shown
+        {search
+          ? `${String(filtered.length)} results (${String(entities.length)} total)`
+          : `${String(entities.length)} ${label.toLowerCase()}`}
       </p>
     </div>
   );
@@ -133,8 +135,6 @@ function VnumPicker({
   onCreate,
   vnumBlocks,
 }: VnumPickerProps) {
-  const [vnumInput, setVnumInput] = useState("");
-
   // Find next available vnum
   let suggestedVnum: null | number = null;
   for (const block of vnumBlocks) {
@@ -148,6 +148,10 @@ function VnumPicker({
       break;
     }
   }
+
+  const [vnumInput, setVnumInput] = useState(
+    suggestedVnum === null ? "" : String(suggestedVnum),
+  );
 
   const vnumNumber = Number(vnumInput);
   const isValid =

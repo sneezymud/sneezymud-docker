@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { ConfirmDialog } from "./confirm-dialog.tsx";
+
 export interface ColumnDef<T> {
   key: keyof T & string;
   label: string;
@@ -23,6 +25,7 @@ export function SubTable<T extends Record<string, number | string>>({
   rows,
 }: SubTableProps<T>) {
   const [collapsed, setCollapsed] = useState(rows.length === 0);
+  const [pendingRemove, setPendingRemove] = useState<null | number>(null);
 
   const addRow = () => {
     onChange([...rows, { ...emptyRow }]);
@@ -44,6 +47,7 @@ export function SubTable<T extends Record<string, number | string>>({
 
   const inputClass =
     "w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100 outline-none focus:border-zinc-500";
+  const numberInputClass = `${inputClass} font-mono`;
 
   return (
     <fieldset className="rounded border border-zinc-700/50 p-4">
@@ -101,7 +105,9 @@ export function SubTable<T extends Record<string, number | string>>({
                       />
                     ) : (
                       <input
-                        className={inputClass}
+                        className={
+                          col.type === "number" ? numberInputClass : inputClass
+                        }
                         id={`${label}-${String(index)}-${col.key}`}
                         onChange={(e) => {
                           updateRow(index, col.key, e.target.value);
@@ -116,7 +122,7 @@ export function SubTable<T extends Record<string, number | string>>({
               <button
                 className="mt-5 shrink-0 rounded px-2 py-1 text-xs text-zinc-500 transition-colors hover:bg-red-900/30 hover:text-red-400"
                 onClick={() => {
-                  removeRow(index);
+                  setPendingRemove(index);
                 }}
                 title="Remove row"
                 type="button"
@@ -135,6 +141,22 @@ export function SubTable<T extends Record<string, number | string>>({
           </button>
         </div>
       )}
+
+      <ConfirmDialog
+        confirmLabel="Remove"
+        message={`Remove this ${label.toLowerCase().replace(/s$/, "")}?`}
+        onCancel={() => {
+          setPendingRemove(null);
+        }}
+        onConfirm={() => {
+          if (pendingRemove !== null) {
+            removeRow(pendingRemove);
+          }
+          setPendingRemove(null);
+        }}
+        open={pendingRemove !== null}
+        variant="danger"
+      />
     </fieldset>
   );
 }

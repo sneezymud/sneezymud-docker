@@ -7,6 +7,7 @@ import {
   createRoom,
   deleteRoom,
   getRoom,
+  getRoomName,
   listRooms,
   roomExists,
   updateRoom,
@@ -43,6 +44,12 @@ roomRoutes.post("/", async (c) => {
   await createRoom(parsed.data.vnum, user.playerName);
   const room = await getRoom(parsed.data.vnum);
   return c.json(room, 201);
+});
+
+roomRoutes.get("/name/:vnum", async (c) => {
+  const vnum = Number(c.req.param("vnum"));
+  const name = await getRoomName(vnum);
+  return c.json({ name, vnum });
 });
 
 roomRoutes.get("/:vnum", async (c) => {

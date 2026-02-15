@@ -34,7 +34,12 @@ export function Nav() {
       </div>
 
       <div className="border-t border-zinc-700/50 pt-4">
-        <p className="mb-2 text-xs text-zinc-500">{user.playerName}</p>
+        <p className="mb-0.5 text-xs text-zinc-400">{user.playerName}</p>
+        {user.username === user.playerName ? (
+          <div className="mb-2" />
+        ) : (
+          <p className="mb-2 text-xs text-zinc-600">({user.username})</p>
+        )}
         <button
           className="text-xs text-zinc-400 hover:text-zinc-200"
           onClick={handleLogout}

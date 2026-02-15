@@ -3,7 +3,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import type { VnumBlock } from "@/shared/schemas/auth.ts";
 import type { Room, RoomListItem } from "@/shared/schemas/room.ts";
 
-import { immortalPool } from "../db.ts";
+import { immortalPool, sneezyPool } from "../db.ts";
 
 interface RoomRow extends RowDataPacket {
   capacity: number;
@@ -197,6 +197,30 @@ export async function deleteRoom(vnum: number): Promise<void> {
   } finally {
     conn.release();
   }
+}
+
+export async function getRoomName(vnum: number): Promise<null | string> {
+  // Try immortal first (builder workspace), then sneezy (production)
+  // Exits can point to rooms outside the builder's assigned blocks
+  const [immortalRows] = await immortalPool.execute<RoomRow[]>(
+    "SELECT name FROM room WHERE vnum = ? LIMIT 1",
+    [vnum],
+  );
+  const immortalRow = immortalRows[0];
+  if (immortalRow) {
+    return immortalRow.name;
+  }
+
+  const [sneezyRows] = await sneezyPool.execute<RoomRow[]>(
+    "SELECT name FROM room WHERE vnum = ? LIMIT 1",
+    [vnum],
+  );
+  const sneezyRow = sneezyRows[0];
+  if (sneezyRow) {
+    return sneezyRow.name;
+  }
+
+  return null;
 }
 
 export async function roomExists(vnum: number): Promise<boolean> {

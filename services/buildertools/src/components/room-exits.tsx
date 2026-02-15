@@ -1,5 +1,10 @@
 import type { RoomExit } from "@/shared/schemas/room.ts";
 
+import { useRoomName } from "@/hooks/use-room-name.ts";
+import { EXIT_FLAGS } from "@/shared/enums/index.ts";
+
+import { BitfieldEditor } from "./bitfield-editor.tsx";
+
 const DIRECTIONS = ["North", "East", "South", "West", "Up", "Down"];
 
 interface RoomExitsProps {
@@ -39,6 +44,16 @@ export function RoomExits({ exits, onChange, vnum }: RoomExitsProps) {
       </div>
     </fieldset>
   );
+}
+
+function DestinationPreview({ vnum }: { vnum: number }) {
+  const { data } = useRoomName(vnum);
+
+  if (!data?.name) {
+    return null;
+  }
+
+  return <p className="mt-0.5 truncate text-xs text-zinc-500">{data.name}</p>;
 }
 
 function ExitSlot({
@@ -98,7 +113,7 @@ function ExitSlot({
             onChange={toggle}
             type="checkbox"
           />
-          {enabled ? "Enabled" : "None"}
+          Has exit
         </label>
       </div>
 
@@ -120,6 +135,7 @@ function ExitSlot({
               type="number"
               value={exit.destination}
             />
+            <DestinationPreview vnum={exit.destination} />
           </div>
           <div>
             <label
@@ -203,6 +219,22 @@ function ExitSlot({
               }}
               type="number"
               value={exit.key_num}
+            />
+          </div>
+          <div className="col-span-2">
+            <label
+              className="text-xs text-zinc-500"
+              htmlFor={`${prefix}-cond`}
+            >
+              Condition Flags
+            </label>
+            <BitfieldEditor
+              entries={EXIT_FLAGS}
+              id={`${prefix}-cond`}
+              onChange={(v) => {
+                update("condition_flag", v);
+              }}
+              value={exit.condition_flag}
             />
           </div>
         </div>

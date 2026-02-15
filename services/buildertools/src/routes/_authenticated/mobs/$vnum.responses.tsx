@@ -1,8 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
-import { apiFetch } from "@/shared/api-client.ts";
+import { QueryStatus } from "@/components/query-status.tsx";
+import { useKeyboardSave } from "@/hooks/use-keyboard-save.ts";
+import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
 import { mobResponseSchema } from "@/shared/schemas/mob-response.ts";
 
 export const Route = createFileRoute("/_authenticated/mobs/$vnum/responses")({
@@ -53,7 +56,7 @@ function MobResponseEditorPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, error, isError, isLoading } = useQuery({
     queryFn: () =>
       apiFetch(`/api/mob-responses/${String(vnum)}`, mobResponseSchema),
     queryKey: ["mob-response", vnum],
@@ -85,19 +88,36 @@ function MobResponseEditorPage() {
         method: "PUT",
       });
     },
+    onError: (err) => {
+      toast.error(
+        err instanceof ApiResponseError ? err.message : "Failed to save",
+      );
+    },
     onSuccess: async () => {
       setDraft(null);
+      toast.success("Saved");
       await queryClient.invalidateQueries({
         queryKey: ["mob-response", vnum],
       });
     },
   });
 
-  if (isLoading) {
+  const handleSave = () => {
+    saveMutation.mutate();
+  };
+
+  useKeyboardSave(handleSave, dirty);
+
+  if (isLoading || isError) {
     return (
-      <p className="text-sm text-zinc-500">
-        Loading responses for mob {vnum}...
-      </p>
+      <QueryStatus
+        backLabel={`Mob ${String(vnum)}`}
+        backTo={`/mobs/${String(vnum)}`}
+        error={error}
+        isError={isError}
+        isLoading={isLoading}
+        label={`responses for mob ${String(vnum)}`}
+      />
     );
   }
 

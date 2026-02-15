@@ -3,6 +3,8 @@ import type { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
+import { Toaster } from "@/components/toaster.tsx";
+
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
 }>()({
@@ -25,8 +27,14 @@ export const Route = createRootRouteWithContext<{
     </div>
   ),
   notFoundComponent: () => (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-zinc-400">
-      404 Not Found
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-zinc-950 text-zinc-400">
+      <p>404 Not Found</p>
+      <a
+        className="text-sm text-zinc-500 hover:text-zinc-300"
+        href="/"
+      >
+        &larr; Back to Builder Tools
+      </a>
     </div>
   ),
 });
@@ -35,6 +43,7 @@ function RootLayout() {
   return (
     <>
       <Outlet />
+      <Toaster />
       {import.meta.env.DEV && <TanStackRouterDevtools />}
     </>
   );

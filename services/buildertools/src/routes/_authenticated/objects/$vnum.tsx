@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import type { FieldGroupDef } from "@/components/entity-form.tsx";
@@ -8,8 +9,17 @@ import type { ColumnDef } from "@/components/sub-table.tsx";
 import type { Obj, ObjAffect, ObjExtra } from "@/shared/schemas/obj.ts";
 
 import { EntityForm } from "@/components/entity-form.tsx";
+import { QueryStatus } from "@/components/query-status.tsx";
+import { EntityFormSkeleton } from "@/components/skeleton.tsx";
 import { SubTable } from "@/components/sub-table.tsx";
-import { apiFetch } from "@/shared/api-client.ts";
+import { useKeyboardSave } from "@/hooks/use-keyboard-save.ts";
+import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
+import {
+  EXTRA_FLAGS,
+  ITEM_TYPES,
+  MATERIAL_TYPES,
+  WEAR_FLAGS,
+} from "@/shared/enums/index.ts";
 import { objSchema } from "@/shared/schemas/obj.ts";
 
 export const Route = createFileRoute("/_authenticated/objects/$vnum")({
@@ -29,22 +39,22 @@ const objFieldGroups: FieldGroupDef[] = [
   {
     fields: [
       {
-        help: "Item category (5=weapon, 8=armor, 15=container, etc.)",
+        enumEntries: ITEM_TYPES,
         key: "type",
         label: "Item Type",
-        type: "number",
+        type: "enum",
       },
       {
-        help: "Bitfield for item behavior",
+        bitfieldEntries: EXTRA_FLAGS,
         key: "action_flag",
         label: "Extra Flags",
-        type: "number",
+        type: "bitfield",
       },
       {
-        help: "Bitfield for equip positions",
+        bitfieldEntries: WEAR_FLAGS,
         key: "wear_flag",
         label: "Wear Flags",
-        type: "number",
+        type: "bitfield",
       },
     ],
     title: "Classification",
@@ -68,7 +78,12 @@ const objFieldGroups: FieldGroupDef[] = [
       { key: "weight", label: "Weight", type: "number" },
       { key: "volume", label: "Volume", type: "number" },
       { key: "price", label: "Price", type: "number" },
-      { key: "material", label: "Material", type: "number" },
+      {
+        enumEntries: MATERIAL_TYPES,
+        key: "material",
+        label: "Material",
+        type: "enum",
+      },
     ],
     title: "Physical",
   },
@@ -114,7 +129,12 @@ function ObjectEditorPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: obj, isLoading } = useQuery({
+  const {
+    data: obj,
+    error,
+    isError,
+    isLoading,
+  } = useQuery({
     queryFn: () => apiFetch(`/api/objects/${String(vnum)}`, objSchema),
     queryKey: ["object", vnum],
   });
@@ -122,7 +142,6 @@ function ObjectEditorPage() {
   const [edits, setEdits] = useState<null | Partial<Obj>>(null);
   const [affectEdits, setAffectEdits] = useState<null | ObjAffect[]>(null);
   const [extraEdits, setExtraEdits] = useState<null | ObjExtra[]>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const dirty = edits !== null || affectEdits !== null || extraEdits !== null;
 
@@ -155,10 +174,16 @@ function ObjectEditorPage() {
         method: "PUT",
       });
     },
+    onError: (err) => {
+      toast.error(
+        err instanceof ApiResponseError ? err.message : "Failed to save",
+      );
+    },
     onSuccess: async () => {
       setEdits(null);
       setAffectEdits(null);
       setExtraEdits(null);
+      toast.success("Saved");
       await queryClient.invalidateQueries({ queryKey: ["object", vnum] });
       await queryClient.invalidateQueries({ queryKey: ["objects"] });
     },
@@ -172,32 +197,42 @@ function ObjectEditorPage() {
         { method: "DELETE" },
       );
     },
+    onError: (err) => {
+      toast.error(
+        err instanceof ApiResponseError ? err.message : "Failed to delete",
+      );
+    },
     onSuccess: async () => {
+      toast.success("Deleted");
       await queryClient.invalidateQueries({ queryKey: ["objects"] });
       await navigate({ to: "/objects" });
     },
   });
 
-  if (isLoading || !obj) {
-    return <p className="text-sm text-zinc-500">Loading object {vnum}...</p>;
+  const handleSave = () => {
+    saveMutation.mutate();
+  };
+
+  useKeyboardSave(handleSave, dirty);
+
+  if (isLoading || isError || !obj) {
+    return (
+      <QueryStatus
+        backLabel="Objects"
+        backTo="/objects"
+        error={error}
+        isError={isError}
+        isLoading={isLoading}
+        label={`object ${String(vnum)}`}
+        skeleton={<EntityFormSkeleton />}
+      />
+    );
   }
 
   const currentValues = objToFormValues(obj, edits);
 
   const handleFieldChange = (key: string, value: number | string) => {
     setEdits((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleSave = () => {
-    saveMutation.mutate();
-  };
-
-  const handleDelete = () => {
-    if (showDeleteConfirm) {
-      deleteMutation.mutate();
-    } else {
-      setShowDeleteConfirm(true);
-    }
   };
 
   return (
@@ -218,10 +253,13 @@ function ObjectEditorPage() {
       </div>
 
       <EntityForm
+        deleteMessage={`Are you sure you want to delete object ${String(vnum)}? This also removes all affects and extra descriptions.`}
         dirty={dirty}
         groups={objFieldGroups}
         onChange={handleFieldChange}
-        onDelete={handleDelete}
+        onDelete={() => {
+          deleteMutation.mutate();
+        }}
         onSave={handleSave}
         saving={saveMutation.isPending}
         values={currentValues}
@@ -241,35 +279,6 @@ function ObjectEditorPage() {
           rows={extraEdits ?? obj.extras}
         />
       </EntityForm>
-
-      {showDeleteConfirm && !deleteMutation.isPending ? (
-        <div className="mt-4 rounded border border-red-800/50 bg-red-900/10 p-4">
-          <p className="mb-3 text-sm text-red-400">
-            Are you sure you want to delete object {vnum}? This also removes all
-            affects and extra descriptions.
-          </p>
-          <div className="flex gap-2">
-            <button
-              className="rounded bg-red-800 px-3 py-1.5 text-sm text-red-100 hover:bg-red-700"
-              onClick={() => {
-                deleteMutation.mutate();
-              }}
-              type="button"
-            >
-              Yes, delete
-            </button>
-            <button
-              className="rounded border border-zinc-600 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
-              onClick={() => {
-                setShowDeleteConfirm(false);
-              }}
-              type="button"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

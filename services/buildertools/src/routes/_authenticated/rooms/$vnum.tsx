@@ -1,14 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import type { FieldGroupDef } from "@/components/entity-form.tsx";
 import type { Room, RoomExit } from "@/shared/schemas/room.ts";
 
 import { EntityForm } from "@/components/entity-form.tsx";
+import { QueryStatus } from "@/components/query-status.tsx";
 import { RoomExits } from "@/components/room-exits.tsx";
-import { apiFetch } from "@/shared/api-client.ts";
+import { EntityFormSkeleton } from "@/components/skeleton.tsx";
+import { useKeyboardSave } from "@/hooks/use-keyboard-save.ts";
+import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
+import { ROOM_FLAGS, SECTOR_TYPES } from "@/shared/enums/index.ts";
 import { roomSchema } from "@/shared/schemas/room.ts";
 
 export const Route = createFileRoute("/_authenticated/rooms/$vnum")({
@@ -32,16 +37,16 @@ const roomFieldGroups: FieldGroupDef[] = [
         type: "number",
       },
       {
-        help: "Bitfield for room properties",
+        bitfieldEntries: ROOM_FLAGS,
         key: "room_flag",
         label: "Room Flags",
-        type: "number",
+        type: "bitfield",
       },
       {
-        help: "Terrain type (0=indoor, 1=city, etc.)",
+        enumEntries: SECTOR_TYPES,
         key: "sector",
         label: "Sector Type",
-        type: "number",
+        type: "enum",
       },
       { key: "capacity", label: "Capacity", type: "number" },
       { key: "height", label: "Height", type: "number" },
@@ -92,18 +97,21 @@ function RoomEditorPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: room, isLoading } = useQuery({
+  const {
+    data: room,
+    error,
+    isError,
+    isLoading,
+  } = useQuery({
     queryFn: () => apiFetch(`/api/rooms/${String(vnum)}`, roomSchema),
     queryKey: ["room", vnum],
   });
 
   const [edits, setEdits] = useState<null | Partial<Room>>(null);
   const [exitEdits, setExitEdits] = useState<null | RoomExit[]>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const dirty = edits !== null || exitEdits !== null;
 
-  // Warn on tab close with unsaved changes
   useEffect(() => {
     if (!dirty) {
       return;
@@ -132,9 +140,15 @@ function RoomEditorPage() {
         method: "PUT",
       });
     },
+    onError: (err) => {
+      toast.error(
+        err instanceof ApiResponseError ? err.message : "Failed to save",
+      );
+    },
     onSuccess: async () => {
       setEdits(null);
       setExitEdits(null);
+      toast.success("Saved");
       await queryClient.invalidateQueries({ queryKey: ["room", vnum] });
       await queryClient.invalidateQueries({ queryKey: ["rooms"] });
     },
@@ -148,14 +162,36 @@ function RoomEditorPage() {
         { method: "DELETE" },
       );
     },
+    onError: (err) => {
+      toast.error(
+        err instanceof ApiResponseError ? err.message : "Failed to delete",
+      );
+    },
     onSuccess: async () => {
+      toast.success("Deleted");
       await queryClient.invalidateQueries({ queryKey: ["rooms"] });
       await navigate({ to: "/rooms" });
     },
   });
 
-  if (isLoading || !room) {
-    return <p className="text-sm text-zinc-500">Loading room {vnum}...</p>;
+  const handleSave = () => {
+    saveMutation.mutate();
+  };
+
+  useKeyboardSave(handleSave, dirty);
+
+  if (isLoading || isError || !room) {
+    return (
+      <QueryStatus
+        backLabel="Rooms"
+        backTo="/rooms"
+        error={error}
+        isError={isError}
+        isLoading={isLoading}
+        label={`room ${String(vnum)}`}
+        skeleton={<EntityFormSkeleton />}
+      />
+    );
   }
 
   const currentValues = roomToFormValues(room, edits);
@@ -166,18 +202,6 @@ function RoomEditorPage() {
 
   const handleExitChange = (exits: RoomExit[]) => {
     setExitEdits(exits);
-  };
-
-  const handleSave = () => {
-    saveMutation.mutate();
-  };
-
-  const handleDelete = () => {
-    if (showDeleteConfirm) {
-      deleteMutation.mutate();
-    } else {
-      setShowDeleteConfirm(true);
-    }
   };
 
   return (
@@ -198,10 +222,13 @@ function RoomEditorPage() {
       </div>
 
       <EntityForm
+        deleteMessage={`Are you sure you want to delete room ${String(vnum)}? This also removes all exits.`}
         dirty={dirty}
         groups={roomFieldGroups}
         onChange={handleFieldChange}
-        onDelete={handleDelete}
+        onDelete={() => {
+          deleteMutation.mutate();
+        }}
         onSave={handleSave}
         saving={saveMutation.isPending}
         values={currentValues}
@@ -212,35 +239,6 @@ function RoomEditorPage() {
           vnum={vnum}
         />
       </EntityForm>
-
-      {showDeleteConfirm && !deleteMutation.isPending ? (
-        <div className="mt-4 rounded border border-red-800/50 bg-red-900/10 p-4">
-          <p className="mb-3 text-sm text-red-400">
-            Are you sure you want to delete room {vnum}? This also removes all
-            exits.
-          </p>
-          <div className="flex gap-2">
-            <button
-              className="rounded bg-red-800 px-3 py-1.5 text-sm text-red-100 hover:bg-red-700"
-              onClick={() => {
-                deleteMutation.mutate();
-              }}
-              type="button"
-            >
-              Yes, delete
-            </button>
-            <button
-              className="rounded border border-zinc-600 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
-              onClick={() => {
-                setShowDeleteConfirm(false);
-              }}
-              type="button"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
