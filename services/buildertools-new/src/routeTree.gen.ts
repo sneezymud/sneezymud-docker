@@ -9,38 +9,176 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedZonesRouteImport } from './routes/_authenticated/zones'
+import { Route as AuthenticatedRoomsIndexRouteImport } from './routes/_authenticated/rooms/index'
+import { Route as AuthenticatedObjectsIndexRouteImport } from './routes/_authenticated/objects/index'
+import { Route as AuthenticatedMobsIndexRouteImport } from './routes/_authenticated/mobs/index'
+import { Route as AuthenticatedRoomsVnumRouteImport } from './routes/_authenticated/rooms/$vnum'
+import { Route as AuthenticatedObjectsVnumRouteImport } from './routes/_authenticated/objects/$vnum'
+import { Route as AuthenticatedMobsVnumRouteImport } from './routes/_authenticated/mobs/$vnum'
+import { Route as AuthenticatedMobsVnumResponsesRouteImport } from './routes/_authenticated/mobs/$vnum.responses'
 
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedZonesRoute = AuthenticatedZonesRouteImport.update({
+  id: '/zones',
+  path: '/zones',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRoomsIndexRoute = AuthenticatedRoomsIndexRouteImport.update({
+  id: '/rooms/',
+  path: '/rooms/',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedObjectsIndexRoute =
+  AuthenticatedObjectsIndexRouteImport.update({
+    id: '/objects/',
+    path: '/objects/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedMobsIndexRoute = AuthenticatedMobsIndexRouteImport.update({
+  id: '/mobs/',
+  path: '/mobs/',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRoomsVnumRoute = AuthenticatedRoomsVnumRouteImport.update({
+  id: '/rooms/$vnum',
+  path: '/rooms/$vnum',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedObjectsVnumRoute =
+  AuthenticatedObjectsVnumRouteImport.update({
+    id: '/objects/$vnum',
+    path: '/objects/$vnum',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedMobsVnumRoute = AuthenticatedMobsVnumRouteImport.update({
+  id: '/mobs/$vnum',
+  path: '/mobs/$vnum',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMobsVnumResponsesRoute =
+  AuthenticatedMobsVnumResponsesRouteImport.update({
+    id: '/responses',
+    path: '/responses',
+    getParentRoute: () => AuthenticatedMobsVnumRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/zones': typeof AuthenticatedZonesRoute
+  '/mobs/$vnum': typeof AuthenticatedMobsVnumRouteWithChildren
+  '/objects/$vnum': typeof AuthenticatedObjectsVnumRoute
+  '/rooms/$vnum': typeof AuthenticatedRoomsVnumRoute
+  '/mobs/': typeof AuthenticatedMobsIndexRoute
+  '/objects/': typeof AuthenticatedObjectsIndexRoute
+  '/rooms/': typeof AuthenticatedRoomsIndexRoute
+  '/mobs/$vnum/responses': typeof AuthenticatedMobsVnumResponsesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/zones': typeof AuthenticatedZonesRoute
+  '/mobs/$vnum': typeof AuthenticatedMobsVnumRouteWithChildren
+  '/objects/$vnum': typeof AuthenticatedObjectsVnumRoute
+  '/rooms/$vnum': typeof AuthenticatedRoomsVnumRoute
+  '/mobs': typeof AuthenticatedMobsIndexRoute
+  '/objects': typeof AuthenticatedObjectsIndexRoute
+  '/rooms': typeof AuthenticatedRoomsIndexRoute
+  '/mobs/$vnum/responses': typeof AuthenticatedMobsVnumResponsesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/login': typeof LoginRoute
+  '/_authenticated/zones': typeof AuthenticatedZonesRoute
+  '/_authenticated/mobs/$vnum': typeof AuthenticatedMobsVnumRouteWithChildren
+  '/_authenticated/objects/$vnum': typeof AuthenticatedObjectsVnumRoute
+  '/_authenticated/rooms/$vnum': typeof AuthenticatedRoomsVnumRoute
+  '/_authenticated/mobs/': typeof AuthenticatedMobsIndexRoute
+  '/_authenticated/objects/': typeof AuthenticatedObjectsIndexRoute
+  '/_authenticated/rooms/': typeof AuthenticatedRoomsIndexRoute
+  '/_authenticated/mobs/$vnum/responses': typeof AuthenticatedMobsVnumResponsesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/zones'
+    | '/mobs/$vnum'
+    | '/objects/$vnum'
+    | '/rooms/$vnum'
+    | '/mobs/'
+    | '/objects/'
+    | '/rooms/'
+    | '/mobs/$vnum/responses'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/login'
+    | '/zones'
+    | '/mobs/$vnum'
+    | '/objects/$vnum'
+    | '/rooms/$vnum'
+    | '/mobs'
+    | '/objects'
+    | '/rooms'
+    | '/mobs/$vnum/responses'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/login'
+    | '/_authenticated/zones'
+    | '/_authenticated/mobs/$vnum'
+    | '/_authenticated/objects/$vnum'
+    | '/_authenticated/rooms/$vnum'
+    | '/_authenticated/mobs/'
+    | '/_authenticated/objects/'
+    | '/_authenticated/rooms/'
+    | '/_authenticated/mobs/$vnum/responses'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +186,106 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/zones': {
+      id: '/_authenticated/zones'
+      path: '/zones'
+      fullPath: '/zones'
+      preLoaderRoute: typeof AuthenticatedZonesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/rooms/': {
+      id: '/_authenticated/rooms/'
+      path: '/rooms'
+      fullPath: '/rooms/'
+      preLoaderRoute: typeof AuthenticatedRoomsIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/objects/': {
+      id: '/_authenticated/objects/'
+      path: '/objects'
+      fullPath: '/objects/'
+      preLoaderRoute: typeof AuthenticatedObjectsIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/mobs/': {
+      id: '/_authenticated/mobs/'
+      path: '/mobs'
+      fullPath: '/mobs/'
+      preLoaderRoute: typeof AuthenticatedMobsIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/rooms/$vnum': {
+      id: '/_authenticated/rooms/$vnum'
+      path: '/rooms/$vnum'
+      fullPath: '/rooms/$vnum'
+      preLoaderRoute: typeof AuthenticatedRoomsVnumRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/objects/$vnum': {
+      id: '/_authenticated/objects/$vnum'
+      path: '/objects/$vnum'
+      fullPath: '/objects/$vnum'
+      preLoaderRoute: typeof AuthenticatedObjectsVnumRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/mobs/$vnum': {
+      id: '/_authenticated/mobs/$vnum'
+      path: '/mobs/$vnum'
+      fullPath: '/mobs/$vnum'
+      preLoaderRoute: typeof AuthenticatedMobsVnumRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/mobs/$vnum/responses': {
+      id: '/_authenticated/mobs/$vnum/responses'
+      path: '/responses'
+      fullPath: '/mobs/$vnum/responses'
+      preLoaderRoute: typeof AuthenticatedMobsVnumResponsesRouteImport
+      parentRoute: typeof AuthenticatedMobsVnumRoute
+    }
   }
 }
 
+interface AuthenticatedMobsVnumRouteChildren {
+  AuthenticatedMobsVnumResponsesRoute: typeof AuthenticatedMobsVnumResponsesRoute
+}
+
+const AuthenticatedMobsVnumRouteChildren: AuthenticatedMobsVnumRouteChildren = {
+  AuthenticatedMobsVnumResponsesRoute: AuthenticatedMobsVnumResponsesRoute,
+}
+
+const AuthenticatedMobsVnumRouteWithChildren =
+  AuthenticatedMobsVnumRoute._addFileChildren(
+    AuthenticatedMobsVnumRouteChildren,
+  )
+
+interface AuthenticatedRouteChildren {
+  AuthenticatedZonesRoute: typeof AuthenticatedZonesRoute
+  AuthenticatedMobsVnumRoute: typeof AuthenticatedMobsVnumRouteWithChildren
+  AuthenticatedObjectsVnumRoute: typeof AuthenticatedObjectsVnumRoute
+  AuthenticatedRoomsVnumRoute: typeof AuthenticatedRoomsVnumRoute
+  AuthenticatedMobsIndexRoute: typeof AuthenticatedMobsIndexRoute
+  AuthenticatedObjectsIndexRoute: typeof AuthenticatedObjectsIndexRoute
+  AuthenticatedRoomsIndexRoute: typeof AuthenticatedRoomsIndexRoute
+}
+
+const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedZonesRoute: AuthenticatedZonesRoute,
+  AuthenticatedMobsVnumRoute: AuthenticatedMobsVnumRouteWithChildren,
+  AuthenticatedObjectsVnumRoute: AuthenticatedObjectsVnumRoute,
+  AuthenticatedRoomsVnumRoute: AuthenticatedRoomsVnumRoute,
+  AuthenticatedMobsIndexRoute: AuthenticatedMobsIndexRoute,
+  AuthenticatedObjectsIndexRoute: AuthenticatedObjectsIndexRoute,
+  AuthenticatedRoomsIndexRoute: AuthenticatedRoomsIndexRoute,
+}
+
+const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
+  AuthenticatedRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
