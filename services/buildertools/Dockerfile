@@ -1,29 +1,51 @@
 # syntax=docker/dockerfile:1
-# Single stage: no compiled dependencies, so multi-stage wouldn't reduce image size
-FROM python:3.14-slim
 
-# Directory must be owned by sneezy so app can create files at runtime (e.g., secretkey)
+# Stage 1: Install dependencies and build frontend
+FROM oven/bun:1-debian AS build
+
+WORKDIR /app
+
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+
+COPY . .
+RUN bun run build
+
+# Stage 2: Production image
+FROM oven/bun:1-debian
+
+# libcrypt is needed for DES password verification via FFI
+RUN apt-get update && apt-get install -y --no-install-recommends libcrypt1 \
+    && rm -rf /var/lib/apt/lists/*
+
 ARG UID=1000
-RUN useradd -r -u $UID -ms /bin/bash sneezy && \
-    mkdir -p /code && chown sneezy:sneezy /code
+RUN useradd -r -u $UID -ms /bin/bash sneezy
 
-WORKDIR /code
+WORKDIR /app
 
-# Copy requirements first for better layer caching
-COPY requirements.txt .
+# Copy only production dependencies
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
 
-# Cache pip downloads between builds to speed up dependency changes
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements.txt
+# Copy server source (needed at runtime since Bun runs TS directly)
+COPY src/server/ src/server/
+COPY src/shared/ src/shared/
+COPY tsconfig.json ./
 
-COPY --chown=sneezy:sneezy . .
+# Copy built frontend assets from build stage
+COPY --from=build /app/.artifacts/build .artifacts/build/
 
 USER sneezy
 
+ENV NODE_ENV=production
+ENV API_PORT=5000
+
+EXPOSE 5000
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5001').read()" || exit 1
+    CMD bun -e "const r = await fetch('http://localhost:5000/api/health'); if (!r.ok) process.exit(1);" || exit 1
 
 LABEL org.opencontainers.image.title="SneezyMUD Builder Tools" \
-    org.opencontainers.image.description="Flask web interface for area, mob, and object editing"
+    org.opencontainers.image.description="React/Hono web interface for area, mob, and object editing"
 
-CMD ["python", "main.py"]
+CMD ["bun", "run", "start"]

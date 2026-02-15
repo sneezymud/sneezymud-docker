@@ -80,7 +80,7 @@ The repository is organized as follows:
     - `Dockerfile` - Production build configuration
     - `dev.Dockerfile` - Development build configuration
   - `/monitor` - Container monitoring service for automatic updates
-  - `/buildertools` - Builder tools web interface (Flask application)
+  - `/buildertools` - Builder tools web interface (React/Hono application)
   - `/webclient` - Web client service
     - `/connectificator` - Git submodule containing the Connectificator web client
 - `/scripts` - Helper scripts and utilities
@@ -97,7 +97,7 @@ The repository is organized as follows:
 - **sneezy-monitor**: Service that monitors the game container, applying updates when available and ensuring it restarts after crashes/in-game shutdowns (production only)
 - **websockify**: Proxy service converting WebSocket connections to TCP for web client compatibility
 - **webclient**: Browser-based MUD client (Connectificator) served via nginx
-- **buildertools**: Flask-based web interface for area, mob, and object creation/editing
+- **buildertools**: Web interface for area, mob, and object creation/editing (React frontend, Hono API on Bun)
 
 All services communicate through the shared database, with the web client connecting through the websockify proxy to maintain compatibility with traditional MUD protocols.
 

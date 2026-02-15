@@ -1,8 +1,0 @@
-node_modules/
-output/
-.env
-.env.*
-!.env.example
-.eslintcache
-*.tsbuildinfo
-.artifacts/
