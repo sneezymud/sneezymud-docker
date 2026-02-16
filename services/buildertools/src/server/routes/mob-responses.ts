@@ -47,7 +47,16 @@ mobResponseRoutes.put("/:vnum", async (c) => {
   const parsed = mobResponseSchema.safeParse(body);
 
   if (!parsed.success) {
-    return c.json({ error: "Invalid response data" }, 400);
+    return c.json(
+      {
+        error: "Validation failed",
+        issues: parsed.error.issues.map((i) => ({
+          message: i.message,
+          path: i.path.map(String),
+        })),
+      },
+      400,
+    );
   }
 
   await (parsed.data.response.trim() === ""

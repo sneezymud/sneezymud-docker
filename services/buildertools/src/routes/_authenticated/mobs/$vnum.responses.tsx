@@ -1,59 +1,70 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, useBlocker } from "@tanstack/react-router";
+import { useState } from "react";
 import { toast } from "sonner";
 
+import { Breadcrumbs } from "@/components/breadcrumbs.tsx";
+import { CodeEditor } from "@/components/code-editor/code-editor.tsx";
+import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { useKeyboardSave } from "@/hooks/use-keyboard-save.ts";
+import { useSyncDirty } from "@/hooks/use-sync-dirty.ts";
 import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
 import { mobResponseSchema } from "@/shared/schemas/mob-response.ts";
+import { mobSchema } from "@/shared/schemas/mob.ts";
+import { toastError } from "@/shared/toast.ts";
 
 export const Route = createFileRoute("/_authenticated/mobs/$vnum/responses")({
   component: MobResponseEditorPage,
 });
 
-const SYNTAX_HELP = `# Mob Response DSL
-
-## Triggers
-say {"keyword";        - Responds to player saying keyword
+const SYNTAX_SECTIONS = [
+  {
+    content: `say {"keyword";        - Responds to player saying keyword
 roomenter {"";         - Fires when player enters room
 give {"item keyword";  - When given an item
-package {"name";       - Reusable action block
-
-## Actions
-say <message>;         - Mob speaks
+package {"name";       - Reusable action block`,
+    title: "Triggers",
+  },
+  {
+    content: `say <message>;         - Mob speaks
 emote <action>;        - Mob emotes
 tovict <message>;      - Message to triggering player
 tonotvict <message>;   - Message to room except player
-link package <name>;   - Execute a named package
-
-## Variables
-%n  - Player's name
+link package <name>;   - Execute a named package`,
+    title: "Actions",
+  },
+  {
+    content: `%n  - Player's name
 %N  - Mob's name
 %o  - Object name
-%r  - Random player in room
-
-## Color Codes
-<r> red    <g> green   <b> blue
+%r  - Random player in room`,
+    title: "Variables",
+  },
+  {
+    content: `<r> red    <g> green   <b> blue
 <c> cyan   <p> purple  <o> orange
 <w> white  <k> black   <W> bold white
-<R> bold red   <z> reset
-
-## Flow Control
-random <N>;           - N% chance to continue
+<R> bold red   <z> reset`,
+    title: "Color Codes",
+  },
+  {
+    content: `random <N>;           - N% chance to continue
 randoption <n>;       - Branch n of random block
-if quest ...;         - Quest conditionals
-
-## Example
-say {"hello";
+if quest ...;         - Quest conditionals`,
+    title: "Flow Control",
+  },
+  {
+    content: `say {"hello";
   smile %n;
   tovict $n says, "Welcome!";
-}`;
+}`,
+    title: "Example",
+  },
+];
 
-function MobResponseEditorPage() {
-  const { vnum: vnumParam } = Route.useParams();
+function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
   const vnum = Number(vnumParam);
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data, error, isError, isLoading } = useQuery({
@@ -62,24 +73,27 @@ function MobResponseEditorPage() {
     queryKey: ["mob-response", vnum],
   });
 
+  const { data: mob } = useQuery({
+    queryFn: () => apiFetch(`/api/mobs/${String(vnum)}`, mobSchema),
+    queryKey: ["mob", vnum],
+  });
+
+  const desc = mob?.short_desc;
+  const mobName =
+    desc !== undefined && desc !== "" ? desc : `Mob ${String(vnum)}`;
+
   // null = no edits yet (show server data), string = user has edited
   const [draft, setDraft] = useState<null | string>(null);
 
   const currentText = draft ?? data?.response ?? "";
   const dirty = draft !== null && draft !== (data?.response ?? "");
+  useSyncDirty(dirty);
 
-  useEffect(() => {
-    if (!dirty) {
-      return;
-    }
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => {
-      window.removeEventListener("beforeunload", handler);
-    };
-  }, [dirty]);
+  const { proceed, reset, status } = useBlocker({
+    enableBeforeUnload: true,
+    shouldBlockFn: () => dirty,
+    withResolver: true,
+  });
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -89,7 +103,7 @@ function MobResponseEditorPage() {
       });
     },
     onError: (err) => {
-      toast.error(
+      toastError(
         err instanceof ApiResponseError ? err.message : "Failed to save",
       );
     },
@@ -106,7 +120,7 @@ function MobResponseEditorPage() {
     saveMutation.mutate();
   };
 
-  useKeyboardSave(handleSave, dirty);
+  useKeyboardSave(handleSave, dirty && !saveMutation.isPending);
 
   if (isLoading || isError) {
     return (
@@ -124,24 +138,39 @@ function MobResponseEditorPage() {
   return (
     <div className="flex h-full flex-col">
       <div className="mb-4 flex items-center gap-3">
-        <button
-          className="text-sm text-zinc-400 hover:text-zinc-200"
-          onClick={() => {
-            void navigate({ params: { vnum: vnumParam }, to: "/mobs/$vnum" });
-          }}
-          type="button"
-        >
-          &larr; Mob {vnum}
-        </button>
-        <h2 className="text-lg font-semibold text-zinc-100">
-          Responses — Mob {vnum}
-        </h2>
+        <div className="space-y-1">
+          <Breadcrumbs
+            items={[
+              { label: "Mobs", to: "/mobs" },
+              { label: mobName, to: `/mobs/${String(vnum)}` },
+              { label: "Responses" },
+            ]}
+          />
+          <h2 className="text-xl font-bold text-zinc-100">
+            Responses — {mobName}
+            <span className="ml-1 text-sm font-normal text-zinc-400">
+              (#{String(vnum)})
+            </span>
+          </h2>
+        </div>
         <div className="ml-auto flex items-center gap-3">
           {dirty ? (
-            <span className="text-xs text-amber-400">Unsaved changes</span>
+            <span className="flex items-center gap-1.5 text-sm font-medium text-amber-400">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+              Unsaved changes
+              <button
+                className="ml-1 text-xs text-zinc-400 underline hover:text-zinc-200"
+                onClick={() => {
+                  setDraft(null);
+                }}
+                type="button"
+              >
+                Discard
+              </button>
+            </span>
           ) : null}
           <button
-            className="rounded bg-zinc-600 px-4 py-2 text-sm text-zinc-100 transition-colors hover:bg-zinc-500 disabled:opacity-50"
+            className="bg-accent hover:bg-accent/80 focus-visible:ring-accent rounded px-4 py-2 text-sm text-white transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!dirty || saveMutation.isPending}
             onClick={() => {
               saveMutation.mutate();
@@ -155,19 +184,10 @@ function MobResponseEditorPage() {
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col">
-          <label
-            className="mb-1 text-xs text-zinc-400"
-            htmlFor="response-editor"
-          >
-            Response Script
-          </label>
-          <textarea
-            className="min-h-[400px] flex-1 resize-y rounded border border-zinc-700 bg-zinc-800 px-3 py-2 font-mono text-sm leading-relaxed text-zinc-100 outline-none focus:border-zinc-500"
-            id="response-editor"
-            onChange={(e) => {
-              setDraft(e.target.value);
-            }}
-            spellCheck={false}
+          <span className="mb-1 text-xs text-zinc-400">Response Script</span>
+          <CodeEditor
+            onChange={setDraft}
+            onSave={dirty && !saveMutation.isPending ? handleSave : undefined}
             value={currentText}
           />
         </div>
@@ -176,11 +196,47 @@ function MobResponseEditorPage() {
           <h3 className="mb-3 text-sm font-medium text-zinc-300">
             Syntax Reference
           </h3>
-          <pre className="text-xs leading-relaxed whitespace-pre-wrap text-zinc-400">
-            {SYNTAX_HELP}
-          </pre>
+          <div className="space-y-1">
+            {SYNTAX_SECTIONS.map((section) => (
+              <details
+                className="group"
+                key={section.title}
+              >
+                <summary className="cursor-pointer rounded px-2 py-1.5 text-xs font-medium text-zinc-400 hover:bg-zinc-700/30 hover:text-zinc-300">
+                  {section.title}
+                </summary>
+                <pre className="mt-1 px-2 pb-2 text-xs leading-relaxed whitespace-pre-wrap text-zinc-400">
+                  {section.content}
+                </pre>
+              </details>
+            ))}
+          </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        confirmLabel="Discard changes"
+        message="You have unsaved changes that will be lost."
+        onCancel={() => {
+          reset?.();
+        }}
+        onConfirm={() => {
+          proceed?.();
+        }}
+        open={status === "blocked"}
+        title="Unsaved Changes"
+        variant="danger"
+      />
     </div>
+  );
+}
+
+function MobResponseEditorPage() {
+  const { vnum: vnumParam } = Route.useParams();
+  return (
+    <MobResponseEditorInner
+      key={vnumParam}
+      vnumParam={vnumParam}
+    />
   );
 }

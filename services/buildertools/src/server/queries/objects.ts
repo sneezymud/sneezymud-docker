@@ -52,11 +52,15 @@ export async function listObjects(blocks: VnumBlock[]): Promise<ObjListItem[]> {
   const params = blocks.flatMap((b) => [b.start, b.end]);
 
   const [rows] = await immortalPool.execute<ObjRow[]>(
-    `SELECT vnum, name FROM obj WHERE ${conditions} ORDER BY vnum`,
+    `SELECT vnum, name, short_desc FROM obj WHERE ${conditions} ORDER BY vnum`,
     params,
   );
 
-  return rows.map((r) => ({ name: r.name, vnum: r.vnum }));
+  return rows.map((r) => ({
+    name: r.name,
+    short_desc: r.short_desc,
+    vnum: r.vnum,
+  }));
 }
 
 export async function getObject(vnum: number): Promise<null | Obj> {
@@ -70,15 +74,16 @@ export async function getObject(vnum: number): Promise<null | Obj> {
     return null;
   }
 
-  const [affects] = await immortalPool.execute<ObjAffectRow[]>(
-    "SELECT * FROM objaffect WHERE vnum = ?",
-    [vnum],
-  );
-
-  const [extras] = await immortalPool.execute<ObjExtraRow[]>(
-    "SELECT * FROM objextra WHERE vnum = ?",
-    [vnum],
-  );
+  const [[affects], [extras]] = await Promise.all([
+    immortalPool.execute<ObjAffectRow[]>(
+      "SELECT * FROM objaffect WHERE vnum = ?",
+      [vnum],
+    ),
+    immortalPool.execute<ObjExtraRow[]>(
+      "SELECT * FROM objextra WHERE vnum = ?",
+      [vnum],
+    ),
+  ]);
 
   return {
     action_desc: row.action_desc,

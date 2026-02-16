@@ -1,8 +1,30 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-// Root redirects to rooms — the _authenticated layout handles auth gating
+const VALID_SECTIONS = new Set(["/mobs", "/objects", "/rooms", "/zones"]);
+const STORAGE_KEY = "bt-last-section";
+
+export function saveLastSection(path: string): void {
+  const section = `/${path.split("/")[1] ?? ""}`;
+  if (VALID_SECTIONS.has(section)) {
+    try {
+      localStorage.setItem(STORAGE_KEY, section);
+    } catch {
+      // localStorage may be unavailable
+    }
+  }
+}
+
 export const Route = createFileRoute("/")({
   beforeLoad: () => {
-    throw redirect({ to: "/rooms" });
+    let target = "/rooms";
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved && VALID_SECTIONS.has(saved)) {
+        target = saved;
+      }
+    } catch {
+      // localStorage may be unavailable
+    }
+    throw redirect({ to: target });
   },
 });

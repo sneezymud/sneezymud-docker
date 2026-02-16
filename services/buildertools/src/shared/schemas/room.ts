@@ -1,8 +1,10 @@
 import { z } from "zod";
 
+import { vnumSchema } from "./common.ts";
+
 export const roomExitSchema = z.object({
   block: z.number().int(),
-  condition_flag: z.number().int(),
+  condition_flag: z.number().int().min(-2_147_483_648).max(2_147_483_647),
   description: z.string(),
   destination: z.number().int(),
   direction: z.number().int().gte(0).lte(5),
@@ -10,7 +12,7 @@ export const roomExitSchema = z.object({
   lock_difficulty: z.number().int(),
   name: z.string(),
   type: z.number().int(),
-  vnum: z.number().int(),
+  vnum: vnumSchema,
   weight: z.number().int(),
 });
 
@@ -24,13 +26,13 @@ export const roomSchema = z.object({
   name: z.string(),
   river_dir: z.number().int(),
   river_speed: z.number().int(),
-  room_flag: z.number().int(),
+  room_flag: z.number().int().min(-2_147_483_648).max(2_147_483_647),
   sector: z.number().int(),
   spec: z.number().int(),
   telelook: z.number().int(),
   teletarg: z.number().int(),
   teletime: z.number().int(),
-  vnum: z.number().int(),
+  vnum: vnumSchema,
   x: z.number().int(),
   y: z.number().int(),
   z: z.number().int(),
@@ -41,7 +43,7 @@ export type Room = z.infer<typeof roomSchema>;
 
 export const roomListItemSchema = z.object({
   name: z.string(),
-  vnum: z.number().int(),
+  vnum: vnumSchema,
 });
 
 export type RoomListItem = z.infer<typeof roomListItemSchema>;
@@ -53,7 +55,7 @@ export const roomUpdateSchema = roomSchema.omit({ vnum: true });
 export type RoomUpdate = z.infer<typeof roomUpdateSchema>;
 
 export const roomCreateSchema = z.object({
-  vnum: z.number().int(),
+  vnum: vnumSchema,
 });
 
 export type RoomCreate = z.infer<typeof roomCreateSchema>;

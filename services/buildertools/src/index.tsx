@@ -1,4 +1,8 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryCache,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
@@ -6,8 +10,35 @@ import { createRoot } from "react-dom/client";
 
 import "./index.css";
 import { routeTree } from "./routeTree.gen";
+import { ApiResponseError } from "./shared/api-client.ts";
+import { useAuthStore } from "./state/auth.ts";
 
-const queryClient = new QueryClient();
+function handleAuthError(error: Error): void {
+  if (error instanceof ApiResponseError && error.status === 401) {
+    useAuthStore.getState().clearUser();
+    void router.navigate({ to: "/login" });
+  }
+}
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    mutations: {
+      onError: handleAuthError,
+    },
+    queries: {
+      retry: (failureCount, error) => {
+        if (error instanceof ApiResponseError && error.status === 401) {
+          return false;
+        }
+        return failureCount < 2;
+      },
+      staleTime: 30_000,
+    },
+  },
+  queryCache: new QueryCache({
+    onError: handleAuthError,
+  }),
+});
 
 const router = createRouter({
   context: { queryClient },

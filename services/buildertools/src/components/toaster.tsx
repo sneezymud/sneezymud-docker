@@ -3,13 +3,14 @@ import { Toaster as SonnerToaster } from "sonner";
 export function Toaster() {
   return (
     <SonnerToaster
+      duration={5000}
       position="bottom-right"
       theme="dark"
       toastOptions={{
         style: {
-          background: "#18181b",
-          border: "1px solid #3f3f46",
-          color: "#e4e4e7",
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          color: "var(--color-foreground)",
         },
       }}
     />

@@ -29,7 +29,16 @@ mobRoutes.post("/", async (c) => {
   const parsed = mobCreateSchema.safeParse(body);
 
   if (!parsed.success) {
-    return c.json({ error: "Invalid request" }, 400);
+    return c.json(
+      {
+        error: "Validation failed",
+        issues: parsed.error.issues.map((i) => ({
+          message: i.message,
+          path: i.path.map(String),
+        })),
+      },
+      400,
+    );
   }
 
   if (!isVnumInBlocks(parsed.data.vnum, user.blocks)) {
@@ -77,7 +86,16 @@ mobRoutes.put("/:vnum", async (c) => {
   const parsed = mobSchema.safeParse(body);
 
   if (!parsed.success) {
-    return c.json({ error: "Invalid mob data" }, 400);
+    return c.json(
+      {
+        error: "Validation failed",
+        issues: parsed.error.issues.map((i) => ({
+          message: i.message,
+          path: i.path.map(String),
+        })),
+      },
+      400,
+    );
   }
 
   await updateMob(vnum, parsed.data, user.playerName);

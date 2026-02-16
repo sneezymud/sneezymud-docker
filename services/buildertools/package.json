@@ -1,7 +1,9 @@
 {
   "dependencies": {
+    "@lezer/highlight": "^1.2.3",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-router": "^1.159.5",
+    "codemirror": "^6.0.2",
     "hono": "^4.7.0",
     "immer": "^11.1.4",
     "mysql2": "^3.12.0",

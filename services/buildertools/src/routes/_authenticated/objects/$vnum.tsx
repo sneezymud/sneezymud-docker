@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import {
+  createFileRoute,
+  useBlocker,
+  useNavigate,
+} from "@tanstack/react-router";
+import { useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -8,97 +12,158 @@ import type { FieldGroupDef } from "@/components/entity-form.tsx";
 import type { ColumnDef } from "@/components/sub-table.tsx";
 import type { Obj, ObjAffect, ObjExtra } from "@/shared/schemas/obj.ts";
 
+import { Breadcrumbs } from "@/components/breadcrumbs.tsx";
+import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
 import { EntityForm } from "@/components/entity-form.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { EntityFormSkeleton } from "@/components/skeleton.tsx";
 import { SubTable } from "@/components/sub-table.tsx";
+import { useConcurrentEditWarning } from "@/hooks/use-concurrent-edit-warning.ts";
 import { useKeyboardSave } from "@/hooks/use-keyboard-save.ts";
+import { useSyncDirty } from "@/hooks/use-sync-dirty.ts";
 import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
 import {
   EXTRA_FLAGS,
   ITEM_TYPES,
   MATERIAL_TYPES,
+  OBJ_SPEC_PROCS,
   WEAR_FLAGS,
 } from "@/shared/enums/index.ts";
+import { getObjValueLabels } from "@/shared/enums/obj-value-labels.ts";
 import { objSchema } from "@/shared/schemas/obj.ts";
+import { toastError } from "@/shared/toast.ts";
 
 export const Route = createFileRoute("/_authenticated/objects/$vnum")({
   component: ObjectEditorPage,
 });
 
-const objFieldGroups: FieldGroupDef[] = [
-  {
-    fields: [
-      { key: "name", label: "Keywords", type: "text" },
-      { key: "short_desc", label: "Short Description", type: "text" },
-      { key: "long_desc", label: "Long Description", type: "text" },
-      { key: "action_desc", label: "Action Description", type: "text" },
-    ],
-    title: "Identity",
-  },
-  {
-    fields: [
-      {
-        enumEntries: ITEM_TYPES,
-        key: "type",
-        label: "Item Type",
-        type: "enum",
-      },
-      {
-        bitfieldEntries: EXTRA_FLAGS,
-        key: "action_flag",
-        label: "Extra Flags",
-        type: "bitfield",
-      },
-      {
-        bitfieldEntries: WEAR_FLAGS,
-        key: "wear_flag",
-        label: "Wear Flags",
-        type: "bitfield",
-      },
-    ],
-    title: "Classification",
-  },
-  {
-    fields: [
-      {
-        help: "Meaning depends on item type",
-        key: "val0",
-        label: "Value 0",
-        type: "number",
-      },
-      { key: "val1", label: "Value 1", type: "number" },
-      { key: "val2", label: "Value 2", type: "number" },
-      { key: "val3", label: "Value 3", type: "number" },
-    ],
-    title: "Type-Specific Values",
-  },
-  {
-    fields: [
-      { key: "weight", label: "Weight", type: "number" },
-      { key: "volume", label: "Volume", type: "number" },
-      { key: "price", label: "Price", type: "number" },
-      {
-        enumEntries: MATERIAL_TYPES,
-        key: "material",
-        label: "Material",
-        type: "enum",
-      },
-    ],
-    title: "Physical",
-  },
-  {
-    fields: [
-      { key: "max_struct", label: "Max Structure", type: "number" },
-      { key: "cur_struct", label: "Current Structure", type: "number" },
-      { key: "decay", label: "Decay Time", type: "number" },
-      { key: "max_exist", label: "Max Exist", type: "number" },
-      { key: "can_be_seen", label: "Can Be Seen", type: "number" },
-      { key: "spec_proc", label: "Special Proc", type: "number" },
-    ],
-    title: "Limits & Behavior",
-  },
-];
+function getObjFieldGroups(itemType: number): FieldGroupDef[] {
+  const valLabels = getObjValueLabels(itemType);
+  return [
+    {
+      fields: [
+        { key: "name", label: "Keywords", required: true, type: "text" },
+        {
+          key: "short_desc",
+          label: "Short Description",
+          required: true,
+          type: "text",
+        },
+        { key: "long_desc", label: "Long Description", type: "text" },
+        { key: "action_desc", label: "Action Description", type: "text" },
+      ],
+      title: "Identity",
+    },
+    {
+      fields: [
+        {
+          enumEntries: ITEM_TYPES,
+          key: "type",
+          label: "Item Type",
+          type: "enum",
+        },
+        {
+          bitfieldEntries: EXTRA_FLAGS,
+          key: "action_flag",
+          label: "Extra Flags",
+          type: "bitfield",
+        },
+        {
+          bitfieldEntries: WEAR_FLAGS,
+          key: "wear_flag",
+          label: "Wear Flags",
+          type: "bitfield",
+        },
+      ],
+      title: "Classification",
+    },
+    {
+      fields: [
+        {
+          help: valLabels[0].help,
+          key: "val0",
+          label: valLabels[0].label,
+          type: "number",
+        },
+        {
+          help: valLabels[1].help,
+          key: "val1",
+          label: valLabels[1].label,
+          type: "number",
+        },
+        {
+          help: valLabels[2].help,
+          key: "val2",
+          label: valLabels[2].label,
+          type: "number",
+        },
+        {
+          help: valLabels[3].help,
+          key: "val3",
+          label: valLabels[3].label,
+          type: "number",
+        },
+      ],
+      title: "Type-Specific Values",
+    },
+    {
+      fields: [
+        { key: "weight", label: "Weight", type: "number" },
+        { key: "volume", label: "Volume", type: "number" },
+        { key: "price", label: "Price", type: "number" },
+        {
+          enumEntries: MATERIAL_TYPES,
+          key: "material",
+          label: "Material",
+          type: "enum",
+        },
+      ],
+      title: "Physical",
+    },
+    {
+      fields: [
+        {
+          help: "Maximum structural points",
+          key: "max_struct",
+          label: "Max Structure",
+          type: "number",
+        },
+        {
+          help: "Current structural points",
+          key: "cur_struct",
+          label: "Current Structure",
+          type: "number",
+        },
+        {
+          help: "Ticks until item decays (0 = never)",
+          key: "decay",
+          label: "Decay Time",
+          type: "number",
+        },
+        {
+          help: "Max instances in the world (0 = unlimited)",
+          key: "max_exist",
+          label: "Max Exist",
+          type: "number",
+        },
+        {
+          help: "Minimum perception to notice this item",
+          key: "can_be_seen",
+          label: "Can Be Seen",
+          type: "number",
+        },
+        {
+          enumEntries: OBJ_SPEC_PROCS,
+          help: "Special procedure ID (0 = none)",
+          key: "spec_proc",
+          label: "Special Proc",
+          type: "enum",
+        },
+      ],
+      title: "Limits & Behavior",
+    },
+  ];
+}
 
 const affectColumns: Array<ColumnDef<ObjAffect>> = [
   { key: "type", label: "Apply Type", type: "number", width: "120px" },
@@ -123,8 +188,7 @@ function objToFormValues(
   return { ...fields, ...editFields };
 }
 
-function ObjectEditorPage() {
-  const { vnum: vnumParam } = Route.useParams();
+function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
   const vnum = Number(vnumParam);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -144,24 +208,19 @@ function ObjectEditorPage() {
   const [extraEdits, setExtraEdits] = useState<null | ObjExtra[]>(null);
 
   const dirty = edits !== null || affectEdits !== null || extraEdits !== null;
+  useSyncDirty(dirty);
+  useConcurrentEditWarning(obj, dirty);
 
-  useEffect(() => {
-    if (!dirty) {
-      return;
-    }
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => {
-      window.removeEventListener("beforeunload", handler);
-    };
-  }, [dirty]);
+  const { proceed, reset, status } = useBlocker({
+    enableBeforeUnload: true,
+    shouldBlockFn: () => dirty,
+    withResolver: true,
+  });
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!obj) {
-        return;
+        return null;
       }
       const body: Obj = {
         ...obj,
@@ -169,23 +228,28 @@ function ObjectEditorPage() {
         affects: affectEdits ?? obj.affects,
         extras: extraEdits ?? obj.extras,
       };
-      await apiFetch(`/api/objects/${String(vnum)}`, objSchema, {
+      return apiFetch(`/api/objects/${String(vnum)}`, objSchema, {
         body: JSON.stringify(body),
         method: "PUT",
       });
     },
     onError: (err) => {
-      toast.error(
+      toastError(
         err instanceof ApiResponseError ? err.message : "Failed to save",
       );
     },
-    onSuccess: async () => {
+    onSuccess: async (saved) => {
+      toast.success("Saved");
+      if (saved) {
+        queryClient.setQueryData(["object", vnum], saved);
+      }
       setEdits(null);
       setAffectEdits(null);
       setExtraEdits(null);
-      toast.success("Saved");
-      await queryClient.invalidateQueries({ queryKey: ["object", vnum] });
-      await queryClient.invalidateQueries({ queryKey: ["objects"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["object", vnum] }),
+        queryClient.invalidateQueries({ queryKey: ["objects"] }),
+      ]);
     },
   });
 
@@ -198,13 +262,13 @@ function ObjectEditorPage() {
       );
     },
     onError: (err) => {
-      toast.error(
+      toastError(
         err instanceof ApiResponseError ? err.message : "Failed to delete",
       );
     },
     onSuccess: async () => {
       toast.success("Deleted");
-      await queryClient.invalidateQueries({ queryKey: ["objects"] });
+      void queryClient.invalidateQueries({ queryKey: ["objects"] });
       await navigate({ to: "/objects" });
     },
   });
@@ -213,7 +277,7 @@ function ObjectEditorPage() {
     saveMutation.mutate();
   };
 
-  useKeyboardSave(handleSave, dirty);
+  useKeyboardSave(handleSave, dirty && !saveMutation.isPending);
 
   if (isLoading || isError || !obj) {
     return (
@@ -237,30 +301,38 @@ function ObjectEditorPage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center gap-3">
-        <button
-          className="text-sm text-zinc-400 hover:text-zinc-200"
-          onClick={() => {
-            void navigate({ to: "/objects" });
-          }}
-          type="button"
-        >
-          &larr; Objects
-        </button>
-        <h2 className="text-lg font-semibold text-zinc-100">
+      <div className="mb-4 space-y-1">
+        <Breadcrumbs
+          items={[
+            { label: "Objects", to: "/objects" },
+            {
+              label: `Object ${String(vnum)}: ${obj.short_desc || "(unnamed)"}`,
+            },
+          ]}
+        />
+        <h2 className="text-xl font-bold text-zinc-100">
           Object {vnum}: {obj.short_desc || "(unnamed)"}
         </h2>
       </div>
 
       <EntityForm
         deleteMessage={`Are you sure you want to delete object ${String(vnum)}? This also removes all affects and extra descriptions.`}
+        deletePending={deleteMutation.isPending}
         dirty={dirty}
-        groups={objFieldGroups}
+        groups={getObjFieldGroups(
+          typeof currentValues["type"] === "number" ? currentValues["type"] : 0,
+        )}
         onChange={handleFieldChange}
         onDelete={() => {
           deleteMutation.mutate();
         }}
+        onReset={() => {
+          setEdits(null);
+          setAffectEdits(null);
+          setExtraEdits(null);
+        }}
         onSave={handleSave}
+        originalValues={objToFormValues(obj, null)}
         saving={saveMutation.isPending}
         values={currentValues}
       >
@@ -270,6 +342,7 @@ function ObjectEditorPage() {
           label="Applies"
           onChange={setAffectEdits}
           rows={affectEdits ?? obj.affects}
+          singularLabel="apply"
         />
         <SubTable
           columns={extraColumns}
@@ -277,8 +350,33 @@ function ObjectEditorPage() {
           label="Extra Descriptions"
           onChange={setExtraEdits}
           rows={extraEdits ?? obj.extras}
+          singularLabel="extra description"
         />
       </EntityForm>
+
+      <ConfirmDialog
+        confirmLabel="Discard changes"
+        message="You have unsaved changes that will be lost."
+        onCancel={() => {
+          reset?.();
+        }}
+        onConfirm={() => {
+          proceed?.();
+        }}
+        open={status === "blocked"}
+        title="Unsaved Changes"
+        variant="danger"
+      />
     </div>
+  );
+}
+
+function ObjectEditorPage() {
+  const { vnum: vnumParam } = Route.useParams();
+  return (
+    <ObjectEditorInner
+      key={vnumParam}
+      vnumParam={vnumParam}
+    />
   );
 }

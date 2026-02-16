@@ -1,6 +1,10 @@
 import type { QueryClient } from "@tanstack/react-query";
 
-import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
+import {
+  createRootRouteWithContext,
+  Link,
+  Outlet,
+} from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import { Toaster } from "@/components/toaster.tsx";
@@ -12,7 +16,7 @@ export const Route = createRootRouteWithContext<{
   errorComponent: ({ error }) => (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-zinc-950 text-zinc-400">
       <p className="text-lg text-red-400">Something went wrong</p>
-      <pre className="max-w-lg overflow-auto rounded border border-zinc-800 bg-zinc-900 p-4 text-xs text-zinc-500">
+      <pre className="max-w-lg overflow-auto rounded border border-zinc-800 bg-zinc-900 p-4 text-xs text-zinc-400">
         {error instanceof Error ? error.message : "Unknown error"}
       </pre>
       <button
@@ -29,12 +33,12 @@ export const Route = createRootRouteWithContext<{
   notFoundComponent: () => (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-zinc-950 text-zinc-400">
       <p>404 Not Found</p>
-      <a
-        className="text-sm text-zinc-500 hover:text-zinc-300"
-        href="/"
+      <Link
+        className="text-sm text-zinc-400 hover:text-zinc-200"
+        to="/"
       >
         &larr; Back to Builder Tools
-      </a>
+      </Link>
     </div>
   ),
 });

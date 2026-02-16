@@ -1,6 +1,11 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import {
+  ERROR_BOX_CLASS,
+  INPUT_CLASS,
+  LABEL_CLASS,
+} from "@/components/styles.ts";
 import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
 import { sessionUserSchema } from "@/shared/schemas/auth.ts";
 import { useAuthStore } from "@/state/auth.ts";
@@ -12,6 +17,11 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const setUser = useAuthStore((s) => s.setUser);
   const navigate = useNavigate();
+  const usernameRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    usernameRef.current?.focus();
+  }, []);
 
   const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -43,26 +53,21 @@ export function LoginForm() {
       className="w-full max-w-sm space-y-4"
       onSubmit={handleSubmit}
     >
-      {error ? (
-        <div className="rounded border border-red-800/50 bg-red-900/20 px-4 py-3 text-sm text-red-400">
-          {error}
-        </div>
-      ) : null}
-
       <div>
         <label
-          className="mb-1 block text-sm text-zinc-400"
+          className={LABEL_CLASS}
           htmlFor="username"
         >
           Username
         </label>
         <input
           autoComplete="username"
-          className="w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+          className={INPUT_CLASS}
           id="username"
           onChange={(e) => {
             setUsername(e.target.value);
           }}
+          ref={usernameRef}
           required
           type="text"
           value={username}
@@ -71,14 +76,14 @@ export function LoginForm() {
 
       <div>
         <label
-          className="mb-1 block text-sm text-zinc-400"
+          className={LABEL_CLASS}
           htmlFor="password"
         >
           Password
         </label>
         <input
           autoComplete="current-password"
-          className="w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+          className={INPUT_CLASS}
           id="password"
           onChange={(e) => {
             setPassword(e.target.value);
@@ -90,7 +95,7 @@ export function LoginForm() {
       </div>
 
       <button
-        className="w-full rounded bg-zinc-700 px-4 py-2 text-sm text-zinc-100 transition-colors hover:bg-zinc-600 disabled:opacity-50"
+        className="focus-visible:ring-accent w-full rounded bg-zinc-700 px-4 py-2 text-sm text-zinc-100 transition-colors hover:bg-zinc-600 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 disabled:opacity-50"
         disabled={loading}
         type="submit"
       >
@@ -121,6 +126,19 @@ export function LoginForm() {
           "Log in"
         )}
       </button>
+
+      {error ? (
+        <div
+          aria-live="assertive"
+          className={ERROR_BOX_CLASS}
+        >
+          {error}
+        </div>
+      ) : null}
+
+      <p className="text-center text-xs text-zinc-400">
+        Need an account? Contact a MUD admin.
+      </p>
     </form>
   );
 }

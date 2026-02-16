@@ -15,19 +15,25 @@ authRoutes.post("/login", async (c) => {
     return c.json({ error: "Invalid request" }, 400);
   }
 
-  const user = await authenticateBuilder(
+  const result = await authenticateBuilder(
     parsed.data.username,
     parsed.data.password,
   );
-  if (!user) {
+
+  if (result.kind === "not_found" || result.kind === "wrong_password") {
+    return c.json({ error: "Invalid username or password" }, 401);
+  }
+  if (result.kind === "no_blocks") {
     return c.json(
-      { error: "Invalid credentials or no assigned vnum blocks" },
-      401,
+      {
+        error: `No vnum blocks assigned to ${result.playerName} \u2014 contact an admin`,
+      },
+      403,
     );
   }
 
-  createSession(c, user);
-  return c.json(user);
+  createSession(c, result.user);
+  return c.json(result.user);
 });
 
 authRoutes.post("/logout", (c) => {

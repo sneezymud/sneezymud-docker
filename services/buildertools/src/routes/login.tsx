@@ -21,7 +21,7 @@ function LoginPage() {
           <h1 className="text-xl font-semibold text-zinc-100">
             SneezyMUD Builder Tools
           </h1>
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-zinc-400">
             Log in with your game account
           </p>
         </div>

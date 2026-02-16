@@ -29,7 +29,16 @@ objectRoutes.post("/", async (c) => {
   const parsed = objCreateSchema.safeParse(body);
 
   if (!parsed.success) {
-    return c.json({ error: "Invalid request" }, 400);
+    return c.json(
+      {
+        error: "Validation failed",
+        issues: parsed.error.issues.map((i) => ({
+          message: i.message,
+          path: i.path.map(String),
+        })),
+      },
+      400,
+    );
   }
 
   if (!isVnumInBlocks(parsed.data.vnum, user.blocks)) {
@@ -77,7 +86,16 @@ objectRoutes.put("/:vnum", async (c) => {
   const parsed = objSchema.safeParse(body);
 
   if (!parsed.success) {
-    return c.json({ error: "Invalid object data" }, 400);
+    return c.json(
+      {
+        error: "Validation failed",
+        issues: parsed.error.issues.map((i) => ({
+          message: i.message,
+          path: i.path.map(String),
+        })),
+      },
+      400,
+    );
   }
 
   await updateObject(vnum, parsed.data, user.playerName);

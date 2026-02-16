@@ -3,13 +3,81 @@
 @theme {
   --color-background: oklch(0.145 0.005 285);
   --color-foreground: oklch(0.87 0.006 286);
-  --color-muted: oklch(0.55 0.01 286);
   --color-border: oklch(0.35 0.01 286);
   --color-surface: oklch(0.2 0.005 285);
-  --color-accent: oklch(0.6 0.08 250);
+  --color-accent: oklch(0.55 0.08 250);
+}
+
+html {
+  color-scheme: dark;
 }
 
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);
+}
+
+/* Ensure interactive elements transition opacity and transforms alongside color changes */
+button,
+a {
+  transition-property:
+    color, background-color, border-color, opacity, transform;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+
+/* Collapse animation helper */
+.collapse-grid {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 200ms ease;
+}
+
+.collapse-grid[data-collapsed="true"] {
+  grid-template-rows: 0fr;
+}
+
+.collapse-grid > * {
+  overflow: hidden;
+}
+
+/* Dialog open/close animation */
+dialog {
+  opacity: 0;
+  transform: scale(0.95);
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease,
+    overlay 150ms ease allow-discrete,
+    display 150ms ease allow-discrete;
+}
+
+dialog[open] {
+  opacity: 1;
+  transform: scale(1);
+}
+
+@starting-style {
+  dialog[open] {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+dialog::backdrop {
+  background: rgb(0 0 0 / 0);
+  transition:
+    background 150ms ease,
+    overlay 150ms ease allow-discrete,
+    display 150ms ease allow-discrete;
+}
+
+dialog[open]::backdrop {
+  background: rgb(0 0 0 / 0.5);
+}
+
+@starting-style {
+  dialog[open]::backdrop {
+    background: rgb(0 0 0 / 0);
+  }
 }

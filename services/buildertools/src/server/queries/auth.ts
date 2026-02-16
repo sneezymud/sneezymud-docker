@@ -5,6 +5,12 @@ import type { SessionUser, VnumBlock } from "@/shared/schemas/auth.ts";
 import { verifyPassword } from "../auth/crypt.ts";
 import { sneezyPool } from "../db.ts";
 
+export type AuthResult =
+  | { kind: "no_blocks"; playerName: string }
+  | { kind: "not_found" }
+  | { kind: "success"; user: SessionUser }
+  | { kind: "wrong_password" };
+
 interface AuthRow extends RowDataPacket {
   blockaend: number;
   blockastart: number;
@@ -18,13 +24,12 @@ interface AuthRow extends RowDataPacket {
  * Authenticate a builder account and return session data.
  *
  * Joins account → player → wizdata to get credentials and vnum assignments
- * in a single query. Returns null if credentials are invalid or the account
- * has no assigned vnum blocks.
+ * in a single query. Returns a discriminated result indicating the outcome.
  */
 export async function authenticateBuilder(
   username: string,
   password: string,
-): Promise<null | SessionUser> {
+): Promise<AuthResult> {
   const [rows] = await sneezyPool.execute<AuthRow[]>(
     `SELECT p.name AS player_name, a.passwd,
             w.blockastart, w.blockaend, w.blockbstart, w.blockbend
@@ -37,11 +42,11 @@ export async function authenticateBuilder(
 
   const row = rows[0];
   if (!row) {
-    return null;
+    return { kind: "not_found" };
   }
 
   if (!verifyPassword(password, username, row.passwd)) {
-    return null;
+    return { kind: "wrong_password" };
   }
 
   const blocks: VnumBlock[] = [];
@@ -53,12 +58,15 @@ export async function authenticateBuilder(
   }
 
   if (blocks.length === 0) {
-    return null;
+    return { kind: "no_blocks", playerName: row.player_name };
   }
 
   return {
-    blocks,
-    playerName: row.player_name,
-    username,
+    kind: "success",
+    user: {
+      blocks,
+      playerName: row.player_name,
+      username,
+    },
   };
 }

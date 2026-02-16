@@ -31,5 +31,13 @@ export const EXTRA_FLAGS: BitfieldEntry[] = [
   { bit: 28, label: "Attached" },
   { bit: 29, label: "Burning" },
   { bit: 30, label: "Charred" },
-  { bit: 31, label: "Nolocate" },
+  // Bit 31 (ITEM_NOLOCATE) exists in C++ as unsigned int, but obj.action_flag
+  // is a signed INT column. The C++ server round-trips it via signed/unsigned
+  // reinterpretation (-2147483648), but JS computes 2^31 = 2147483648 which
+  // overflows the signed column max of 2147483647, corrupting the bitfield.
+  {
+    bit: 31,
+    disabledReason: "Overflows signed INT column (use in-game commands)",
+    label: "Nolocate",
+  },
 ];

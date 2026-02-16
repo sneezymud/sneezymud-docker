@@ -1,83 +1,156 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import {
+  createFileRoute,
+  useBlocker,
+  useNavigate,
+} from "@tanstack/react-router";
+import { useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import type { FieldGroupDef } from "@/components/entity-form.tsx";
+import type { FieldDef, FieldGroupDef } from "@/components/entity-form.tsx";
+import type { EnumEntry } from "@/shared/enums/types.ts";
 import type { Room, RoomExit } from "@/shared/schemas/room.ts";
 
+import { Breadcrumbs } from "@/components/breadcrumbs.tsx";
+import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
 import { EntityForm } from "@/components/entity-form.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { RoomExits } from "@/components/room-exits.tsx";
 import { EntityFormSkeleton } from "@/components/skeleton.tsx";
+import { useConcurrentEditWarning } from "@/hooks/use-concurrent-edit-warning.ts";
 import { useKeyboardSave } from "@/hooks/use-keyboard-save.ts";
+import { useSyncDirty } from "@/hooks/use-sync-dirty.ts";
 import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
-import { ROOM_FLAGS, SECTOR_TYPES } from "@/shared/enums/index.ts";
+import {
+  ROOM_FLAGS,
+  ROOM_SPEC_PROCS,
+  SECTOR_TYPES,
+} from "@/shared/enums/index.ts";
 import { roomSchema } from "@/shared/schemas/room.ts";
+import { zoneListSchema } from "@/shared/schemas/zone.ts";
+import { toastError } from "@/shared/toast.ts";
 
 export const Route = createFileRoute("/_authenticated/rooms/$vnum")({
   component: RoomEditorPage,
 });
 
-const roomFieldGroups: FieldGroupDef[] = [
-  {
-    fields: [
-      { key: "name", label: "Name", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
-    ],
-    title: "Identity",
-  },
-  {
-    fields: [
-      {
-        help: "Area this room belongs to",
-        key: "zone",
-        label: "Zone",
-        type: "number",
-      },
-      {
-        bitfieldEntries: ROOM_FLAGS,
-        key: "room_flag",
-        label: "Room Flags",
-        type: "bitfield",
-      },
-      {
-        enumEntries: SECTOR_TYPES,
-        key: "sector",
-        label: "Sector Type",
-        type: "enum",
-      },
-      { key: "capacity", label: "Capacity", type: "number" },
-      { key: "height", label: "Height", type: "number" },
-      { key: "spec", label: "Special Proc", type: "number" },
-    ],
-    title: "Properties",
-  },
-  {
-    fields: [
-      { key: "teletime", label: "Teleport Time", type: "number" },
-      { key: "teletarg", label: "Teleport Target", type: "number" },
-      { key: "telelook", label: "Teleport Look", type: "number" },
-    ],
-    title: "Teleport",
-  },
-  {
-    fields: [
-      { key: "river_speed", label: "River Speed", type: "number" },
-      { key: "river_dir", label: "River Direction", type: "number" },
-    ],
-    title: "River",
-  },
-  {
-    fields: [
-      { key: "x", label: "X", type: "number" },
-      { key: "y", label: "Y", type: "number" },
-      { key: "z", label: "Z", type: "number" },
-    ],
-    title: "Coordinates",
-  },
-];
+function buildZoneField(zoneEntries: EnumEntry[] | undefined): FieldDef {
+  if (zoneEntries && zoneEntries.length > 0) {
+    return {
+      enumEntries: zoneEntries,
+      key: "zone",
+      label: "Zone",
+      type: "enum",
+    };
+  }
+  return {
+    help: "Area this room belongs to",
+    key: "zone",
+    label: "Zone",
+    type: "number",
+  };
+}
+
+function getRoomFieldGroups(
+  zoneEntries: EnumEntry[] | undefined,
+): FieldGroupDef[] {
+  return [
+    {
+      fields: [
+        { key: "name", label: "Name", required: true, type: "text" },
+        {
+          key: "description",
+          label: "Description",
+          required: true,
+          type: "textarea",
+        },
+      ],
+      title: "Identity",
+    },
+    {
+      fields: [
+        buildZoneField(zoneEntries),
+        {
+          bitfieldEntries: ROOM_FLAGS,
+          key: "room_flag",
+          label: "Room Flags",
+          type: "bitfield",
+        },
+        {
+          enumEntries: SECTOR_TYPES,
+          key: "sector",
+          label: "Sector Type",
+          type: "enum",
+        },
+        {
+          help: "Max people allowed in room (0 = unlimited)",
+          key: "capacity",
+          label: "Capacity",
+          type: "number",
+        },
+        {
+          help: "Room height in feet (affects flying, etc.)",
+          key: "height",
+          label: "Height",
+          type: "number",
+        },
+        {
+          enumEntries: ROOM_SPEC_PROCS,
+          help: "Special procedure ID (0 = none)",
+          key: "spec",
+          label: "Special Proc",
+          type: "enum",
+        },
+      ],
+      title: "Properties",
+    },
+    {
+      collapsible: true,
+      defaultCollapsed: true,
+      fields: [
+        { key: "teletime", label: "Teleport Time", type: "number" },
+        { key: "teletarg", label: "Teleport Target", type: "number" },
+        {
+          help: "0 = show new room desc, 1 = silent",
+          key: "telelook",
+          label: "Teleport Look",
+          type: "number",
+        },
+      ],
+      title: "Teleport",
+    },
+    {
+      collapsible: true,
+      defaultCollapsed: true,
+      fields: [
+        {
+          help: "Ticks between river pulses (0 = disabled)",
+          key: "river_speed",
+          label: "River Speed",
+          type: "number",
+        },
+        {
+          help: "Exit direction for river flow (0-5)",
+          key: "river_dir",
+          label: "River Direction",
+          type: "number",
+        },
+      ],
+      title: "River",
+    },
+    {
+      collapsible: true,
+      defaultCollapsed: true,
+      fields: [
+        { key: "x", label: "X", type: "number" },
+        { key: "y", label: "Y", type: "number" },
+        { key: "z", label: "Z", type: "number" },
+      ],
+      title: "Coordinates",
+    },
+  ];
+}
 
 function roomToFormValues(
   room: Room,
@@ -91,8 +164,7 @@ function roomToFormValues(
   return { ...roomFields, ...editFields };
 }
 
-function RoomEditorPage() {
-  const { vnum: vnumParam } = Route.useParams();
+function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
   const vnum = Number(vnumParam);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -107,50 +179,60 @@ function RoomEditorPage() {
     queryKey: ["room", vnum],
   });
 
+  const { data: zones } = useQuery({
+    queryFn: () => apiFetch("/api/zones", zoneListSchema),
+    queryKey: ["zones"],
+  });
+
+  const zoneEntries: EnumEntry[] | undefined = zones?.map((z) => ({
+    label: `${String(z.zone_nr)}: ${z.zone_name}`,
+    value: z.zone_nr,
+  }));
+
   const [edits, setEdits] = useState<null | Partial<Room>>(null);
   const [exitEdits, setExitEdits] = useState<null | RoomExit[]>(null);
 
   const dirty = edits !== null || exitEdits !== null;
+  useSyncDirty(dirty);
+  useConcurrentEditWarning(room, dirty);
 
-  useEffect(() => {
-    if (!dirty) {
-      return;
-    }
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => {
-      window.removeEventListener("beforeunload", handler);
-    };
-  }, [dirty]);
+  const { proceed, reset, status } = useBlocker({
+    enableBeforeUnload: true,
+    shouldBlockFn: () => dirty,
+    withResolver: true,
+  });
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!room) {
-        return;
+        return null;
       }
       const body: Room = {
         ...room,
         ...edits,
         exits: exitEdits ?? room.exits,
       };
-      await apiFetch(`/api/rooms/${String(vnum)}`, roomSchema, {
+      return apiFetch(`/api/rooms/${String(vnum)}`, roomSchema, {
         body: JSON.stringify(body),
         method: "PUT",
       });
     },
     onError: (err) => {
-      toast.error(
+      toastError(
         err instanceof ApiResponseError ? err.message : "Failed to save",
       );
     },
-    onSuccess: async () => {
+    onSuccess: async (saved) => {
+      toast.success("Saved");
+      if (saved) {
+        queryClient.setQueryData(["room", vnum], saved);
+      }
       setEdits(null);
       setExitEdits(null);
-      toast.success("Saved");
-      await queryClient.invalidateQueries({ queryKey: ["room", vnum] });
-      await queryClient.invalidateQueries({ queryKey: ["rooms"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["room", vnum] }),
+        queryClient.invalidateQueries({ queryKey: ["rooms"] }),
+      ]);
     },
   });
 
@@ -163,13 +245,13 @@ function RoomEditorPage() {
       );
     },
     onError: (err) => {
-      toast.error(
+      toastError(
         err instanceof ApiResponseError ? err.message : "Failed to delete",
       );
     },
     onSuccess: async () => {
       toast.success("Deleted");
-      await queryClient.invalidateQueries({ queryKey: ["rooms"] });
+      void queryClient.invalidateQueries({ queryKey: ["rooms"] });
       await navigate({ to: "/rooms" });
     },
   });
@@ -178,7 +260,7 @@ function RoomEditorPage() {
     saveMutation.mutate();
   };
 
-  useKeyboardSave(handleSave, dirty);
+  useKeyboardSave(handleSave, dirty && !saveMutation.isPending);
 
   if (isLoading || isError || !room) {
     return (
@@ -206,30 +288,33 @@ function RoomEditorPage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center gap-3">
-        <button
-          className="text-sm text-zinc-400 hover:text-zinc-200"
-          onClick={() => {
-            void navigate({ to: "/rooms" });
-          }}
-          type="button"
-        >
-          &larr; Rooms
-        </button>
-        <h2 className="text-lg font-semibold text-zinc-100">
+      <div className="mb-4 space-y-1">
+        <Breadcrumbs
+          items={[
+            { label: "Rooms", to: "/rooms" },
+            { label: `Room ${String(vnum)}: ${room.name || "(unnamed)"}` },
+          ]}
+        />
+        <h2 className="text-xl font-bold text-zinc-100">
           Room {vnum}: {room.name || "(unnamed)"}
         </h2>
       </div>
 
       <EntityForm
         deleteMessage={`Are you sure you want to delete room ${String(vnum)}? This also removes all exits.`}
+        deletePending={deleteMutation.isPending}
         dirty={dirty}
-        groups={roomFieldGroups}
+        groups={getRoomFieldGroups(zoneEntries)}
         onChange={handleFieldChange}
         onDelete={() => {
           deleteMutation.mutate();
         }}
+        onReset={() => {
+          setEdits(null);
+          setExitEdits(null);
+        }}
         onSave={handleSave}
+        originalValues={roomToFormValues(room, null)}
         saving={saveMutation.isPending}
         values={currentValues}
       >
@@ -239,6 +324,30 @@ function RoomEditorPage() {
           vnum={vnum}
         />
       </EntityForm>
+
+      <ConfirmDialog
+        confirmLabel="Discard changes"
+        message="You have unsaved changes that will be lost."
+        onCancel={() => {
+          reset?.();
+        }}
+        onConfirm={() => {
+          proceed?.();
+        }}
+        open={status === "blocked"}
+        title="Unsaved Changes"
+        variant="danger"
+      />
     </div>
+  );
+}
+
+function RoomEditorPage() {
+  const { vnum: vnumParam } = Route.useParams();
+  return (
+    <RoomEditorInner
+      key={vnumParam}
+      vnumParam={vnumParam}
+    />
   );
 }

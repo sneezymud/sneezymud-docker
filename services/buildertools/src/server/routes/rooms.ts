@@ -10,6 +10,7 @@ import {
   getRoomName,
   listRooms,
   roomExists,
+  searchRooms,
   updateRoom,
 } from "../queries/rooms.ts";
 import { isVnumInBlocks } from "../queries/vnum-access.ts";
@@ -30,7 +31,16 @@ roomRoutes.post("/", async (c) => {
   const parsed = roomCreateSchema.safeParse(body);
 
   if (!parsed.success) {
-    return c.json({ error: "Invalid request" }, 400);
+    return c.json(
+      {
+        error: "Validation failed",
+        issues: parsed.error.issues.map((i) => ({
+          message: i.message,
+          path: i.path.map(String),
+        })),
+      },
+      400,
+    );
   }
 
   if (!isVnumInBlocks(parsed.data.vnum, user.blocks)) {
@@ -44,6 +54,15 @@ roomRoutes.post("/", async (c) => {
   await createRoom(parsed.data.vnum, user.playerName);
   const room = await getRoom(parsed.data.vnum);
   return c.json(room, 201);
+});
+
+roomRoutes.get("/search", async (c) => {
+  const query = c.req.query("q") ?? "";
+  if (query.length < 2) {
+    return c.json([]);
+  }
+  const results = await searchRooms(query);
+  return c.json(results);
 });
 
 roomRoutes.get("/name/:vnum", async (c) => {
@@ -84,7 +103,16 @@ roomRoutes.put("/:vnum", async (c) => {
   const parsed = roomSchema.safeParse(body);
 
   if (!parsed.success) {
-    return c.json({ error: "Invalid room data" }, 400);
+    return c.json(
+      {
+        error: "Validation failed",
+        issues: parsed.error.issues.map((i) => ({
+          message: i.message,
+          path: i.path.map(String),
+        })),
+      },
+      400,
+    );
   }
 
   // Determine which block this vnum belongs to for the owner field

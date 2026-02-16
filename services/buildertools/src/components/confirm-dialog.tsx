@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 
 interface ConfirmDialogProps {
   confirmLabel?: string;
@@ -20,6 +20,9 @@ export function ConfirmDialog({
   variant = "default",
 }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const id = useId();
+  const titleId = `${id}-title`;
+  const descId = `${id}-desc`;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -37,32 +40,56 @@ export function ConfirmDialog({
 
   return (
     <dialog
-      className="rounded-lg border border-zinc-700 bg-zinc-900 p-0 text-zinc-100 shadow-xl backdrop:bg-black/50"
+      aria-describedby={descId}
+      aria-labelledby={title ? titleId : undefined}
+      className="bg-transparent p-0"
       onClose={onCancel}
       ref={dialogRef}
     >
-      <div className="w-80 p-5">
-        {title ? <h3 className="mb-2 text-sm font-semibold">{title}</h3> : null}
-        <p className="mb-4 text-sm text-zinc-400">{message}</p>
-        <div className="flex justify-end gap-2">
-          <button
-            className="rounded border border-zinc-600 px-3 py-1.5 text-sm text-zinc-300 transition-colors hover:bg-zinc-800"
-            onClick={onCancel}
-            type="button"
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- backdrop dismiss zone around the dialog content */}
+      <div
+        className="p-4"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            onCancel();
+          }
+        }}
+      >
+        <div className="w-80 max-w-[calc(100vw-2rem)] rounded border border-zinc-700 bg-zinc-900 p-5 text-zinc-100 shadow-xl">
+          {title ? (
+            <h3
+              className="mb-2 text-sm font-semibold"
+              id={titleId}
+            >
+              {title}
+            </h3>
+          ) : null}
+          <p
+            className="mb-4 text-sm text-zinc-400"
+            id={descId}
           >
-            Cancel
-          </button>
-          <button
-            className={`rounded px-3 py-1.5 text-sm transition-colors ${
-              isDanger
-                ? "bg-red-800 text-red-100 hover:bg-red-700"
-                : "bg-zinc-600 text-zinc-100 hover:bg-zinc-500"
-            }`}
-            onClick={onConfirm}
-            type="button"
-          >
-            {confirmLabel}
-          </button>
+            {message}
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              className="focus-visible:ring-accent rounded border border-zinc-600 px-3 py-1.5 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
+              onClick={onCancel}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button
+              className={`focus-visible:ring-accent rounded px-3 py-1.5 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 ${
+                isDanger
+                  ? "bg-red-700 text-red-100 hover:bg-red-600"
+                  : "bg-zinc-600 text-zinc-100 hover:bg-zinc-500"
+              }`}
+              onClick={onConfirm}
+              type="button"
+            >
+              {confirmLabel}
+            </button>
+          </div>
         </div>
       </div>
     </dialog>

@@ -223,6 +223,35 @@ export async function getRoomName(vnum: number): Promise<null | string> {
   return null;
 }
 
+export async function searchRooms(
+  query: string,
+): Promise<Array<{ name: string; vnum: number }>> {
+  // Search both immortal and sneezy since exits can point to any room
+  const likeParam = `%${query}%`;
+  const isNumeric = /^\d+$/.test(query);
+
+  const sql = isNumeric
+    ? `(SELECT vnum, name FROM immortal.room WHERE vnum = ? LIMIT 10)
+       UNION
+       (SELECT vnum, name FROM immortal.room WHERE name LIKE ? LIMIT 10)
+       UNION
+       (SELECT vnum, name FROM sneezy.room WHERE vnum = ? LIMIT 10)
+       UNION
+       (SELECT vnum, name FROM sneezy.room WHERE name LIKE ? LIMIT 10)
+       ORDER BY vnum LIMIT 20`
+    : `(SELECT vnum, name FROM immortal.room WHERE name LIKE ? LIMIT 10)
+       UNION
+       (SELECT vnum, name FROM sneezy.room WHERE name LIKE ? LIMIT 10)
+       ORDER BY vnum LIMIT 20`;
+
+  const params = isNumeric
+    ? [Number(query), likeParam, Number(query), likeParam]
+    : [likeParam, likeParam];
+
+  const [rows] = await immortalPool.execute<RoomRow[]>(sql, params);
+  return rows.map((r) => ({ name: r.name, vnum: r.vnum }));
+}
+
 export async function roomExists(vnum: number): Promise<boolean> {
   const [rows] = await immortalPool.execute<RowDataPacket[]>(
     "SELECT 1 FROM room WHERE vnum = ? LIMIT 1",

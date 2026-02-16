@@ -18,7 +18,11 @@ export function SkeletonBlock({ height = "80px" }: { height?: string }) {
 
 export function EntityFormSkeleton() {
   return (
-    <div className="space-y-6">
+    <div
+      aria-busy="true"
+      className="space-y-6"
+      role="status"
+    >
       <div className="flex items-center gap-3 py-3">
         <div className="h-9 w-20 animate-pulse rounded bg-zinc-800" />
         <div className="ml-auto h-9 w-20 animate-pulse rounded bg-zinc-800" />

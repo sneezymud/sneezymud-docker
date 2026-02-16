@@ -1,21 +1,69 @@
 import type { Context } from "hono";
 
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { z } from "zod";
 
 import type { SessionUser } from "@/shared/schemas/auth.ts";
 
+import { sessionUserSchema } from "@/shared/schemas/auth.ts";
+
 const SESSION_COOKIE = "bt_session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24; // 24 hours
+// Random secret per process — sessions don't survive restarts, which is fine
+// for a 24h TTL. Set BT_SESSION_SECRET for persistence across restarts.
+const SECRET =
+  process.env["BT_SESSION_SECRET"] ?? randomBytes(32).toString("hex");
 
-const sessions = new Map<string, { expiresAt: number; user: SessionUser }>();
+const tokenPayloadSchema = z.object({
+  expiresAt: z.number(),
+  user: sessionUserSchema,
+});
+
+type TokenPayload = z.infer<typeof tokenPayloadSchema>;
 
 export function createSession(c: Context, user: SessionUser): void {
-  const id = generateId();
-  sessions.set(id, {
+  const token = sign({
     expiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
     user,
   });
-  setCookie(c, SESSION_COOKIE, id, {
+  setSessionCookie(c, token);
+}
+
+export function destroySession(c: Context): void {
+  deleteCookie(c, SESSION_COOKIE, { path: "/" });
+}
+
+export function getSession(c: Context): null | SessionUser {
+  const token = getCookie(c, SESSION_COOKIE);
+  if (!token) {
+    return null;
+  }
+  const payload = verify(token);
+  if (!payload) {
+    return null;
+  }
+  return payload.user;
+}
+
+export function touchSession(c: Context): void {
+  const token = getCookie(c, SESSION_COOKIE);
+  if (!token) {
+    return;
+  }
+  const payload = verify(token);
+  if (!payload) {
+    return;
+  }
+  const refreshed = sign({
+    expiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
+    user: payload.user,
+  });
+  setSessionCookie(c, refreshed);
+}
+
+function setSessionCookie(c: Context, token: string): void {
+  setCookie(c, SESSION_COOKIE, token, {
     httpOnly: true,
     maxAge: SESSION_MAX_AGE_SECONDS,
     path: "/",
@@ -23,31 +71,39 @@ export function createSession(c: Context, user: SessionUser): void {
   });
 }
 
-export function getSession(c: Context): null | SessionUser {
-  const id = getCookie(c, SESSION_COOKIE);
-  if (!id) {
-    return null;
-  }
-  const session = sessions.get(id);
-  if (!session) {
-    return null;
-  }
-  if (Date.now() > session.expiresAt) {
-    sessions.delete(id);
-    return null;
-  }
-  return session.user;
+function sign(payload: TokenPayload): string {
+  const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const sig = createHmac("sha256", SECRET).update(data).digest("base64url");
+  return `${data}.${sig}`;
 }
 
-export function destroySession(c: Context): void {
-  const id = getCookie(c, SESSION_COOKIE);
-  if (id) {
-    sessions.delete(id);
+function verify(token: string): null | TokenPayload {
+  const dotIndex = token.indexOf(".");
+  if (dotIndex === -1) {
+    return null;
   }
-  deleteCookie(c, SESSION_COOKIE, { path: "/" });
-}
-
-function generateId(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  const data = token.slice(0, dotIndex);
+  const sig = token.slice(dotIndex + 1);
+  const expected = createHmac("sha256", SECRET)
+    .update(data)
+    .digest("base64url");
+  if (sig.length !== expected.length) {
+    return null;
+  }
+  if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+    return null;
+  }
+  try {
+    const raw: unknown = JSON.parse(Buffer.from(data, "base64url").toString());
+    const parsed = tokenPayloadSchema.safeParse(raw);
+    if (!parsed.success) {
+      return null;
+    }
+    if (Date.now() > parsed.data.expiresAt) {
+      return null;
+    }
+    return parsed.data;
+  } catch {
+    return null;
+  }
 }

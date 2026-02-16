@@ -73,11 +73,15 @@ export async function listMobs(blocks: VnumBlock[]): Promise<MobListItem[]> {
   const params = blocks.flatMap((b) => [b.start, b.end]);
 
   const [rows] = await immortalPool.execute<MobRow[]>(
-    `SELECT vnum, name FROM mob WHERE ${conditions} ORDER BY vnum`,
+    `SELECT vnum, name, short_desc FROM mob WHERE ${conditions} ORDER BY vnum`,
     params,
   );
 
-  return rows.map((r) => ({ name: r.name, vnum: r.vnum }));
+  return rows.map((r) => ({
+    name: r.name,
+    short_desc: r.short_desc,
+    vnum: r.vnum,
+  }));
 }
 
 export async function getMob(vnum: number): Promise<Mob | null> {
@@ -91,15 +95,15 @@ export async function getMob(vnum: number): Promise<Mob | null> {
     return null;
   }
 
-  const [extras] = await immortalPool.execute<MobExtraRow[]>(
-    "SELECT * FROM mob_extra WHERE vnum = ?",
-    [vnum],
-  );
-
-  const [immunities] = await immortalPool.execute<MobImmRow[]>(
-    "SELECT * FROM mob_imm WHERE vnum = ?",
-    [vnum],
-  );
+  const [[extras], [immunities]] = await Promise.all([
+    immortalPool.execute<MobExtraRow[]>(
+      "SELECT * FROM mob_extra WHERE vnum = ?",
+      [vnum],
+    ),
+    immortalPool.execute<MobImmRow[]>("SELECT * FROM mob_imm WHERE vnum = ?", [
+      vnum,
+    ]),
+  ]);
 
   return {
     ac: row.ac,
@@ -170,7 +174,7 @@ export async function createMob(vnum: number, owner: string): Promise<void> {
      VALUES (?, ?, '', '', '', '', 0, 0, 0, 0, '', 1.0, 0, 1, 0,
        0, 0, 0, 0, 0, 0, 0, 0,
        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-       0, 0, 0, 0, 0, 0, 0, 0,
+       8, 8, 0, 0, 0, 0, 0, 0,
        '', '')`,
     [vnum, owner],
   );

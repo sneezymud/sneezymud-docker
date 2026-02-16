@@ -33,7 +33,22 @@ export const MOB_AFFECTS: BitfieldEntry[] = [
   { bit: 29, label: "Engager" },
   { bit: 30, label: "Aggressor" },
   { bit: 31, label: "Clarity" },
-  { bit: 32, label: "Flightworthy" },
-  { bit: 33, label: "Focus Attack" },
-  { bit: 34, label: "Orient" },
+  // Bits 32-34 exist in the C++ server as uint64_t runtime flags, but the
+  // mob.affects DB column is unsigned INT (max 2^32-1). These flags are set by
+  // game commands (preen, focus_attack, orient) and never stored in the DB.
+  {
+    bit: 32,
+    disabledReason: "Runtime-only flag (overflows DB column)",
+    label: "Flightworthy",
+  },
+  {
+    bit: 33,
+    disabledReason: "Runtime-only flag (overflows DB column)",
+    label: "Focus Attack",
+  },
+  {
+    bit: 34,
+    disabledReason: "Runtime-only flag (overflows DB column)",
+    label: "Orient",
+  },
 ];

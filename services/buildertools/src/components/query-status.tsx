@@ -1,3 +1,6 @@
+import { Link } from "@tanstack/react-router";
+
+import { ERROR_BOX_CLASS } from "@/components/styles.ts";
 import { ApiResponseError } from "@/shared/api-client.ts";
 
 interface QueryStatusProps {
@@ -21,7 +24,7 @@ export function QueryStatus({
 }: QueryStatusProps) {
   if (isLoading) {
     return (
-      skeleton ?? <p className="text-sm text-zinc-500">Loading {label}...</p>
+      skeleton ?? <p className="text-sm text-zinc-400">Loading {label}...</p>
     );
   }
 
@@ -33,16 +36,16 @@ export function QueryStatus({
 
     return (
       <div className="space-y-3">
-        <div className="rounded border border-red-800/50 bg-red-900/10 p-4">
-          <p className="text-sm text-red-400">{message}</p>
+        <div className={ERROR_BOX_CLASS}>
+          <p>{message}</p>
         </div>
         {backTo ? (
-          <a
+          <Link
             className="inline-block text-sm text-zinc-400 hover:text-zinc-200"
-            href={backTo}
+            to={backTo}
           >
             &larr; {backLabel ?? "Go back"}
-          </a>
+          </Link>
         ) : null}
       </div>
     );

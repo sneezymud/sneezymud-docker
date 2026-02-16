@@ -1,9 +1,16 @@
+import { Link } from "@tanstack/react-router";
+import { useRef, useState } from "react";
+
 import type { RoomExit } from "@/shared/schemas/room.ts";
 
 import { useRoomName } from "@/hooks/use-room-name.ts";
 import { EXIT_FLAGS } from "@/shared/enums/index.ts";
 
 import { BitfieldEditor } from "./bitfield-editor.tsx";
+import { ConfirmDialog } from "./confirm-dialog.tsx";
+import { NumberInput } from "./number-input.tsx";
+import { RoomPicker } from "./room-picker.tsx";
+import { LABEL_CLASS } from "./styles.ts";
 
 const DIRECTIONS = ["North", "East", "South", "West", "Up", "Down"];
 
@@ -26,7 +33,7 @@ export function RoomExits({ exits, onChange, vnum }: RoomExitsProps) {
   };
 
   return (
-    <fieldset className="rounded border border-zinc-700/50 p-4">
+    <fieldset className="rounded border border-zinc-700 p-4">
       <legend className="px-2 text-sm font-medium text-zinc-300">Exits</legend>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
         {DIRECTIONS.map((dirName, direction) => (
@@ -53,7 +60,15 @@ function DestinationPreview({ vnum }: { vnum: number }) {
     return null;
   }
 
-  return <p className="mt-0.5 truncate text-xs text-zinc-500">{data.name}</p>;
+  return (
+    <Link
+      className="mt-0.5 block truncate text-xs text-zinc-400 hover:text-zinc-200"
+      params={{ vnum: String(vnum) }}
+      to="/rooms/$vnum"
+    >
+      {data.name}
+    </Link>
+  );
 }
 
 function ExitSlot({
@@ -71,11 +86,28 @@ function ExitSlot({
 }) {
   const enabled = exit !== null;
   const prefix = `exit-${String(direction)}`;
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const destRef = useRef<HTMLDivElement>(null);
+
+  const hasExitData =
+    exit !== null &&
+    (exit.destination !== 0 ||
+      exit.name !== "" ||
+      exit.description !== "" ||
+      exit.condition_flag !== 0);
 
   const toggle = () => {
     if (enabled) {
-      onChange(null);
+      if (hasExitData) {
+        setShowRemoveConfirm(true);
+      } else {
+        onChange(null);
+      }
     } else {
+      // Focus destination input after React renders the exit fields
+      requestAnimationFrame(() => {
+        destRef.current?.querySelector("input")?.focus();
+      });
       onChange({
         block: 0,
         condition_flag: 0,
@@ -100,13 +132,19 @@ function ExitSlot({
   };
 
   const inputClass =
-    "w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100 outline-none focus:border-zinc-500 disabled:opacity-30";
+    "w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100 outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 disabled:opacity-30";
 
   return (
-    <div className="rounded border border-zinc-700/30 bg-zinc-800/20 p-3">
+    <div
+      className={`rounded border border-zinc-700/30 bg-zinc-800/20 p-3 transition-shadow hover:shadow-md hover:shadow-zinc-900/50 ${
+        enabled
+          ? "border-l-accent border-l-2"
+          : "border-l-2 border-l-transparent"
+      }`}
+    >
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium text-zinc-300">{name}</span>
-        <label className="flex cursor-pointer items-center gap-1.5 text-xs text-zinc-500">
+        <label className="flex cursor-pointer items-center gap-1.5 text-xs text-zinc-400">
           <input
             checked={enabled}
             className="accent-zinc-400"
@@ -119,44 +157,41 @@ function ExitSlot({
 
       {enabled ? (
         <div className="grid grid-cols-2 gap-2">
-          <div>
+          <div ref={destRef}>
             <label
-              className="text-xs text-zinc-500"
+              className={LABEL_CLASS}
               htmlFor={`${prefix}-dest`}
             >
               Destination
             </label>
-            <input
-              className={inputClass}
+            <RoomPicker
               id={`${prefix}-dest`}
-              onChange={(e) => {
-                update("destination", Number(e.target.value) || 0);
+              onChange={(v) => {
+                update("destination", v);
               }}
-              type="number"
               value={exit.destination}
             />
             <DestinationPreview vnum={exit.destination} />
           </div>
           <div>
             <label
-              className="text-xs text-zinc-500"
+              className={LABEL_CLASS}
               htmlFor={`${prefix}-type`}
             >
               Type
             </label>
-            <input
+            <NumberInput
               className={inputClass}
               id={`${prefix}-type`}
-              onChange={(e) => {
-                update("type", Number(e.target.value) || 0);
+              onValueChange={(v) => {
+                update("type", v);
               }}
-              type="number"
               value={exit.type}
             />
           </div>
           <div className="col-span-2">
             <label
-              className="text-xs text-zinc-500"
+              className={LABEL_CLASS}
               htmlFor={`${prefix}-name`}
             >
               Door name
@@ -173,7 +208,7 @@ function ExitSlot({
           </div>
           <div className="col-span-2">
             <label
-              className="text-xs text-zinc-500"
+              className={LABEL_CLASS}
               htmlFor={`${prefix}-desc`}
             >
               Description
@@ -189,41 +224,39 @@ function ExitSlot({
           </div>
           <div>
             <label
-              className="text-xs text-zinc-500"
+              className={LABEL_CLASS}
               htmlFor={`${prefix}-lock`}
             >
               Lock difficulty
             </label>
-            <input
+            <NumberInput
               className={inputClass}
               id={`${prefix}-lock`}
-              onChange={(e) => {
-                update("lock_difficulty", Number(e.target.value) || 0);
+              onValueChange={(v) => {
+                update("lock_difficulty", v);
               }}
-              type="number"
               value={exit.lock_difficulty}
             />
           </div>
           <div>
             <label
-              className="text-xs text-zinc-500"
+              className={LABEL_CLASS}
               htmlFor={`${prefix}-key`}
             >
               Key vnum
             </label>
-            <input
+            <NumberInput
               className={inputClass}
               id={`${prefix}-key`}
-              onChange={(e) => {
-                update("key_num", Number(e.target.value) || 0);
+              onValueChange={(v) => {
+                update("key_num", v);
               }}
-              type="number"
               value={exit.key_num}
             />
           </div>
           <div className="col-span-2">
             <label
-              className="text-xs text-zinc-500"
+              className={LABEL_CLASS}
               htmlFor={`${prefix}-cond`}
             >
               Condition Flags
@@ -231,6 +264,7 @@ function ExitSlot({
             <BitfieldEditor
               entries={EXIT_FLAGS}
               id={`${prefix}-cond`}
+              label="Condition Flags"
               onChange={(v) => {
                 update("condition_flag", v);
               }}
@@ -239,6 +273,21 @@ function ExitSlot({
           </div>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        confirmLabel="Remove exit"
+        message={`Remove the ${name.toLowerCase()} exit? This will discard all exit data.`}
+        onCancel={() => {
+          setShowRemoveConfirm(false);
+        }}
+        onConfirm={() => {
+          setShowRemoveConfirm(false);
+          onChange(null);
+        }}
+        open={showRemoveConfirm}
+        title="Remove Exit"
+        variant="danger"
+      />
     </div>
   );
 }
