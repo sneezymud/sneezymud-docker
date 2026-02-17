@@ -1,15 +1,28 @@
 import { useState } from "react";
 
+import type { EnumEntry } from "@/shared/enums/types.ts";
+
 import { ConfirmDialog } from "./confirm-dialog.tsx";
+import { EnumSelect } from "./enum-select.tsx";
 import { Input, Textarea } from "./input.tsx";
 import { Label } from "./label.tsx";
 import { NumberInput } from "./number-input.tsx";
 
-export interface ColumnDef<T> {
+export type ColumnDef<T> = EnumColumnDef<T> | TextColumnDef<T>;
+
+interface ColumnDefBase<T> {
   key: keyof T & string;
   label: string;
-  type: "number" | "text" | "textarea";
   width?: string;
+}
+
+interface TextColumnDef<T> extends ColumnDefBase<T> {
+  type: "number" | "text" | "textarea";
+}
+
+interface EnumColumnDef<T> extends ColumnDefBase<T> {
+  entries: EnumEntry[];
+  type: "enum";
 }
 
 interface SubTableProps<T extends Record<string, number | string>> {
@@ -113,6 +126,7 @@ export function SubTable<T extends Record<string, number | string>>({
                   <div key={col.key}>
                     <Label htmlFor={cellId}>{col.label}</Label>
                     <CellInput
+                      entries={col.type === "enum" ? col.entries : undefined}
                       id={cellId}
                       onNumberChange={(v) => {
                         updateNumberRow(index, col.key, v);
@@ -168,18 +182,31 @@ export function SubTable<T extends Record<string, number | string>>({
 }
 
 function CellInput({
+  entries,
   id,
   onNumberChange,
   onTextChange,
   type,
   value,
 }: {
+  entries?: EnumEntry[] | undefined;
   id: string;
   onNumberChange: (v: number) => void;
   onTextChange: (v: string) => void;
-  type: "number" | "text" | "textarea";
+  type: "enum" | "number" | "text" | "textarea";
   value: number | string;
 }) {
+  if (type === "enum" && entries) {
+    return (
+      <EnumSelect
+        entries={entries}
+        id={id}
+        onChange={onNumberChange}
+        value={typeof value === "number" ? value : Number(value) || 0}
+      />
+    );
+  }
+
   if (type === "textarea") {
     return (
       <Textarea
