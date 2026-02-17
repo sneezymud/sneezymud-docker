@@ -2,23 +2,16 @@ import { Hono } from "hono";
 
 import { loginRequestSchema } from "@/shared/schemas/auth.ts";
 
+import { jsonValidator } from "../auth/middleware.ts";
 import { createSession, destroySession, getSession } from "../auth/session.ts";
 import { authenticateBuilder } from "../queries/auth.ts";
 
 export const authRoutes = new Hono();
 
-authRoutes.post("/login", async (c) => {
-  const body: unknown = await c.req.json();
-  const parsed = loginRequestSchema.safeParse(body);
+authRoutes.post("/login", jsonValidator(loginRequestSchema), async (c) => {
+  const { password, username } = c.req.valid("json");
 
-  if (!parsed.success) {
-    return c.json({ error: "Invalid request" }, 400);
-  }
-
-  const result = await authenticateBuilder(
-    parsed.data.username,
-    parsed.data.password,
-  );
+  const result = await authenticateBuilder(username, password);
 
   if (result.kind === "not_found" || result.kind === "wrong_password") {
     return c.json({ error: "Invalid username or password" }, 401);

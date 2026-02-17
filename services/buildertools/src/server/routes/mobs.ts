@@ -2,7 +2,12 @@ import { Hono } from "hono";
 
 import { mobCreateSchema, mobSchema } from "@/shared/schemas/mob.ts";
 
-import { type AuthEnv, requireAuth } from "../auth/middleware.ts";
+import {
+  type AuthEnv,
+  jsonValidator,
+  requireAuth,
+  requireVnumAccess,
+} from "../auth/middleware.ts";
 import {
   createMob,
   deleteMob,
@@ -23,44 +28,25 @@ mobRoutes.get("/", async (c) => {
   return c.json(mobs);
 });
 
-mobRoutes.post("/", async (c) => {
+mobRoutes.post("/", jsonValidator(mobCreateSchema), async (c) => {
   const user = c.get("user");
-  const body: unknown = await c.req.json();
-  const parsed = mobCreateSchema.safeParse(body);
+  const data = c.req.valid("json");
 
-  if (!parsed.success) {
-    return c.json(
-      {
-        error: "Validation failed",
-        issues: parsed.error.issues.map((i) => ({
-          message: i.message,
-          path: i.path.map(String),
-        })),
-      },
-      400,
-    );
-  }
-
-  if (!isVnumInBlocks(parsed.data.vnum, user.blocks)) {
+  if (!isVnumInBlocks(data.vnum, user.blocks)) {
     return c.json({ error: "Vnum outside assigned blocks" }, 403);
   }
 
-  if (await mobExists(parsed.data.vnum)) {
+  if (await mobExists(data.vnum)) {
     return c.json({ error: "Mob already exists" }, 409);
   }
 
-  await createMob(parsed.data.vnum, user.playerName);
-  const mob = await getMob(parsed.data.vnum);
+  await createMob(data.vnum, user.playerName);
+  const mob = await getMob(data.vnum);
   return c.json(mob, 201);
 });
 
-mobRoutes.get("/:vnum", async (c) => {
-  const user = c.get("user");
+mobRoutes.get("/:vnum", requireVnumAccess, async (c) => {
   const vnum = Number(c.req.param("vnum"));
-
-  if (!isVnumInBlocks(vnum, user.blocks)) {
-    return c.json({ error: "Vnum outside assigned blocks" }, 403);
-  }
 
   const mob = await getMob(vnum);
   if (!mob) {
@@ -70,46 +56,27 @@ mobRoutes.get("/:vnum", async (c) => {
   return c.json(mob);
 });
 
-mobRoutes.put("/:vnum", async (c) => {
-  const user = c.get("user");
+mobRoutes.put(
+  "/:vnum",
+  requireVnumAccess,
+  jsonValidator(mobSchema),
+  async (c) => {
+    const user = c.get("user");
+    const vnum = Number(c.req.param("vnum"));
+
+    if (!(await mobExists(vnum))) {
+      return c.json({ error: "Mob not found" }, 404);
+    }
+
+    const data = c.req.valid("json");
+    await updateMob(vnum, data, user.playerName);
+    const updated = await getMob(vnum);
+    return c.json(updated);
+  },
+);
+
+mobRoutes.delete("/:vnum", requireVnumAccess, async (c) => {
   const vnum = Number(c.req.param("vnum"));
-
-  if (!isVnumInBlocks(vnum, user.blocks)) {
-    return c.json({ error: "Vnum outside assigned blocks" }, 403);
-  }
-
-  if (!(await mobExists(vnum))) {
-    return c.json({ error: "Mob not found" }, 404);
-  }
-
-  const body: unknown = await c.req.json();
-  const parsed = mobSchema.safeParse(body);
-
-  if (!parsed.success) {
-    return c.json(
-      {
-        error: "Validation failed",
-        issues: parsed.error.issues.map((i) => ({
-          message: i.message,
-          path: i.path.map(String),
-        })),
-      },
-      400,
-    );
-  }
-
-  await updateMob(vnum, parsed.data, user.playerName);
-  const updated = await getMob(vnum);
-  return c.json(updated);
-});
-
-mobRoutes.delete("/:vnum", async (c) => {
-  const user = c.get("user");
-  const vnum = Number(c.req.param("vnum"));
-
-  if (!isVnumInBlocks(vnum, user.blocks)) {
-    return c.json({ error: "Vnum outside assigned blocks" }, 403);
-  }
 
   if (!(await mobExists(vnum))) {
     return c.json({ error: "Mob not found" }, 404);
