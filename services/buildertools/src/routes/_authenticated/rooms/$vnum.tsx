@@ -1,12 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  createFileRoute,
-  useBlocker,
-  useNavigate,
-} from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { toast } from "sonner";
-import { z } from "zod";
 
 import type { FieldDef, FieldGroupDef } from "@/components/entity-form.tsx";
 import type { EnumEntry } from "@/shared/enums/types.ts";
@@ -18,18 +12,16 @@ import { EntityForm } from "@/components/entity-form.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { RoomExits } from "@/components/room-exits.tsx";
 import { EntityFormSkeleton } from "@/components/skeleton.tsx";
-import { useConcurrentEditWarning } from "@/hooks/use-concurrent-edit-warning.ts";
-import { useKeyboardSave } from "@/hooks/use-keyboard-save.ts";
-import { useSyncDirty } from "@/hooks/use-sync-dirty.ts";
-import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
+import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
+import { apiFetch } from "@/shared/api-client.ts";
 import {
   ROOM_FLAGS,
   ROOM_SPEC_PROCS,
   SECTOR_TYPES,
 } from "@/shared/enums/index.ts";
+import { roomKeys, zoneKeys } from "@/shared/query-keys.ts";
 import { roomSchema } from "@/shared/schemas/room.ts";
 import { zoneListSchema } from "@/shared/schemas/zone.ts";
-import { toastError } from "@/shared/toast.ts";
 
 export const Route = createFileRoute("/_authenticated/rooms/$vnum")({
   component: RoomEditorPage,
@@ -166,8 +158,6 @@ function roomToFormValues(
 
 function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
   const vnum = Number(vnumParam);
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
   const {
     data: room,
@@ -175,35 +165,45 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
     isError,
     isLoading,
   } = useQuery({
-    queryFn: () => apiFetch(`/api/rooms/${String(vnum)}`, roomSchema),
-    queryKey: ["room", vnum],
+    queryFn: () => apiFetch(`/api/rooms/${vnum}`, roomSchema),
+    queryKey: roomKeys.detail(vnum),
   });
 
   const { data: zones } = useQuery({
     queryFn: () => apiFetch("/api/zones", zoneListSchema),
-    queryKey: ["zones"],
+    queryKey: zoneKeys.all,
   });
 
-  const zoneEntries: EnumEntry[] | undefined = zones?.map((z) => ({
-    label: `${String(z.zone_nr)}: ${z.zone_name}`,
-    value: z.zone_nr,
+  const zoneEntries: EnumEntry[] | undefined = zones?.map((zn) => ({
+    label: `${zn.zone_nr}: ${zn.zone_name}`,
+    value: zn.zone_nr,
   }));
 
   const [edits, setEdits] = useState<null | Partial<Room>>(null);
   const [exitEdits, setExitEdits] = useState<null | RoomExit[]>(null);
 
   const dirty = edits !== null || exitEdits !== null;
-  useSyncDirty(dirty);
-  useConcurrentEditWarning(room, dirty);
 
-  const { proceed, reset, status } = useBlocker({
-    enableBeforeUnload: true,
-    shouldBlockFn: () => dirty,
-    withResolver: true,
-  });
-
-  const saveMutation = useMutation({
-    mutationFn: async () => {
+  const {
+    blockerProceed,
+    blockerReset,
+    blockerStatus,
+    deletePending,
+    handleDelete,
+    handleSave,
+    saving,
+  } = useEntityEditor({
+    allKey: roomKeys.all,
+    data: room,
+    deletePath: `/api/rooms/${vnum}`,
+    detailKey: roomKeys.detail(vnum),
+    dirty,
+    listPath: "/rooms",
+    onReset: () => {
+      setEdits(null);
+      setExitEdits(null);
+    },
+    saveFn: async () => {
       if (!room) {
         return null;
       }
@@ -212,55 +212,12 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
         ...edits,
         exits: exitEdits ?? room.exits,
       };
-      return apiFetch(`/api/rooms/${String(vnum)}`, roomSchema, {
+      return apiFetch(`/api/rooms/${vnum}`, roomSchema, {
         body: JSON.stringify(body),
         method: "PUT",
       });
     },
-    onError: (err) => {
-      toastError(
-        err instanceof ApiResponseError ? err.message : "Failed to save",
-      );
-    },
-    onSuccess: async (saved) => {
-      toast.success("Saved");
-      if (saved) {
-        queryClient.setQueryData(["room", vnum], saved);
-      }
-      setEdits(null);
-      setExitEdits(null);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["room", vnum] }),
-        queryClient.invalidateQueries({ queryKey: ["rooms"] }),
-      ]);
-    },
   });
-
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      await apiFetch(
-        `/api/rooms/${String(vnum)}`,
-        z.object({ ok: z.boolean() }),
-        { method: "DELETE" },
-      );
-    },
-    onError: (err) => {
-      toastError(
-        err instanceof ApiResponseError ? err.message : "Failed to delete",
-      );
-    },
-    onSuccess: async () => {
-      toast.success("Deleted");
-      void queryClient.invalidateQueries({ queryKey: ["rooms"] });
-      await navigate({ to: "/rooms" });
-    },
-  });
-
-  const handleSave = () => {
-    saveMutation.mutate();
-  };
-
-  useKeyboardSave(handleSave, dirty && !saveMutation.isPending);
 
   if (isLoading || isError || !room) {
     return (
@@ -270,7 +227,7 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
         error={error}
         isError={isError}
         isLoading={isLoading}
-        label={`room ${String(vnum)}`}
+        label={`room ${vnum}`}
         skeleton={<EntityFormSkeleton />}
       />
     );
@@ -292,7 +249,7 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
         <Breadcrumbs
           items={[
             { label: "Rooms", to: "/rooms" },
-            { label: `Room ${String(vnum)}: ${room.name || "(unnamed)"}` },
+            { label: `Room ${vnum}: ${room.name || "(unnamed)"}` },
           ]}
         />
         <h2 className="text-xl font-bold text-zinc-100">
@@ -301,21 +258,19 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
       </div>
 
       <EntityForm
-        deleteMessage={`Are you sure you want to delete room ${String(vnum)}? This also removes all exits.`}
-        deletePending={deleteMutation.isPending}
+        deleteMessage={`Are you sure you want to delete room ${vnum}? This also removes all exits.`}
+        deletePending={deletePending}
         dirty={dirty}
         groups={getRoomFieldGroups(zoneEntries)}
         onChange={handleFieldChange}
-        onDelete={() => {
-          deleteMutation.mutate();
-        }}
+        onDelete={handleDelete}
         onReset={() => {
           setEdits(null);
           setExitEdits(null);
         }}
         onSave={handleSave}
         originalValues={roomToFormValues(room, null)}
-        saving={saveMutation.isPending}
+        saving={saving}
         values={currentValues}
       >
         <RoomExits
@@ -329,12 +284,12 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
         confirmLabel="Discard changes"
         message="You have unsaved changes that will be lost."
         onCancel={() => {
-          reset?.();
+          blockerReset?.();
         }}
         onConfirm={() => {
-          proceed?.();
+          blockerProceed?.();
         }}
-        open={status === "blocked"}
+        open={blockerStatus === "blocked"}
         title="Unsaved Changes"
         variant="danger"
       />

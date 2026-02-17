@@ -1,18 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useBlocker } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { Breadcrumbs } from "@/components/breadcrumbs.tsx";
 import { CodeEditor } from "@/components/code-editor/code-editor.tsx";
 import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
-import { useKeyboardSave } from "@/hooks/use-keyboard-save.ts";
-import { useSyncDirty } from "@/hooks/use-sync-dirty.ts";
-import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
+import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
+import { apiFetch } from "@/shared/api-client.ts";
+import { mobKeys } from "@/shared/query-keys.ts";
 import { mobResponseSchema } from "@/shared/schemas/mob-response.ts";
 import { mobSchema } from "@/shared/schemas/mob.ts";
-import { toastError } from "@/shared/toast.ts";
 
 export const Route = createFileRoute("/_authenticated/mobs/$vnum/responses")({
   component: MobResponseEditorPage,
@@ -65,72 +63,52 @@ if quest ...;         - Quest conditionals`,
 
 function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
   const vnum = Number(vnumParam);
-  const queryClient = useQueryClient();
 
   const { data, error, isError, isLoading } = useQuery({
-    queryFn: () =>
-      apiFetch(`/api/mob-responses/${String(vnum)}`, mobResponseSchema),
-    queryKey: ["mob-response", vnum],
+    queryFn: () => apiFetch(`/api/mob-responses/${vnum}`, mobResponseSchema),
+    queryKey: mobKeys.response(vnum),
   });
 
   const { data: mob } = useQuery({
-    queryFn: () => apiFetch(`/api/mobs/${String(vnum)}`, mobSchema),
-    queryKey: ["mob", vnum],
+    queryFn: () => apiFetch(`/api/mobs/${vnum}`, mobSchema),
+    queryKey: mobKeys.detail(vnum),
   });
 
   const desc = mob?.short_desc;
-  const mobName =
-    desc !== undefined && desc !== "" ? desc : `Mob ${String(vnum)}`;
+  const mobName = desc !== undefined && desc !== "" ? desc : `Mob ${vnum}`;
 
   // null = no edits yet (show server data), string = user has edited
   const [draft, setDraft] = useState<null | string>(null);
 
   const currentText = draft ?? data?.response ?? "";
   const dirty = draft !== null && draft !== (data?.response ?? "");
-  useSyncDirty(dirty);
 
-  const { proceed, reset, status } = useBlocker({
-    enableBeforeUnload: true,
-    shouldBlockFn: () => dirty,
-    withResolver: true,
-  });
-
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      await apiFetch(`/api/mob-responses/${String(vnum)}`, mobResponseSchema, {
-        body: JSON.stringify({ response: currentText, vnum }),
-        method: "PUT",
-      });
-    },
-    onError: (err) => {
-      toastError(
-        err instanceof ApiResponseError ? err.message : "Failed to save",
-      );
-    },
-    onSuccess: async () => {
-      setDraft(null);
-      toast.success("Saved");
-      await queryClient.invalidateQueries({
-        queryKey: ["mob-response", vnum],
-      });
-    },
-  });
-
-  const handleSave = () => {
-    saveMutation.mutate();
-  };
-
-  useKeyboardSave(handleSave, dirty && !saveMutation.isPending);
+  const { blockerProceed, blockerReset, blockerStatus, handleSave, saving } =
+    useEntityEditor({
+      allKey: mobKeys.all,
+      data,
+      dirty,
+      onReset: () => {
+        setDraft(null);
+      },
+      saveFn: async () => {
+        await apiFetch(`/api/mob-responses/${vnum}`, mobResponseSchema, {
+          body: JSON.stringify({ response: currentText, vnum }),
+          method: "PUT",
+        });
+        return null;
+      },
+    });
 
   if (isLoading || isError) {
     return (
       <QueryStatus
-        backLabel={`Mob ${String(vnum)}`}
-        backTo={`/mobs/${String(vnum)}`}
+        backLabel={`Mob ${vnum}`}
+        backTo={`/mobs/${vnum}`}
         error={error}
         isError={isError}
         isLoading={isLoading}
-        label={`responses for mob ${String(vnum)}`}
+        label={`responses for mob ${vnum}`}
       />
     );
   }
@@ -142,14 +120,14 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
           <Breadcrumbs
             items={[
               { label: "Mobs", to: "/mobs" },
-              { label: mobName, to: `/mobs/${String(vnum)}` },
+              { label: mobName, to: `/mobs/${vnum}` },
               { label: "Responses" },
             ]}
           />
           <h2 className="text-xl font-bold text-zinc-100">
             Responses — {mobName}
             <span className="ml-1 text-sm font-normal text-zinc-400">
-              (#{String(vnum)})
+              (#{vnum})
             </span>
           </h2>
         </div>
@@ -171,13 +149,11 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
           ) : null}
           <button
             className="bg-accent hover:bg-accent/80 focus-visible:ring-accent rounded px-4 py-2 text-sm text-white transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!dirty || saveMutation.isPending}
-            onClick={() => {
-              saveMutation.mutate();
-            }}
+            disabled={!dirty || saving}
+            onClick={handleSave}
             type="button"
           >
-            {saveMutation.isPending ? "Saving..." : "Save"}
+            {saving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
@@ -187,7 +163,7 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
           <span className="mb-1 text-xs text-zinc-400">Response Script</span>
           <CodeEditor
             onChange={setDraft}
-            onSave={dirty && !saveMutation.isPending ? handleSave : undefined}
+            onSave={dirty && !saving ? handleSave : undefined}
             value={currentText}
           />
         </div>
@@ -218,12 +194,12 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
         confirmLabel="Discard changes"
         message="You have unsaved changes that will be lost."
         onCancel={() => {
-          reset?.();
+          blockerReset?.();
         }}
         onConfirm={() => {
-          proceed?.();
+          blockerProceed?.();
         }}
-        open={status === "blocked"}
+        open={blockerStatus === "blocked"}
         title="Unsaved Changes"
         variant="danger"
       />

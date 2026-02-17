@@ -1,12 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  createFileRoute,
-  useBlocker,
-  useNavigate,
-} from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { toast } from "sonner";
-import { z } from "zod";
 
 import type { FieldGroupDef } from "@/components/entity-form.tsx";
 import type { ColumnDef } from "@/components/sub-table.tsx";
@@ -18,10 +12,8 @@ import { EntityForm } from "@/components/entity-form.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { EntityFormSkeleton } from "@/components/skeleton.tsx";
 import { SubTable } from "@/components/sub-table.tsx";
-import { useConcurrentEditWarning } from "@/hooks/use-concurrent-edit-warning.ts";
-import { useKeyboardSave } from "@/hooks/use-keyboard-save.ts";
-import { useSyncDirty } from "@/hooks/use-sync-dirty.ts";
-import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
+import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
+import { apiFetch } from "@/shared/api-client.ts";
 import {
   EXTRA_FLAGS,
   ITEM_TYPES,
@@ -30,8 +22,8 @@ import {
   WEAR_FLAGS,
 } from "@/shared/enums/index.ts";
 import { getObjValueLabels } from "@/shared/enums/obj-value-labels.ts";
+import { objectKeys } from "@/shared/query-keys.ts";
 import { objSchema } from "@/shared/schemas/obj.ts";
-import { toastError } from "@/shared/toast.ts";
 
 export const Route = createFileRoute("/_authenticated/objects/$vnum")({
   component: ObjectEditorPage,
@@ -190,8 +182,6 @@ function objToFormValues(
 
 function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
   const vnum = Number(vnumParam);
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
   const {
     data: obj,
@@ -199,8 +189,8 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
     isError,
     isLoading,
   } = useQuery({
-    queryFn: () => apiFetch(`/api/objects/${String(vnum)}`, objSchema),
-    queryKey: ["object", vnum],
+    queryFn: () => apiFetch(`/api/objects/${vnum}`, objSchema),
+    queryKey: objectKeys.detail(vnum),
   });
 
   const [edits, setEdits] = useState<null | Partial<Obj>>(null);
@@ -208,17 +198,28 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
   const [extraEdits, setExtraEdits] = useState<null | ObjExtra[]>(null);
 
   const dirty = edits !== null || affectEdits !== null || extraEdits !== null;
-  useSyncDirty(dirty);
-  useConcurrentEditWarning(obj, dirty);
 
-  const { proceed, reset, status } = useBlocker({
-    enableBeforeUnload: true,
-    shouldBlockFn: () => dirty,
-    withResolver: true,
-  });
-
-  const saveMutation = useMutation({
-    mutationFn: async () => {
+  const {
+    blockerProceed,
+    blockerReset,
+    blockerStatus,
+    deletePending,
+    handleDelete,
+    handleSave,
+    saving,
+  } = useEntityEditor({
+    allKey: objectKeys.all,
+    data: obj,
+    deletePath: `/api/objects/${vnum}`,
+    detailKey: objectKeys.detail(vnum),
+    dirty,
+    listPath: "/objects",
+    onReset: () => {
+      setEdits(null);
+      setAffectEdits(null);
+      setExtraEdits(null);
+    },
+    saveFn: async () => {
       if (!obj) {
         return null;
       }
@@ -228,56 +229,12 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
         affects: affectEdits ?? obj.affects,
         extras: extraEdits ?? obj.extras,
       };
-      return apiFetch(`/api/objects/${String(vnum)}`, objSchema, {
+      return apiFetch(`/api/objects/${vnum}`, objSchema, {
         body: JSON.stringify(body),
         method: "PUT",
       });
     },
-    onError: (err) => {
-      toastError(
-        err instanceof ApiResponseError ? err.message : "Failed to save",
-      );
-    },
-    onSuccess: async (saved) => {
-      toast.success("Saved");
-      if (saved) {
-        queryClient.setQueryData(["object", vnum], saved);
-      }
-      setEdits(null);
-      setAffectEdits(null);
-      setExtraEdits(null);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["object", vnum] }),
-        queryClient.invalidateQueries({ queryKey: ["objects"] }),
-      ]);
-    },
   });
-
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      await apiFetch(
-        `/api/objects/${String(vnum)}`,
-        z.object({ ok: z.boolean() }),
-        { method: "DELETE" },
-      );
-    },
-    onError: (err) => {
-      toastError(
-        err instanceof ApiResponseError ? err.message : "Failed to delete",
-      );
-    },
-    onSuccess: async () => {
-      toast.success("Deleted");
-      void queryClient.invalidateQueries({ queryKey: ["objects"] });
-      await navigate({ to: "/objects" });
-    },
-  });
-
-  const handleSave = () => {
-    saveMutation.mutate();
-  };
-
-  useKeyboardSave(handleSave, dirty && !saveMutation.isPending);
 
   if (isLoading || isError || !obj) {
     return (
@@ -287,7 +244,7 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
         error={error}
         isError={isError}
         isLoading={isLoading}
-        label={`object ${String(vnum)}`}
+        label={`object ${vnum}`}
         skeleton={<EntityFormSkeleton />}
       />
     );
@@ -306,7 +263,7 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
           items={[
             { label: "Objects", to: "/objects" },
             {
-              label: `Object ${String(vnum)}: ${obj.short_desc || "(unnamed)"}`,
+              label: `Object ${vnum}: ${obj.short_desc || "(unnamed)"}`,
             },
           ]}
         />
@@ -316,16 +273,14 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
       </div>
 
       <EntityForm
-        deleteMessage={`Are you sure you want to delete object ${String(vnum)}? This also removes all affects and extra descriptions.`}
-        deletePending={deleteMutation.isPending}
+        deleteMessage={`Are you sure you want to delete object ${vnum}? This also removes all affects and extra descriptions.`}
+        deletePending={deletePending}
         dirty={dirty}
         groups={getObjFieldGroups(
           typeof currentValues["type"] === "number" ? currentValues["type"] : 0,
         )}
         onChange={handleFieldChange}
-        onDelete={() => {
-          deleteMutation.mutate();
-        }}
+        onDelete={handleDelete}
         onReset={() => {
           setEdits(null);
           setAffectEdits(null);
@@ -333,7 +288,7 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
         }}
         onSave={handleSave}
         originalValues={objToFormValues(obj, null)}
-        saving={saveMutation.isPending}
+        saving={saving}
         values={currentValues}
       >
         <SubTable
@@ -358,12 +313,12 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
         confirmLabel="Discard changes"
         message="You have unsaved changes that will be lost."
         onCancel={() => {
-          reset?.();
+          blockerReset?.();
         }}
         onConfirm={() => {
-          proceed?.();
+          blockerProceed?.();
         }}
-        open={status === "blocked"}
+        open={blockerStatus === "blocked"}
         title="Unsaved Changes"
         variant="danger"
       />
