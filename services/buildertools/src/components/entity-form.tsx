@@ -10,6 +10,7 @@ import { Label } from "./label.tsx";
 import { NumberInput } from "./number-input.tsx";
 
 interface FieldDefBase {
+  fullWidth?: boolean;
   help?: string;
   key: string;
   label: string;
@@ -177,7 +178,8 @@ function FormField({
   onChange: (key: string, value: number | string) => void;
   value: number | string | undefined;
 }) {
-  const isFullWidth = field.type === "textarea" || field.type === "bitfield";
+  const isFullWidth =
+    field.fullWidth ?? (field.type === "textarea" || field.type === "bitfield");
 
   return (
     <div
