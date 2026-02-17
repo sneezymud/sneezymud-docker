@@ -1,4 +1,6 @@
-import { useEffect, useId, useRef, useState } from "react";
+import * as Popover from "@radix-ui/react-popover";
+import * as Select from "@radix-ui/react-select";
+import { useId, useRef, useState } from "react";
 
 import type { EnumEntry } from "@/shared/enums/types.ts";
 
@@ -37,24 +39,48 @@ function NativeEnumSelect({ entries, id, onChange, value }: EnumSelectProps) {
   const known = entries.some((e) => e.value === value);
 
   return (
-    <select
-      className="focus-visible:ring-accent w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
-      id={id}
-      onChange={(e) => {
-        onChange(Number(e.target.value));
+    <Select.Root
+      onValueChange={(v) => {
+        onChange(Number(v));
       }}
-      value={value}
+      value={String(value)}
     >
-      {known ? null : <option value={value}>Unknown ({String(value)})</option>}
-      {entries.map((entry) => (
-        <option
-          key={entry.value}
-          value={entry.value}
+      <Select.Trigger
+        className="focus-visible:ring-accent w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-left text-sm text-zinc-100 outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
+        id={id}
+      >
+        <Select.Value />
+      </Select.Trigger>
+      <Select.Portal>
+        <Select.Content
+          className="z-20 max-h-60 overflow-auto rounded border border-zinc-700 bg-zinc-800 py-1 shadow-lg"
+          position="popper"
+          sideOffset={4}
         >
-          {entry.label} ({String(entry.value)})
-        </option>
-      ))}
-    </select>
+          <Select.Viewport>
+            {known ? null : (
+              <Select.Item
+                className="data-[highlighted]:bg-accent/20 cursor-pointer px-3 py-1.5 text-sm text-zinc-300 outline-none data-[highlighted]:text-zinc-100"
+                value={String(value)}
+              >
+                <Select.ItemText>Unknown ({String(value)})</Select.ItemText>
+              </Select.Item>
+            )}
+            {entries.map((entry) => (
+              <Select.Item
+                className="data-[highlighted]:bg-accent/20 cursor-pointer px-3 py-1.5 text-sm text-zinc-300 outline-none data-[highlighted]:text-zinc-100 data-[state=checked]:bg-zinc-700/50 data-[state=checked]:text-zinc-100"
+                key={entry.value}
+                value={String(entry.value)}
+              >
+                <Select.ItemText>
+                  {entry.label} ({String(entry.value)})
+                </Select.ItemText>
+              </Select.Item>
+            ))}
+          </Select.Viewport>
+        </Select.Content>
+      </Select.Portal>
+    </Select.Root>
   );
 }
 
@@ -67,11 +93,8 @@ function SearchableEnumSelect({
   const autoId = useId();
   const inputId = id ?? autoId;
   const listboxId = `${inputId}-listbox`;
-  const containerRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const openRef = useRef(false);
 
   const current = entries.find((e) => e.value === value);
   const displayText = current
@@ -81,7 +104,6 @@ function SearchableEnumSelect({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [highlightIndex, setHighlightIndex] = useState(-1);
-  const [dropUp, setDropUp] = useState(false);
 
   const filtered = search
     ? entries.filter((e) => {
@@ -102,71 +124,12 @@ function SearchableEnumSelect({
     }
   };
 
-  const closeDropdown = () => {
-    setOpen(false);
-    setSearch("");
-    setHighlightIndex(-1);
-    openRef.current = false;
-    // Button remounts after state update; schedule focus for next frame
-    requestAnimationFrame(() => {
-      buttonRef.current?.focus();
-    });
-  };
-
-  const openDropdown = () => {
-    // Measure available space below trigger to decide dropdown direction
-    const DROPDOWN_HEIGHT = 260; // max-h-60 (240px) + buffer
-    const triggerEl = buttonRef.current ?? containerRef.current;
-    if (triggerEl) {
-      const rect = triggerEl.getBoundingClientRect();
-      setDropUp(rect.bottom + DROPDOWN_HEIGHT > window.innerHeight);
-    }
-    setOpen(true);
-    openRef.current = true;
-    requestAnimationFrame(() => {
-      inputRef.current?.focus();
-    });
-  };
-
-  // Persistent outside-click listener — uses openRef to avoid state deps
-  useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (
-        openRef.current &&
-        containerRef.current &&
-        e.target instanceof Node &&
-        !containerRef.current.contains(e.target)
-      ) {
-        setOpen(false);
-        setSearch("");
-        setHighlightIndex(-1);
-        openRef.current = false;
-        requestAnimationFrame(() => {
-          buttonRef.current?.focus();
-        });
-      }
-    };
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-    };
-  }, []);
-
   const select = (entry: EnumEntry) => {
     onChange(entry.value);
-    closeDropdown();
+    setOpen(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!open) {
-      if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        openDropdown();
-        return;
-      }
-      return;
-    }
-
     switch (e.key) {
       case "ArrowDown": {
         e.preventDefault();
@@ -192,99 +155,107 @@ function SearchableEnumSelect({
         }
         break;
       }
-      case "Escape": {
-        e.preventDefault();
-        closeDropdown();
-        break;
-      }
     }
   };
 
   return (
-    <div
-      className="relative"
-      ref={containerRef}
+    <Popover.Root
+      onOpenChange={(isOpen) => {
+        setOpen(isOpen);
+        if (!isOpen) {
+          setSearch("");
+          setHighlightIndex(-1);
+        }
+      }}
+      open={open}
     >
-      {open ? (
-        <input
-          aria-activedescendant={
-            highlightIndex >= 0
-              ? `${listboxId}-${String(highlightIndex)}`
-              : undefined
-          }
-          aria-autocomplete="list"
-          aria-controls={listboxId}
-          aria-expanded
-          className="focus-visible:ring-accent w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
-          id={inputId}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setHighlightIndex(0);
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder="Search..."
-          ref={inputRef}
-          role="combobox"
-          type="text"
-          value={search}
-        />
-      ) : (
+      <Popover.Trigger asChild>
         <button
-          aria-expanded={false}
           aria-haspopup="listbox"
           className="focus-visible:ring-accent w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-left text-sm text-zinc-100 outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
           id={inputId}
-          onClick={() => {
-            openDropdown();
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setOpen(true);
+            }
           }}
-          onKeyDown={handleKeyDown}
-          ref={buttonRef}
           type="button"
         >
           {displayText}
         </button>
-      )}
-
-      {open ? (
-        <ul
-          className={`absolute z-20 max-h-60 w-full overflow-auto rounded border border-zinc-700 bg-zinc-800 py-1 shadow-lg ${dropUp ? "bottom-full mb-1" : "mt-1"}`}
-          id={listboxId}
-          ref={listRef}
-          role="listbox"
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="start"
+          className="z-20 w-[var(--radix-popover-trigger-width)] rounded border border-zinc-700 bg-zinc-800 shadow-lg"
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            inputRef.current?.focus();
+          }}
+          sideOffset={4}
         >
-          {filtered.length === 0 ? (
-            <li className="px-3 py-2 text-sm text-zinc-400">No matches</li>
-          ) : (
-            filtered.map((entry, index) => (
-              <li
-                aria-selected={entry.value === value}
-                className={`cursor-pointer px-3 py-1.5 text-sm ${
-                  index === highlightIndex
-                    ? "bg-accent/20 text-zinc-100"
-                    : entry.value === value
-                      ? "bg-zinc-700/50 text-zinc-100"
-                      : "text-zinc-300 hover:bg-zinc-700/30"
-                }`}
-                id={`${listboxId}-${String(index)}`}
-                key={entry.value}
-                onClick={() => {
-                  select(entry);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
+          <input
+            aria-activedescendant={
+              highlightIndex >= 0
+                ? `${listboxId}-${String(highlightIndex)}`
+                : undefined
+            }
+            aria-autocomplete="list"
+            aria-controls={listboxId}
+            aria-expanded
+            className="w-full border-b border-zinc-700 bg-transparent px-3 py-2 text-sm text-zinc-100 outline-none"
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setHighlightIndex(0);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="Search..."
+            ref={inputRef}
+            role="combobox"
+            type="text"
+            value={search}
+          />
+          <ul
+            className="max-h-60 overflow-auto py-1"
+            id={listboxId}
+            ref={listRef}
+            role="listbox"
+          >
+            {filtered.length === 0 ? (
+              <li className="px-3 py-2 text-sm text-zinc-400">No matches</li>
+            ) : (
+              filtered.map((entry, index) => (
+                <li
+                  aria-selected={entry.value === value}
+                  className={`cursor-pointer px-3 py-1.5 text-sm ${
+                    index === highlightIndex
+                      ? "bg-accent/20 text-zinc-100"
+                      : entry.value === value
+                        ? "bg-zinc-700/50 text-zinc-100"
+                        : "text-zinc-300 hover:bg-zinc-700/30"
+                  }`}
+                  id={`${listboxId}-${String(index)}`}
+                  key={entry.value}
+                  onClick={() => {
                     select(entry);
-                  }
-                }}
-                role="option"
-              >
-                {entry.label}{" "}
-                <span className="text-zinc-400">({String(entry.value)})</span>
-              </li>
-            ))
-          )}
-        </ul>
-      ) : null}
-    </div>
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      select(entry);
+                    }
+                  }}
+                  role="option"
+                >
+                  {entry.label}{" "}
+                  <span className="text-zinc-400">({String(entry.value)})</span>
+                </li>
+              ))
+            )}
+          </ul>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }

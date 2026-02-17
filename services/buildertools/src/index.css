@@ -26,58 +26,59 @@ a {
   transition-timing-function: ease;
 }
 
-/* Collapse animation helper */
-.collapse-grid {
-  display: grid;
-  grid-template-rows: 1fr;
-  transition: grid-template-rows 200ms ease;
-}
-
-.collapse-grid[data-collapsed="true"] {
-  grid-template-rows: 0fr;
-}
-
-.collapse-grid > * {
+/* Collapsible animation (Radix) */
+.collapsible-content {
   overflow: hidden;
 }
 
-/* Dialog open/close animation */
-dialog {
-  opacity: 0;
-  transform: scale(0.95);
-  transition:
-    opacity 150ms ease,
-    transform 150ms ease,
-    overlay 150ms ease allow-discrete,
-    display 150ms ease allow-discrete;
+.collapsible-content[data-state="open"] {
+  animation: collapsible-open 200ms ease;
 }
 
-dialog[open] {
-  opacity: 1;
-  transform: scale(1);
+.collapsible-content[data-state="closed"] {
+  animation: collapsible-close 200ms ease;
 }
 
-@starting-style {
-  dialog[open] {
-    opacity: 0;
-    transform: scale(0.95);
+@keyframes collapsible-open {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
   }
 }
 
-dialog::backdrop {
-  background: rgb(0 0 0 / 0);
-  transition:
-    background 150ms ease,
-    overlay 150ms ease allow-discrete,
-    display 150ms ease allow-discrete;
+@keyframes collapsible-close {
+  from {
+    height: var(--radix-collapsible-content-height);
+  }
+  to {
+    height: 0;
+  }
 }
 
-dialog[open]::backdrop {
+/* Dialog overlay animation */
+.confirm-overlay {
   background: rgb(0 0 0 / 0.5);
+  transition: background 150ms ease;
 }
 
 @starting-style {
-  dialog[open]::backdrop {
+  .confirm-overlay {
     background: rgb(0 0 0 / 0);
+  }
+}
+
+/* Dialog content animation */
+.confirm-content {
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+@starting-style {
+  .confirm-content {
+    opacity: 0;
+    transform: scale(0.95);
   }
 }

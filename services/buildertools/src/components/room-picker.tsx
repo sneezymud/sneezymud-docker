@@ -1,5 +1,6 @@
+import * as Popover from "@radix-ui/react-popover";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { z } from "zod";
 
 import { apiFetch } from "@/shared/api-client.ts";
@@ -24,9 +25,7 @@ export function RoomPicker({ id, onChange, value }: RoomPickerProps) {
   const autoId = useId();
   const inputId = id ?? autoId;
   const listboxId = `${inputId}-results`;
-  const containerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const openRef = useRef(false);
 
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -45,51 +44,12 @@ export function RoomPicker({ id, onChange, value }: RoomPickerProps) {
 
   const items = results ?? [];
 
-  const closeDropdown = () => {
-    setOpen(false);
-    setSearch("");
-    setHighlightIndex(-1);
-    openRef.current = false;
-  };
-
-  const openDropdown = () => {
-    setOpen(true);
-    openRef.current = true;
-    requestAnimationFrame(() => {
-      searchRef.current?.focus();
-    });
-  };
-
-  // Persistent outside-click listener
-  useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (
-        openRef.current &&
-        containerRef.current &&
-        e.target instanceof Node &&
-        !containerRef.current.contains(e.target)
-      ) {
-        setOpen(false);
-        setSearch("");
-        setHighlightIndex(-1);
-        openRef.current = false;
-      }
-    };
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-    };
-  }, []);
-
   const selectRoom = (vnum: number) => {
     onChange(vnum);
-    closeDropdown();
+    setOpen(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!open) {
-      return;
-    }
     switch (e.key) {
       case "ArrowDown": {
         e.preventDefault();
@@ -111,58 +71,61 @@ export function RoomPicker({ id, onChange, value }: RoomPickerProps) {
         }
         break;
       }
-      case "Escape": {
-        e.preventDefault();
-        closeDropdown();
-        break;
-      }
     }
   };
 
   return (
-    <div
-      className="relative"
-      ref={containerRef}
+    <Popover.Root
+      onOpenChange={(isOpen) => {
+        setOpen(isOpen);
+        if (!isOpen) {
+          setSearch("");
+          setHighlightIndex(-1);
+        }
+      }}
+      open={open}
     >
-      <div className="flex items-center gap-1">
-        <NumberInput
-          className="focus-visible:ring-accent w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100 outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
-          id={inputId}
-          onValueChange={onChange}
-          value={value}
-        />
-        <button
-          aria-label="Search rooms"
-          className="shrink-0 rounded border border-zinc-700 px-1.5 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-          onClick={() => {
-            if (open) {
-              closeDropdown();
-            } else {
-              openDropdown();
-            }
+      <Popover.Anchor asChild>
+        <div className="flex items-center gap-1">
+          <NumberInput
+            className="focus-visible:ring-accent w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100 outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
+            id={inputId}
+            onValueChange={onChange}
+            value={value}
+          />
+          <Popover.Trigger asChild>
+            <button
+              aria-label="Search rooms"
+              className="shrink-0 rounded border border-zinc-700 px-1.5 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+              type="button"
+            >
+              <svg
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  cx="11"
+                  cy="11"
+                  r="8"
+                />
+                <path d="M21 21l-4.35-4.35" />
+              </svg>
+            </button>
+          </Popover.Trigger>
+        </div>
+      </Popover.Anchor>
+      <Popover.Portal>
+        <Popover.Content
+          align="start"
+          className={`${Z_DROPDOWN} w-64 rounded border border-zinc-700 bg-zinc-800 p-2 shadow-lg`}
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            searchRef.current?.focus();
           }}
-          type="button"
-        >
-          <svg
-            className="h-3.5 w-3.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              cx="11"
-              cy="11"
-              r="8"
-            />
-            <path d="M21 21l-4.35-4.35" />
-          </svg>
-        </button>
-      </div>
-
-      {open ? (
-        <div
-          className={`absolute ${Z_DROPDOWN} mt-1 w-64 rounded border border-zinc-700 bg-zinc-800 p-2 shadow-lg`}
+          sideOffset={4}
         >
           <input
             aria-controls={listboxId}
@@ -219,8 +182,8 @@ export function RoomPicker({ id, onChange, value }: RoomPickerProps) {
               Type at least 2 characters to search
             </p>
           )}
-        </div>
-      ) : null}
-    </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }

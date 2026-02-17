@@ -1,3 +1,4 @@
+import * as Collapsible from "@radix-ui/react-collapsible";
 import { useState } from "react";
 
 import type { BitfieldEntry, EnumEntry } from "@/shared/enums/types.ts";
@@ -291,51 +292,64 @@ function FieldGroup({
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed === true);
 
+  const fieldsContent = (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {fields.map((field) => {
+        const fieldDirty =
+          originalValues !== undefined &&
+          values[field.key] !== originalValues[field.key];
+        return (
+          <FormField
+            field={field}
+            isDirty={fieldDirty}
+            key={field.key}
+            labelClass={labelClass}
+            onChange={onChange}
+            value={values[field.key]}
+          />
+        );
+      })}
+    </div>
+  );
+
+  if (!collapsible) {
+    return (
+      <fieldset className="rounded border border-zinc-700 p-4">
+        <legend className="px-2 text-sm font-medium text-zinc-300">
+          {title}
+        </legend>
+        {fieldsContent}
+      </fieldset>
+    );
+  }
+
   return (
-    <fieldset className="rounded border border-zinc-700 p-4">
-      <legend className="px-2 text-sm font-medium text-zinc-300">
-        {collapsible ? (
-          <button
-            className="focus-visible:ring-accent flex items-center gap-1.5 hover:text-zinc-100 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
-            onClick={() => {
-              setCollapsed((prev) => !prev);
-            }}
-            type="button"
-          >
-            <span className="text-xs text-zinc-400">
-              {collapsed ? "\u25B6" : "\u25BC"}
-            </span>
-            {title}
-          </button>
-        ) : (
-          title
-        )}
-      </legend>
-      <div
-        className="collapse-grid"
-        data-collapsed={collapsible && collapsed}
-      >
-        <div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {fields.map((field) => {
-              const fieldDirty =
-                originalValues !== undefined &&
-                values[field.key] !== originalValues[field.key];
-              return (
-                <FormField
-                  field={field}
-                  isDirty={fieldDirty}
-                  key={field.key}
-                  labelClass={labelClass}
-                  onChange={onChange}
-                  value={values[field.key]}
-                />
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </fieldset>
+    <Collapsible.Root
+      asChild
+      onOpenChange={(open) => {
+        setCollapsed(!open);
+      }}
+      open={!collapsed}
+    >
+      <fieldset className="rounded border border-zinc-700 p-4">
+        <legend className="px-2 text-sm font-medium text-zinc-300">
+          <Collapsible.Trigger asChild>
+            <button
+              className="focus-visible:ring-accent flex items-center gap-1.5 hover:text-zinc-100 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
+              type="button"
+            >
+              <span className="text-xs text-zinc-400">
+                {collapsed ? "\u25B6" : "\u25BC"}
+              </span>
+              {title}
+            </button>
+          </Collapsible.Trigger>
+        </legend>
+        <Collapsible.Content className="collapsible-content">
+          {fieldsContent}
+        </Collapsible.Content>
+      </fieldset>
+    </Collapsible.Root>
   );
 }
 

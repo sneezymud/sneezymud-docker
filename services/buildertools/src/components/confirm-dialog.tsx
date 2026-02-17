@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 
 interface ConfirmDialogProps {
   confirmLabel?: string;
@@ -19,57 +19,26 @@ export function ConfirmDialog({
   title,
   variant = "default",
 }: ConfirmDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const id = useId();
-  const titleId = `${id}-title`;
-  const descId = `${id}-desc`;
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) {
-      return;
-    }
-    if (open && !dialog.open) {
-      dialog.showModal();
-    } else if (!open && dialog.open) {
-      dialog.close();
-    }
-  }, [open]);
-
   const isDanger = variant === "danger";
 
   return (
-    <dialog
-      aria-describedby={descId}
-      aria-labelledby={title ? titleId : undefined}
-      className="bg-transparent p-0"
-      onClose={onCancel}
-      ref={dialogRef}
+    <Dialog.Root
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onCancel();
+      }}
+      open={open}
     >
-      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- backdrop dismiss zone around the dialog content */}
-      <div
-        className="p-4"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            onCancel();
-          }
-        }}
-      >
-        <div className="w-80 max-w-[calc(100vw-2rem)] rounded border border-zinc-700 bg-zinc-900 p-5 text-zinc-100 shadow-xl">
-          {title ? (
-            <h3
-              className="mb-2 text-sm font-semibold"
-              id={titleId}
-            >
-              {title}
-            </h3>
-          ) : null}
-          <p
-            className="mb-4 text-sm text-zinc-400"
-            id={descId}
+      <Dialog.Portal>
+        <Dialog.Overlay className="confirm-overlay fixed inset-0 z-50" />
+        <Dialog.Content className="confirm-content fixed top-1/2 left-1/2 z-50 w-80 max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 rounded border border-zinc-700 bg-zinc-900 p-5 text-zinc-100 shadow-xl">
+          <Dialog.Title
+            className={title ? "mb-2 text-sm font-semibold" : "sr-only"}
           >
+            {title ?? "Confirmation"}
+          </Dialog.Title>
+          <Dialog.Description className="mb-4 text-sm text-zinc-400">
             {message}
-          </p>
+          </Dialog.Description>
           <div className="flex justify-end gap-2">
             <button
               className="focus-visible:ring-accent rounded border border-zinc-600 px-3 py-1.5 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
@@ -90,8 +59,8 @@ export function ConfirmDialog({
               {confirmLabel}
             </button>
           </div>
-        </div>
-      </div>
-    </dialog>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

@@ -1,4 +1,5 @@
-import { useId, useState } from "react";
+import * as Collapsible from "@radix-ui/react-collapsible";
+import { useState } from "react";
 
 import { ConfirmDialog } from "./confirm-dialog.tsx";
 import { NumberInput } from "./number-input.tsx";
@@ -30,8 +31,6 @@ export function SubTable<T extends Record<string, number | string>>({
 }: SubTableProps<T>) {
   const [collapsed, setCollapsed] = useState(rows.length === 0);
   const [pendingRemove, setPendingRemove] = useState<null | number>(null);
-  const autoId = useId();
-  const contentId = `${autoId}-content`;
 
   // Stable row keys — track UUID per row via state
   const [rowKeys, setRowKeys] = useState<string[]>(() =>
@@ -85,36 +84,33 @@ export function SubTable<T extends Record<string, number | string>>({
     "w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100 outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950";
 
   return (
-    <fieldset className="rounded border border-zinc-700 p-4">
-      <legend className="px-2 text-sm font-medium text-zinc-300">
-        <button
-          aria-controls={contentId}
-          aria-expanded={!collapsed}
-          className="focus-visible:ring-accent flex items-center gap-1.5 hover:text-zinc-100 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
-          onClick={() => {
-            setCollapsed((prev) => !prev);
-          }}
-          type="button"
-        >
-          <span className="text-xs text-zinc-400">
-            {collapsed ? "\u25B6" : "\u25BC"}
-          </span>
-          {label}
-          <span className="text-xs font-normal text-zinc-400">
-            ({String(rows.length)})
-          </span>
-        </button>
-      </legend>
+    <Collapsible.Root
+      asChild
+      onOpenChange={(open) => {
+        setCollapsed(!open);
+      }}
+      open={!collapsed}
+    >
+      <fieldset className="rounded border border-zinc-700 p-4">
+        <legend className="px-2 text-sm font-medium text-zinc-300">
+          <Collapsible.Trigger asChild>
+            <button
+              className="focus-visible:ring-accent flex items-center gap-1.5 hover:text-zinc-100 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
+              type="button"
+            >
+              <span className="text-xs text-zinc-400">
+                {collapsed ? "\u25B6" : "\u25BC"}
+              </span>
+              {label}
+              <span className="text-xs font-normal text-zinc-400">
+                ({String(rows.length)})
+              </span>
+            </button>
+          </Collapsible.Trigger>
+        </legend>
 
-      <div
-        className="collapse-grid"
-        data-collapsed={collapsed}
-      >
-        <div>
-          <div
-            className="space-y-2"
-            id={contentId}
-          >
+        <Collapsible.Content className="collapsible-content">
+          <div className="space-y-2">
             {rows.length === 0 ? (
               <p className="py-2 text-sm text-zinc-400">
                 No {label.toLowerCase()} yet. Click + to add.
@@ -198,24 +194,24 @@ export function SubTable<T extends Record<string, number | string>>({
               + Add {singularLabel.toLowerCase()}
             </button>
           </div>
-        </div>
-      </div>
+        </Collapsible.Content>
 
-      <ConfirmDialog
-        confirmLabel="Remove"
-        message={`Remove this ${singularLabel.toLowerCase()}?`}
-        onCancel={() => {
-          setPendingRemove(null);
-        }}
-        onConfirm={() => {
-          if (pendingRemove !== null) {
-            removeRow(pendingRemove);
-          }
-          setPendingRemove(null);
-        }}
-        open={pendingRemove !== null}
-        variant="danger"
-      />
-    </fieldset>
+        <ConfirmDialog
+          confirmLabel="Remove"
+          message={`Remove this ${singularLabel.toLowerCase()}?`}
+          onCancel={() => {
+            setPendingRemove(null);
+          }}
+          onConfirm={() => {
+            if (pendingRemove !== null) {
+              removeRow(pendingRemove);
+            }
+            setPendingRemove(null);
+          }}
+          open={pendingRemove !== null}
+          variant="danger"
+        />
+      </fieldset>
+    </Collapsible.Root>
   );
 }

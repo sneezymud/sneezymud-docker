@@ -1,4 +1,5 @@
-import { useId, useState } from "react";
+import * as Collapsible from "@radix-ui/react-collapsible";
+import { useState } from "react";
 
 import type { BitfieldEntry } from "@/shared/enums/types.ts";
 
@@ -20,8 +21,6 @@ export function BitfieldEditor({
   value,
 }: BitfieldEditorProps) {
   const [collapsed, setCollapsed] = useState(true);
-  const autoId = useId();
-  const gridId = `${autoId}-grid`;
 
   const enabledEntries = entries.filter((e) => !e.disabledReason);
   const activeCount = enabledEntries.filter((e) => hasBit(value, e.bit)).length;
@@ -32,7 +31,13 @@ export function BitfieldEditor({
   };
 
   return (
-    <div id={id}>
+    <Collapsible.Root
+      id={id}
+      onOpenChange={(open) => {
+        setCollapsed(!open);
+      }}
+      open={!collapsed}
+    >
       <div className="flex items-center gap-2">
         <NumberInput
           aria-label={label ? `${label} numeric value` : "Bitfield value"}
@@ -41,62 +46,53 @@ export function BitfieldEditor({
           onValueChange={handleValueChange}
           value={value}
         />
-        <button
-          aria-controls={gridId}
-          aria-expanded={!collapsed}
-          className="focus-visible:ring-accent shrink-0 rounded border border-zinc-700 px-2 py-2 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
-          onClick={() => {
-            setCollapsed((prev) => !prev);
-          }}
-          type="button"
-        >
-          {collapsed
-            ? `Show ${String(activeCount)} flag${activeCount === 1 ? "" : "s"}`
-            : "Hide flags"}
-        </button>
+        <Collapsible.Trigger asChild>
+          <button
+            className="focus-visible:ring-accent shrink-0 rounded border border-zinc-700 px-2 py-2 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
+            type="button"
+          >
+            {collapsed
+              ? `Show ${String(activeCount)} flag${activeCount === 1 ? "" : "s"}`
+              : "Hide flags"}
+          </button>
+        </Collapsible.Trigger>
       </div>
 
-      <div
-        className="collapse-grid"
-        data-collapsed={collapsed}
-      >
-        <div>
-          <div
-            aria-label={label ? `${label} flags` : "Flags"}
-            className="mt-2 grid grid-cols-2 gap-1 md:grid-cols-3 lg:grid-cols-4"
-            id={gridId}
-            role="group"
-          >
-            {entries.map((entry) => {
-              const isSet = hasBit(value, entry.bit);
-              const isDisabled = Boolean(entry.disabledReason);
-              return (
-                <label
-                  className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 text-xs ${
-                    isDisabled
-                      ? "cursor-not-allowed text-zinc-600"
-                      : "cursor-pointer text-zinc-400 hover:bg-zinc-800"
-                  }`}
-                  key={entry.bit}
-                  title={entry.disabledReason}
-                >
-                  <input
-                    checked={isSet}
-                    className="accent-accent"
-                    disabled={isDisabled}
-                    onChange={() => {
-                      onChange(toggleBitValue(value, entry.bit));
-                    }}
-                    type="checkbox"
-                  />
-                  {entry.label}
-                </label>
-              );
-            })}
-          </div>
+      <Collapsible.Content className="collapsible-content">
+        <div
+          aria-label={label ? `${label} flags` : "Flags"}
+          className="mt-2 grid grid-cols-2 gap-1 md:grid-cols-3 lg:grid-cols-4"
+          role="group"
+        >
+          {entries.map((entry) => {
+            const isSet = hasBit(value, entry.bit);
+            const isDisabled = Boolean(entry.disabledReason);
+            return (
+              <label
+                className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 text-xs ${
+                  isDisabled
+                    ? "cursor-not-allowed text-zinc-600"
+                    : "cursor-pointer text-zinc-400 hover:bg-zinc-800"
+                }`}
+                key={entry.bit}
+                title={entry.disabledReason}
+              >
+                <input
+                  checked={isSet}
+                  className="accent-accent"
+                  disabled={isDisabled}
+                  onChange={() => {
+                    onChange(toggleBitValue(value, entry.bit));
+                  }}
+                  type="checkbox"
+                />
+                {entry.label}
+              </label>
+            );
+          })}
         </div>
-      </div>
-    </div>
+      </Collapsible.Content>
+    </Collapsible.Root>
   );
 }
 
