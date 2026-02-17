@@ -3,6 +3,8 @@ import { useState } from "react";
 
 import type { BitfieldEntry, EnumEntry } from "@/shared/enums/types.ts";
 
+import { cn } from "@/lib/cn.ts";
+
 import { BitfieldEditor } from "./bitfield-editor.tsx";
 import { ConfirmDialog } from "./confirm-dialog.tsx";
 import { EnumSelect } from "./enum-select.tsx";
@@ -225,7 +227,10 @@ function FormField({
 
   return (
     <div
-      className={`${isFullWidth ? "col-span-full" : ""} ${isDirty ? "border-l-2 border-l-amber-400/50 pl-2" : ""}`}
+      className={cn(
+        isFullWidth && "col-span-full",
+        isDirty && "border-l-2 border-l-amber-400/50 pl-2",
+      )}
     >
       <Label
         className={labelClass}

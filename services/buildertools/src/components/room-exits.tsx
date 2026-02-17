@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import type { RoomExit } from "@/shared/schemas/room.ts";
 
 import { useRoomName } from "@/hooks/use-room-name.ts";
+import { cn } from "@/lib/cn.ts";
 import { EXIT_FLAGS } from "@/shared/enums/index.ts";
 
 import { BitfieldEditor } from "./bitfield-editor.tsx";
@@ -134,11 +135,12 @@ function ExitSlot({
 
   return (
     <div
-      className={`rounded border border-zinc-700/30 bg-zinc-800/20 p-3 transition-shadow hover:shadow-md hover:shadow-zinc-900/50 ${
+      className={cn(
+        "rounded border border-zinc-700/30 bg-zinc-800/20 p-3 transition-shadow hover:shadow-md hover:shadow-zinc-900/50",
         enabled
           ? "border-l-accent border-l-2"
-          : "border-l-2 border-l-transparent"
-      }`}
+          : "border-l-2 border-l-transparent",
+      )}
     >
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium text-zinc-300">{name}</span>

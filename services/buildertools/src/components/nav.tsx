@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { cn } from "@/lib/cn.ts";
 import { useAuthStore } from "@/state/auth.ts";
 import { useDirtyStore } from "@/state/dirty.ts";
 import { useSidebarStore } from "@/state/sidebar.ts";
@@ -51,9 +52,10 @@ export function Nav() {
 
   return (
     <nav
-      className={`fixed inset-y-0 left-0 z-40 flex w-56 transform flex-col border-r border-zinc-700/50 bg-zinc-900 p-4 transition-transform md:sticky md:top-0 md:h-screen md:translate-x-0 md:overflow-y-auto ${
-        sidebarOpen ? "translate-x-0" : "-translate-x-full"
-      }`}
+      className={cn(
+        "fixed inset-y-0 left-0 z-40 flex w-56 transform flex-col border-r border-zinc-700/50 bg-zinc-900 p-4 transition-transform md:sticky md:top-0 md:h-screen md:translate-x-0 md:overflow-y-auto",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full",
+      )}
     >
       <div className="mb-6">
         <p className="text-base font-semibold text-zinc-400">SneezyMUD</p>

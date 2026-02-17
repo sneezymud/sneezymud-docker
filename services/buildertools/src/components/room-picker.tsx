@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useId, useRef, useState } from "react";
 import { z } from "zod";
 
+import { cn } from "@/lib/cn.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import { roomKeys } from "@/shared/query-keys.ts";
 
@@ -154,11 +155,12 @@ export function RoomPicker({ id, onChange, value }: RoomPickerProps) {
                 items.map((item, index) => (
                   <li
                     aria-selected={item.vnum === value}
-                    className={`cursor-pointer rounded px-2 py-1 text-xs ${
+                    className={cn(
+                      "cursor-pointer rounded px-2 py-1 text-xs",
                       index === highlightIndex
                         ? "bg-accent/20 text-zinc-100"
-                        : "text-zinc-300 hover:bg-zinc-700/30"
-                    }`}
+                        : "text-zinc-300 hover:bg-zinc-700/30",
+                    )}
                     key={item.vnum}
                     onClick={() => {
                       selectRoom(item.vnum);

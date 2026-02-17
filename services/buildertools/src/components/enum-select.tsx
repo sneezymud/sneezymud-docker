@@ -4,6 +4,8 @@ import { useId, useRef, useState } from "react";
 
 import type { EnumEntry } from "@/shared/enums/types.ts";
 
+import { cn } from "@/lib/cn.ts";
+
 interface EnumSelectProps {
   entries: EnumEntry[];
   id?: string | undefined;
@@ -226,13 +228,14 @@ function SearchableEnumSelect({
               filtered.map((entry, index) => (
                 <li
                   aria-selected={entry.value === value}
-                  className={`cursor-pointer px-3 py-1.5 text-sm ${
+                  className={cn(
+                    "cursor-pointer px-3 py-1.5 text-sm",
                     index === highlightIndex
                       ? "bg-accent/20 text-zinc-100"
                       : entry.value === value
                         ? "bg-zinc-700/50 text-zinc-100"
-                        : "text-zinc-300 hover:bg-zinc-700/30"
-                  }`}
+                        : "text-zinc-300 hover:bg-zinc-700/30",
+                  )}
                   id={`${listboxId}-${index}`}
                   key={entry.value}
                   onClick={() => {

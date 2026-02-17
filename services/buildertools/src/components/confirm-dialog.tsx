@@ -1,5 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 
+import { cn } from "@/lib/cn.ts";
+
 interface ConfirmDialogProps {
   confirmLabel?: string;
   message: string;
@@ -48,11 +50,12 @@ export function ConfirmDialog({
               Cancel
             </button>
             <button
-              className={`focus-visible:ring-accent rounded px-3 py-1.5 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 ${
+              className={cn(
+                "focus-visible:ring-accent rounded px-3 py-1.5 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950",
                 isDanger
                   ? "bg-red-700 text-red-100 hover:bg-red-600"
-                  : "bg-zinc-600 text-zinc-100 hover:bg-zinc-500"
-              }`}
+                  : "bg-zinc-600 text-zinc-100 hover:bg-zinc-500",
+              )}
               onClick={onConfirm}
               type="button"
             >
