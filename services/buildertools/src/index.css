@@ -26,37 +26,6 @@ a {
   transition-timing-function: ease;
 }
 
-/* Collapsible animation (Radix) */
-.collapsible-content {
-  overflow: hidden;
-}
-
-.collapsible-content[data-state="open"] {
-  animation: collapsible-open 200ms ease;
-}
-
-.collapsible-content[data-state="closed"] {
-  animation: collapsible-close 200ms ease;
-}
-
-@keyframes collapsible-open {
-  from {
-    height: 0;
-  }
-  to {
-    height: var(--radix-collapsible-content-height);
-  }
-}
-
-@keyframes collapsible-close {
-  from {
-    height: var(--radix-collapsible-content-height);
-  }
-  to {
-    height: 0;
-  }
-}
-
 /* Dialog overlay animation */
 .confirm-overlay {
   background: rgb(0 0 0 / 0.5);

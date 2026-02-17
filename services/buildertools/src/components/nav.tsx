@@ -51,7 +51,7 @@ export function Nav() {
 
   return (
     <nav
-      className={`fixed inset-y-0 left-0 z-40 flex w-56 transform flex-col border-r border-zinc-700/50 bg-zinc-900 p-4 transition-transform md:static md:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-40 flex w-56 transform flex-col border-r border-zinc-700/50 bg-zinc-900 p-4 transition-transform md:sticky md:top-0 md:h-screen md:translate-x-0 md:overflow-y-auto ${
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       }`}
     >
