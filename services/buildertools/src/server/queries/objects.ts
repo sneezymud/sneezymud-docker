@@ -1,10 +1,11 @@
-import { and, eq, gte, lte, or } from "drizzle-orm";
+import { and, eq, gte, like, lte, or } from "drizzle-orm";
 
 import type { VnumBlock } from "@/shared/schemas/auth.ts";
 import type { Obj, ObjListItem } from "@/shared/schemas/obj.ts";
 
-import { immortalDb } from "../db.ts";
+import { immortalDb, sneezyDb } from "../db.ts";
 import { obj, objaffect, objextra } from "../schema/immortal.ts";
+import { obj as sneezyObj } from "../schema/sneezy.ts";
 
 export async function listObjects(blocks: VnumBlock[]): Promise<ObjListItem[]> {
   if (blocks.length === 0) {
@@ -102,6 +103,50 @@ export async function deleteObject(vnum: number): Promise<void> {
     await tx.delete(objextra).where(eq(objextra.vnum, vnum));
     await tx.delete(obj).where(eq(obj.vnum, vnum));
   });
+}
+
+export async function searchObjects(
+  query: string,
+): Promise<Array<{ short_desc: string; vnum: number }>> {
+  const likeParam = `%${query}%`;
+  const isNumeric = /^\d+$/.test(query);
+
+  const nameFilter = like(obj.short_desc, likeParam);
+  const sneezyNameFilter = like(sneezyObj.short_desc, likeParam);
+
+  const [immortalRows, sneezyRows] = await Promise.all([
+    immortalDb
+      .select({ short_desc: obj.short_desc, vnum: obj.vnum })
+      .from(obj)
+      .where(
+        isNumeric ? or(eq(obj.vnum, Number(query)), nameFilter) : nameFilter,
+      )
+      .orderBy(obj.vnum)
+      .limit(10),
+    sneezyDb
+      .select({ short_desc: sneezyObj.short_desc, vnum: sneezyObj.vnum })
+      .from(sneezyObj)
+      .where(
+        isNumeric
+          ? or(eq(sneezyObj.vnum, Number(query)), sneezyNameFilter)
+          : sneezyNameFilter,
+      )
+      .orderBy(sneezyObj.vnum)
+      .limit(10),
+  ]);
+
+  const seen = new Set<number>();
+  const merged: Array<{ short_desc: string; vnum: number }> = [];
+
+  for (const row of [...immortalRows, ...sneezyRows]) {
+    if (!seen.has(row.vnum)) {
+      seen.add(row.vnum);
+      merged.push({ short_desc: row.short_desc, vnum: row.vnum });
+    }
+  }
+
+  merged.sort((a, b) => a.vnum - b.vnum);
+  return merged.slice(0, 20);
 }
 
 export async function objectExists(vnum: number): Promise<boolean> {

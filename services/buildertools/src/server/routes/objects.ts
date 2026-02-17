@@ -14,6 +14,7 @@ import {
   getObject,
   listObjects,
   objectExists,
+  searchObjects,
   updateObject,
 } from "../queries/objects.ts";
 import { isVnumInBlocks } from "../queries/vnum-access.ts";
@@ -43,6 +44,15 @@ objectRoutes.post("/", jsonValidator(objCreateSchema), async (c) => {
   await createObject(data.vnum, user.playerName);
   const obj = await getObject(data.vnum);
   return c.json(obj, 201);
+});
+
+objectRoutes.get("/search", async (c) => {
+  const query = c.req.query("q") ?? "";
+  if (query.length < 2) {
+    return c.json([]);
+  }
+  const results = await searchObjects(query);
+  return c.json(results);
 });
 
 objectRoutes.get("/:vnum", requireVnumAccess, async (c) => {

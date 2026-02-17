@@ -25,6 +25,11 @@ export const wizdata = mysqlTable("wizdata", {
   player_id: int().notNull(),
 });
 
+export const obj = mysqlTable("obj", {
+  short_desc: text().notNull(),
+  vnum: int().primaryKey(),
+});
+
 export const zone = mysqlTable("zone", {
   age: int(),
   bottom: int(),
