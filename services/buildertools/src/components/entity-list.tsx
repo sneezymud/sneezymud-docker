@@ -1,4 +1,14 @@
 import { Link } from "@tanstack/react-router";
+import {
+  type ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  type SortingState,
+  useReactTable,
+} from "@tanstack/react-table";
 import { useDeferredValue, useState } from "react";
 
 import { VnumPicker } from "./vnum-picker.tsx";
@@ -19,6 +29,8 @@ interface EntityListProps {
   vnumBlocks?: Array<{ end: number; start: number }> | undefined;
 }
 
+const PAGE_SIZE = 50;
+
 export function EntityList({
   basePath,
   createPending,
@@ -30,44 +42,54 @@ export function EntityList({
 }: EntityListProps) {
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [sortBy, setSortBy] = useState<"name" | "vnum">("vnum");
-  const [sortAsc, setSortAsc] = useState(true);
-  const [page, setPage] = useState(0);
+  const [sorting, setSorting] = useState<SortingState>([
+    { desc: false, id: "vnum" },
+  ]);
 
   const deferredSearch = useDeferredValue(search);
 
-  const filtered = deferredSearch
-    ? entities.filter(
-        (e) =>
-          e.name.toLowerCase().includes(deferredSearch.toLowerCase()) ||
-          String(e.vnum).includes(deferredSearch),
-      )
-    : entities;
+  const columns: Array<ColumnDef<EntityListItem>> = [
+    { accessorKey: "vnum", header: "Vnum" },
+    { accessorKey: "name", header: "Name", sortingFn: "text" },
+  ];
 
-  const sorted = filtered.toSorted((a, b) => {
-    const cmp =
-      sortBy === "vnum" ? a.vnum - b.vnum : a.name.localeCompare(b.name);
-    return sortAsc ? cmp : -cmp;
+  if (secondaryLabel) {
+    columns.push({
+      accessorKey: "secondary",
+      enableSorting: false,
+      header: secondaryLabel,
+    });
+  }
+
+  const table = useReactTable({
+    columns,
+    data: entities,
+    enableSortingRemoval: false,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    globalFilterFn: (row, _columnId, filterValue: string) => {
+      const searchLower = filterValue.toLowerCase();
+      return (
+        row.original.name.toLowerCase().includes(searchLower) ||
+        String(row.original.vnum).includes(filterValue)
+      );
+    },
+    initialState: {
+      pagination: { pageSize: PAGE_SIZE },
+    },
+    onSortingChange: setSorting,
+    state: {
+      globalFilter: deferredSearch,
+      sorting,
+    },
   });
 
-  const toggleSort = (col: "name" | "vnum") => {
-    if (sortBy === col) {
-      setSortAsc((prev) => !prev);
-    } else {
-      setSortBy(col);
-      setSortAsc(true);
-    }
-  };
-
-  const PAGE_SIZE = 50;
-  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
-  const paginated =
-    totalPages > 1
-      ? sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
-      : sorted;
-
-  const sortIndicator = (col: "name" | "vnum") =>
-    sortBy === col ? (sortAsc ? " \u25B2" : " \u25BC") : "";
+  const rows = table.getRowModel().rows;
+  const filteredCount = table.getFilteredRowModel().rows.length;
+  const totalPages = table.getPageCount();
+  const pageIndex = table.getState().pagination.pageIndex;
 
   return (
     <div>
@@ -75,7 +97,7 @@ export function EntityList({
         <h2 className="text-xl font-bold text-zinc-100">
           {label}{" "}
           <span className="text-sm font-normal text-zinc-400">
-            ({String(entities.length)})
+            ({entities.length})
           </span>
         </h2>
         {onCreateVnum && vnumBlocks ? (
@@ -97,7 +119,6 @@ export function EntityList({
           className="focus-visible:ring-accent w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-2 pr-8 text-sm text-zinc-100 outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
           onChange={(e) => {
             setSearch(e.target.value);
-            setPage(0);
           }}
           placeholder="Search by vnum or name..."
           type="text"
@@ -109,7 +130,6 @@ export function EntityList({
             className="absolute top-1/2 right-2 -translate-y-1/2 text-sm text-zinc-400 hover:text-zinc-200"
             onClick={() => {
               setSearch("");
-              setPage(0);
             }}
             type="button"
           >
@@ -120,48 +140,52 @@ export function EntityList({
 
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-zinc-700/50 text-left text-zinc-400">
-            <th
-              className="w-24 px-3 py-2 font-medium"
-              scope="col"
+          {table.getHeaderGroups().map((headerGroup) => (
+            <tr
+              className="border-b border-zinc-700/50 text-left text-zinc-400"
+              key={headerGroup.id}
             >
-              <button
-                className="hover:text-zinc-200"
-                onClick={() => {
-                  toggleSort("vnum");
-                }}
-                type="button"
-              >
-                Vnum{sortIndicator("vnum")}
-              </button>
-            </th>
-            <th
-              className="px-3 py-2 font-medium"
-              scope="col"
-            >
-              <button
-                className="hover:text-zinc-200"
-                onClick={() => {
-                  toggleSort("name");
-                }}
-                type="button"
-              >
-                Name{sortIndicator("name")}
-              </button>
-            </th>
-            {secondaryLabel ? (
-              <th
-                className="px-3 py-2 font-medium"
-                scope="col"
-              >
-                {secondaryLabel}
-              </th>
-            ) : null}
-          </tr>
+              {headerGroup.headers.map((header) => (
+                <th
+                  className={
+                    header.column.id === "vnum"
+                      ? "w-24 px-3 py-2 font-medium"
+                      : "px-3 py-2 font-medium"
+                  }
+                  key={header.id}
+                  scope="col"
+                >
+                  {header.column.getCanSort() ? (
+                    <button
+                      className="hover:text-zinc-200"
+                      onClick={header.column.getToggleSortingHandler()}
+                      type="button"
+                    >
+                      {flexRender(
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
+                      {header.column.getIsSorted() === "asc"
+                        ? " \u25B2"
+                        : header.column.getIsSorted() === "desc"
+                          ? " \u25BC"
+                          : ""}
+                    </button>
+                  ) : (
+                    flexRender(
+                      header.column.columnDef.header,
+                      header.getContext(),
+                    )
+                  )}
+                </th>
+              ))}
+            </tr>
+          ))}
         </thead>
         <tbody>
-          {paginated.map((entity) => {
-            const to = `${basePath}/${String(entity.vnum)}`;
+          {rows.map((row) => {
+            const entity = row.original;
+            const to = `${basePath}/${entity.vnum}`;
             return (
               <tr
                 className="has-[a:focus-visible]:ring-accent group border-b border-zinc-800/50 transition-colors hover:bg-zinc-800/30 has-[a:focus-visible]:bg-zinc-800/30 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-inset"
@@ -198,7 +222,7 @@ export function EntityList({
               </tr>
             );
           })}
-          {paginated.length === 0 ? (
+          {rows.length === 0 ? (
             <tr>
               <td
                 className="px-3 py-8 text-center text-zinc-400"
@@ -232,22 +256,22 @@ export function EntityList({
         <div className="mt-3 flex items-center justify-between text-sm text-zinc-400">
           <button
             className="rounded px-3 py-1 hover:bg-zinc-800 disabled:opacity-40"
-            disabled={page === 0}
+            disabled={!table.getCanPreviousPage()}
             onClick={() => {
-              setPage((p) => p - 1);
+              table.previousPage();
             }}
             type="button"
           >
             {"\u2190"} Previous
           </button>
           <span>
-            Page {String(page + 1)} of {String(totalPages)}
+            Page {pageIndex + 1} of {totalPages}
           </span>
           <button
             className="rounded px-3 py-1 hover:bg-zinc-800 disabled:opacity-40"
-            disabled={page >= totalPages - 1}
+            disabled={!table.getCanNextPage()}
             onClick={() => {
-              setPage((p) => p + 1);
+              table.nextPage();
             }}
             type="button"
           >
@@ -258,8 +282,8 @@ export function EntityList({
 
       <p className="mt-2 text-xs text-zinc-400">
         {search
-          ? `${String(sorted.length)} results (${String(entities.length)} total)`
-          : `${String(entities.length)} ${label.toLowerCase()}`}
+          ? `${filteredCount} results (${entities.length} total)`
+          : `${entities.length} ${label.toLowerCase()}`}
       </p>
     </div>
   );
