@@ -1,3 +1,4 @@
+import * as Tooltip from "@radix-ui/react-tooltip";
 import { useState } from "react";
 
 import type { BitfieldEntry, EnumEntry } from "@/shared/enums/types.ts";
@@ -15,6 +16,7 @@ interface FieldDefBase {
   key: string;
   label: string;
   required?: boolean | undefined;
+  tooltip?: string;
 }
 
 interface TextFieldDef extends FieldDefBase {
@@ -83,85 +85,125 @@ export function EntityForm({
   };
 
   return (
-    <form
-      className="space-y-6"
-      onSubmit={handleSubmit}
-    >
-      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-zinc-700/30 bg-zinc-950/95 py-3 backdrop-blur-sm">
-        <button
-          className="bg-accent hover:bg-accent/80 focus-visible:ring-accent rounded px-4 py-2 text-sm text-white transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!dirty || saving}
-          type="submit"
-        >
-          {saving ? "Saving..." : "Save"}
-        </button>
+    <Tooltip.Provider delayDuration={300}>
+      <form
+        className="space-y-6"
+        onSubmit={handleSubmit}
+      >
+        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-zinc-700/30 bg-zinc-950/95 py-3 backdrop-blur-sm">
+          <button
+            className="bg-accent hover:bg-accent/80 focus-visible:ring-accent rounded px-4 py-2 text-sm text-white transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!dirty || saving}
+            type="submit"
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
 
-        <span
-          aria-live="polite"
-          className="contents"
-        >
-          {dirty ? (
-            <span className="flex items-center gap-1.5 text-sm font-medium text-amber-400">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
-              Unsaved changes
-              {onReset ? (
-                <button
-                  className="ml-1 text-xs text-zinc-400 underline hover:text-zinc-200"
-                  onClick={onReset}
-                  type="button"
-                >
-                  Discard
-                </button>
-              ) : null}
-            </span>
+          <span
+            aria-live="polite"
+            className="contents"
+          >
+            {dirty ? (
+              <span className="flex items-center gap-1.5 text-sm font-medium text-amber-400">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+                Unsaved changes
+                {onReset ? (
+                  <button
+                    className="ml-1 text-xs text-zinc-400 underline hover:text-zinc-200"
+                    onClick={onReset}
+                    type="button"
+                  >
+                    Discard
+                  </button>
+                ) : null}
+              </span>
+            ) : null}
+          </span>
+
+          {onDelete ? (
+            <button
+              className="focus-visible:ring-accent ml-auto rounded border border-red-800/50 px-3 py-1.5 text-sm text-red-400 transition-colors hover:bg-red-900/20 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={deletePending}
+              onClick={() => {
+                setShowDeleteConfirm(true);
+              }}
+              type="button"
+            >
+              {deletePending ? "Deleting..." : "Delete"}
+            </button>
           ) : null}
-        </span>
+        </div>
+
+        {groups.map((group) => (
+          <FieldGroup
+            fields={group.fields}
+            key={group.title}
+            labelClass={group.labelClass}
+            onChange={onChange}
+            originalValues={originalValues}
+            title={group.title}
+            values={values}
+          />
+        ))}
+
+        {children}
 
         {onDelete ? (
-          <button
-            className="focus-visible:ring-accent ml-auto rounded border border-red-800/50 px-3 py-1.5 text-sm text-red-400 transition-colors hover:bg-red-900/20 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={deletePending}
-            onClick={() => {
-              setShowDeleteConfirm(true);
+          <ConfirmDialog
+            confirmLabel="Yes, delete"
+            message={deleteMessage ?? "Are you sure you want to delete this?"}
+            onCancel={() => {
+              setShowDeleteConfirm(false);
             }}
-            type="button"
-          >
-            {deletePending ? "Deleting..." : "Delete"}
-          </button>
+            onConfirm={() => {
+              setShowDeleteConfirm(false);
+              onDelete();
+            }}
+            open={showDeleteConfirm}
+            title="Confirm Delete"
+            variant="danger"
+          />
         ) : null}
-      </div>
+      </form>
+    </Tooltip.Provider>
+  );
+}
 
-      {groups.map((group) => (
-        <FieldGroup
-          fields={group.fields}
-          key={group.title}
-          labelClass={group.labelClass}
-          onChange={onChange}
-          originalValues={originalValues}
-          title={group.title}
-          values={values}
-        />
-      ))}
-
-      {children}
-
-      {onDelete ? (
-        <ConfirmDialog
-          confirmLabel="Yes, delete"
-          message={deleteMessage ?? "Are you sure you want to delete this?"}
-          onCancel={() => {
-            setShowDeleteConfirm(false);
-          }}
-          onConfirm={() => {
-            setShowDeleteConfirm(false);
-            onDelete();
-          }}
-          open={showDeleteConfirm}
-          title="Confirm Delete"
-          variant="danger"
-        />
-      ) : null}
-    </form>
+function FieldTooltip({ text }: { text: string }) {
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger asChild>
+        <span className="ml-1 inline-flex cursor-help text-zinc-500 hover:text-zinc-300">
+          <svg
+            aria-hidden="true"
+            className="h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+            />
+            <path
+              d="M12 16v-4M12 8h.01"
+              strokeLinecap="round"
+            />
+          </svg>
+        </span>
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content
+          className="tooltip-content z-50 max-w-xs rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 shadow-lg"
+          sideOffset={5}
+        >
+          {text}
+          <Tooltip.Arrow className="fill-zinc-800" />
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
   );
 }
 
@@ -196,6 +238,7 @@ function FormField({
             className="ml-1 inline-block h-1 w-1 rounded-full bg-amber-400 align-super"
           />
         ) : null}
+        {field.tooltip ? <FieldTooltip text={field.tooltip} /> : null}
       </Label>
       {field.type === "textarea" ? (
         <Textarea
