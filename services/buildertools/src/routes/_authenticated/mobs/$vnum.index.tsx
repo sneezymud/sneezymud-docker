@@ -42,7 +42,7 @@ const mobFieldGroups: FieldGroupDef[] = [
         required: true,
         type: "text",
       },
-      { key: "long_desc", label: "Long Description", type: "text" },
+      { key: "long_desc", label: "Long Description", type: "textarea" },
       { key: "description", label: "Detailed Description", type: "textarea" },
     ],
     title: "Identity",
@@ -129,7 +129,6 @@ const mobFieldGroups: FieldGroupDef[] = [
       },
       {
         enumEntries: FACTION_TYPES,
-        help: "Faction group ID",
         key: "faction",
         label: "Faction",
         type: "enum",
@@ -194,11 +193,9 @@ const mobFieldGroups: FieldGroupDef[] = [
     title: "Economy & Limits",
   },
   {
-    collapsible: true,
-    defaultCollapsed: true,
     fields: [
-      { key: "local_sound", label: "Local Sound", type: "text" },
-      { key: "adjacent_sound", label: "Adjacent Sound", type: "text" },
+      { key: "local_sound", label: "Local Sound", type: "textarea" },
+      { key: "adjacent_sound", label: "Adjacent Sound", type: "textarea" },
     ],
     title: "Sounds",
   },

@@ -98,8 +98,6 @@ function getRoomFieldGroups(
       title: "Properties",
     },
     {
-      collapsible: true,
-      defaultCollapsed: true,
       fields: [
         { key: "teletime", label: "Teleport Time", type: "number" },
         { key: "teletarg", label: "Teleport Target", type: "number" },
@@ -113,8 +111,6 @@ function getRoomFieldGroups(
       title: "Teleport",
     },
     {
-      collapsible: true,
-      defaultCollapsed: true,
       fields: [
         {
           help: "Ticks between river pulses (0 = disabled)",
@@ -132,8 +128,6 @@ function getRoomFieldGroups(
       title: "River",
     },
     {
-      collapsible: true,
-      defaultCollapsed: true,
       fields: [
         { key: "x", label: "X", type: "number" },
         { key: "y", label: "Y", type: "number" },

@@ -79,7 +79,7 @@
     "dev:api": "bun --watch src/server/index.ts",
     "dev:web": "vite",
     "format": "prettier --check .",
-    "format:write": "prettier --write .",
+    "format:write": "prettier --write . --loglevel silent",
     "lint": "bun --bun eslint .",
     "lint:fix": "bun --bun eslint . --fix",
     "start": "NODE_ENV=production bun src/server/index.ts",

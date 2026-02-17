@@ -41,8 +41,8 @@ function getObjFieldGroups(itemType: number): FieldGroupDef[] {
           required: true,
           type: "text",
         },
-        { key: "long_desc", label: "Long Description", type: "text" },
-        { key: "action_desc", label: "Action Description", type: "text" },
+        { key: "long_desc", label: "Long Description", type: "textarea" },
+        { key: "action_desc", label: "Action Description", type: "textarea" },
       ],
       title: "Identity",
     },
@@ -114,18 +114,8 @@ function getObjFieldGroups(itemType: number): FieldGroupDef[] {
     },
     {
       fields: [
-        {
-          help: "Maximum structural points",
-          key: "max_struct",
-          label: "Max Structure",
-          type: "number",
-        },
-        {
-          help: "Current structural points",
-          key: "cur_struct",
-          label: "Current Structure",
-          type: "number",
-        },
+        { key: "max_struct", label: "Max Structure", type: "number" },
+        { key: "cur_struct", label: "Current Structure", type: "number" },
         {
           help: "Ticks until item decays (0 = never)",
           key: "decay",

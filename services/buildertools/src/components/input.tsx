@@ -1,3 +1,5 @@
+import { useLayoutEffect, useRef } from "react";
+
 import { cn } from "@/lib/cn.ts";
 
 const baseClass =
@@ -14,12 +16,25 @@ export function Input({ className, ...props }: React.ComponentProps<"input">) {
 
 export function Textarea({
   className,
+  rows = 1,
   ...props
 }: React.ComponentProps<"textarea">) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el) {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  });
+
   return (
     <textarea
-      className={cn(baseClass, className)}
       {...props}
+      className={cn(baseClass, "resize-none overflow-hidden", className)}
+      ref={ref}
+      rows={rows}
     />
   );
 }
