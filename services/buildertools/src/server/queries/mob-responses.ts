@@ -1,28 +1,19 @@
-import type { RowDataPacket } from "mysql2/promise";
+import { eq } from "drizzle-orm";
 
 import type { MobResponse } from "@/shared/schemas/mob-response.ts";
 
-import { immortalPool } from "../db.ts";
-
-interface MobResponseRow extends RowDataPacket {
-  response: string;
-  vnum: number;
-}
+import { immortalDb } from "../db.ts";
+import { mobresponses } from "../schema/immortal.ts";
 
 export async function getMobResponse(
   vnum: number,
 ): Promise<MobResponse | null> {
-  const [rows] = await immortalPool.execute<MobResponseRow[]>(
-    "SELECT vnum, response FROM mobresponses WHERE vnum = ?",
-    [vnum],
-  );
+  const [row] = await immortalDb
+    .select({ response: mobresponses.response, vnum: mobresponses.vnum })
+    .from(mobresponses)
+    .where(eq(mobresponses.vnum, vnum));
 
-  const row = rows[0];
-  if (!row) {
-    return null;
-  }
-
-  return { response: row.response, vnum: row.vnum };
+  return row ?? null;
 }
 
 export async function upsertMobResponse(
@@ -30,13 +21,12 @@ export async function upsertMobResponse(
   response: string,
   owner: string,
 ): Promise<void> {
-  await immortalPool.execute(
-    `INSERT INTO mobresponses (vnum, owner, response) VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE response = ?, owner = ?`,
-    [vnum, owner, response, response, owner],
-  );
+  await immortalDb
+    .insert(mobresponses)
+    .values({ owner, response, vnum })
+    .onDuplicateKeyUpdate({ set: { owner, response } });
 }
 
 export async function deleteMobResponse(vnum: number): Promise<void> {
-  await immortalPool.execute("DELETE FROM mobresponses WHERE vnum = ?", [vnum]);
+  await immortalDb.delete(mobresponses).where(eq(mobresponses.vnum, vnum));
 }

@@ -1,88 +1,37 @@
-import type { RowDataPacket } from "mysql2/promise";
+import { and, eq, gte, lte, or } from "drizzle-orm";
 
 import type { VnumBlock } from "@/shared/schemas/auth.ts";
 import type { Obj, ObjListItem } from "@/shared/schemas/obj.ts";
 
-import { immortalPool } from "../db.ts";
-
-interface ObjRow extends RowDataPacket {
-  action_desc: string;
-  action_flag: number;
-  can_be_seen: number;
-  cur_struct: number;
-  decay: number;
-  long_desc: string;
-  material: number;
-  max_exist: number;
-  max_struct: number;
-  name: string;
-  price: number;
-  short_desc: string;
-  spec_proc: number;
-  type: number;
-  val0: number;
-  val1: number;
-  val2: number;
-  val3: number;
-  vnum: number;
-  volume: number;
-  wear_flag: number;
-  weight: number;
-}
-
-interface ObjAffectRow extends RowDataPacket {
-  mod1: number;
-  mod2: number;
-  type: number;
-  vnum: number;
-}
-
-interface ObjExtraRow extends RowDataPacket {
-  description: string;
-  name: string;
-  vnum: number;
-}
+import { immortalDb } from "../db.ts";
+import { obj, objaffect, objextra } from "../schema/immortal.ts";
 
 export async function listObjects(blocks: VnumBlock[]): Promise<ObjListItem[]> {
   if (blocks.length === 0) {
     return [];
   }
 
-  const conditions = blocks.map(() => "(vnum >= ? AND vnum <= ?)").join(" OR ");
-  const params = blocks.flatMap((b) => [b.start, b.end]);
-
-  const [rows] = await immortalPool.execute<ObjRow[]>(
-    `SELECT vnum, name, short_desc FROM obj WHERE ${conditions} ORDER BY vnum`,
-    params,
-  );
-
-  return rows.map((r) => ({
-    name: r.name,
-    short_desc: r.short_desc,
-    vnum: r.vnum,
-  }));
+  return immortalDb
+    .select({ name: obj.name, short_desc: obj.short_desc, vnum: obj.vnum })
+    .from(obj)
+    .where(
+      or(
+        ...blocks.map((b) => and(gte(obj.vnum, b.start), lte(obj.vnum, b.end))),
+      ),
+    )
+    .orderBy(obj.vnum);
 }
 
 export async function getObject(vnum: number): Promise<null | Obj> {
-  const [objects] = await immortalPool.execute<ObjRow[]>(
-    "SELECT * FROM obj WHERE vnum = ?",
-    [vnum],
-  );
+  const [row] = await immortalDb.select().from(obj).where(eq(obj.vnum, vnum));
 
-  const row = objects[0];
   if (!row) {
     return null;
   }
 
-  const [[affects], [extras]] = await Promise.all([
-    immortalPool.execute<ObjAffectRow[]>(
-      "SELECT * FROM objaffect WHERE vnum = ?",
-      [vnum],
-    ),
-    immortalPool.execute<ObjExtraRow[]>(
-      "SELECT * FROM objextra WHERE vnum = ?",
-      [vnum],
-    ),
+  const [affects, extras] = await Promise.all([
+    immortalDb.select().from(objaffect).where(eq(objaffect.vnum, vnum)),
+    immortalDb.select().from(objextra).where(eq(objextra.vnum, vnum)),
   ]);
 
   return {
@@ -123,105 +72,105 @@ export async function getObject(vnum: number): Promise<null | Obj> {
 }
 
 export async function createObject(vnum: number, owner: string): Promise<void> {
-  await immortalPool.execute(
-    `INSERT INTO obj (vnum, owner, name, short_desc, long_desc, action_desc,
-       type, action_flag, wear_flag, val0, val1, val2, val3, weight, price,
-       can_be_seen, spec_proc, max_exist, max_struct, cur_struct, decay, volume, material)
-     VALUES (?, ?, '', '', '', '', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)`,
-    [vnum, owner],
-  );
+  await immortalDb.insert(obj).values({
+    action_desc: "",
+    action_flag: 0,
+    can_be_seen: 0,
+    cur_struct: 0,
+    decay: 0,
+    long_desc: "",
+    material: 0,
+    max_exist: 0,
+    max_struct: 0,
+    name: "",
+    owner,
+    price: 0,
+    short_desc: "",
+    spec_proc: 0,
+    type: 0,
+    val0: 0,
+    val1: 0,
+    val2: 0,
+    val3: 0,
+    vnum,
+    volume: 0,
+    wear_flag: 0,
+    weight: 0,
+  });
 }
 
 export async function updateObject(
   vnum: number,
-  obj: Obj,
+  data: Obj,
   owner: string,
 ): Promise<void> {
-  const conn = await immortalPool.getConnection();
-  try {
-    await conn.beginTransaction();
-
-    await conn.execute(
-      `UPDATE obj SET name = ?, short_desc = ?, long_desc = ?, action_desc = ?,
-         type = ?, action_flag = ?, wear_flag = ?, val0 = ?, val1 = ?, val2 = ?, val3 = ?,
-         weight = ?, price = ?, can_be_seen = ?, spec_proc = ?, max_exist = ?,
-         max_struct = ?, cur_struct = ?, decay = ?, volume = ?, material = ?
-       WHERE vnum = ?`,
-      [
-        obj.name,
-        obj.short_desc,
-        obj.long_desc,
-        obj.action_desc,
-        obj.type,
-        obj.action_flag,
-        obj.wear_flag,
-        obj.val0,
-        obj.val1,
-        obj.val2,
-        obj.val3,
-        obj.weight,
-        obj.price,
-        obj.can_be_seen,
-        obj.spec_proc,
-        obj.max_exist,
-        obj.max_struct,
-        obj.cur_struct,
-        obj.decay,
-        obj.volume,
-        obj.material,
-        vnum,
-      ],
-    );
+  await immortalDb.transaction(async (tx) => {
+    await tx
+      .update(obj)
+      .set({
+        action_desc: data.action_desc,
+        action_flag: data.action_flag,
+        can_be_seen: data.can_be_seen,
+        cur_struct: data.cur_struct,
+        decay: data.decay,
+        long_desc: data.long_desc,
+        material: data.material,
+        max_exist: data.max_exist,
+        max_struct: data.max_struct,
+        name: data.name,
+        price: data.price,
+        short_desc: data.short_desc,
+        spec_proc: data.spec_proc,
+        type: data.type,
+        val0: data.val0,
+        val1: data.val1,
+        val2: data.val2,
+        val3: data.val3,
+        volume: data.volume,
+        wear_flag: data.wear_flag,
+        weight: data.weight,
+      })
+      .where(eq(obj.vnum, vnum));
 
     // Replace affects atomically
-    await conn.execute("DELETE FROM objaffect WHERE vnum = ?", [vnum]);
-    for (const affect of obj.affects) {
-      await conn.execute(
-        `INSERT INTO objaffect (vnum, owner, type, mod1, mod2)
-         VALUES (?, ?, ?, ?, ?)`,
-        [vnum, owner, affect.type, affect.mod1, affect.mod2],
-      );
+    await tx.delete(objaffect).where(eq(objaffect.vnum, vnum));
+    for (const affect of data.affects) {
+      await tx.insert(objaffect).values({
+        mod1: affect.mod1,
+        mod2: affect.mod2,
+        owner,
+        type: affect.type,
+        vnum,
+      });
     }
 
     // Replace extras atomically
-    await conn.execute("DELETE FROM objextra WHERE vnum = ?", [vnum]);
-    for (const extra of obj.extras) {
-      await conn.execute(
-        `INSERT INTO objextra (vnum, owner, name, description)
-         VALUES (?, ?, ?, ?)`,
-        [vnum, owner, extra.name, extra.description],
-      );
+    await tx.delete(objextra).where(eq(objextra.vnum, vnum));
+    for (const extra of data.extras) {
+      await tx.insert(objextra).values({
+        description: extra.description,
+        name: extra.name,
+        owner,
+        vnum,
+      });
     }
-
-    await conn.commit();
-  } catch (error) {
-    await conn.rollback();
-    throw error;
-  } finally {
-    conn.release();
-  }
+  });
 }
 
 export async function deleteObject(vnum: number): Promise<void> {
-  const conn = await immortalPool.getConnection();
-  try {
-    await conn.beginTransaction();
-    await conn.execute("DELETE FROM objaffect WHERE vnum = ?", [vnum]);
-    await conn.execute("DELETE FROM objextra WHERE vnum = ?", [vnum]);
-    await conn.execute("DELETE FROM obj WHERE vnum = ?", [vnum]);
-    await conn.commit();
-  } catch (error) {
-    await conn.rollback();
-    throw error;
-  } finally {
-    conn.release();
-  }
+  await immortalDb.transaction(async (tx) => {
+    await tx.delete(objaffect).where(eq(objaffect.vnum, vnum));
+    await tx.delete(objextra).where(eq(objextra.vnum, vnum));
+    await tx.delete(obj).where(eq(obj.vnum, vnum));
+  });
 }
 
 export async function objectExists(vnum: number): Promise<boolean> {
-  const [rows] = await immortalPool.execute<RowDataPacket[]>(
-    "SELECT 1 FROM obj WHERE vnum = ? LIMIT 1",
-    [vnum],
-  );
-  return rows.length > 0;
+  const [row] = await immortalDb
+    .select({ vnum: obj.vnum })
+    .from(obj)
+    .where(eq(obj.vnum, vnum))
+    .limit(1);
+
+  return row !== undefined;
 }

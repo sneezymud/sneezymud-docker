@@ -1,3 +1,4 @@
+import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 
 function noop() {
@@ -46,13 +47,16 @@ const poolConfig: mysql.PoolOptions = {
 };
 
 // Builder workspace — rooms, mobs, objects, mob responses
-export const immortalPool = mysql.createPool({
+const immortalPool = mysql.createPool({
   ...poolConfig,
   database: "immortal",
 });
 
 // Production game database — accounts, players, wizdata, zones (read-only from this app)
-export const sneezyPool = mysql.createPool({
+const sneezyPool = mysql.createPool({
   ...poolConfig,
   database: "sneezy",
 });
+
+export const immortalDb = drizzle(immortalPool);
+export const sneezyDb = drizzle(sneezyPool);

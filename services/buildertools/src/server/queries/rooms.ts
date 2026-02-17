@@ -1,75 +1,36 @@
-import type { RowDataPacket } from "mysql2/promise";
+import { and, eq, gte, like, lte, or } from "drizzle-orm";
 
 import type { VnumBlock } from "@/shared/schemas/auth.ts";
 import type { Room, RoomListItem } from "@/shared/schemas/room.ts";
 
-import { immortalPool, sneezyPool } from "../db.ts";
-
-interface RoomRow extends RowDataPacket {
-  capacity: number;
-  description: string;
-  height: number;
-  name: string;
-  river_dir: number;
-  river_speed: number;
-  room_flag: number;
-  sector: number;
-  spec: number;
-  telelook: number;
-  teletarg: number;
-  teletime: number;
-  vnum: number;
-  x: number;
-  y: number;
-  z: number;
-  zone: number;
-}
-
-interface ExitRow extends RowDataPacket {
-  block: number;
-  condition_flag: number;
-  description: string;
-  destination: number;
-  direction: number;
-  key_num: number;
-  lock_difficulty: number;
-  name: string;
-  type: number;
-  vnum: number;
-  weight: number;
-}
+import { immortalDb, sneezyDb } from "../db.ts";
+import { room, roomexit } from "../schema/immortal.ts";
+import { room as sneezyRoom } from "../schema/sneezy.ts";
 
 export async function listRooms(blocks: VnumBlock[]): Promise<RoomListItem[]> {
   if (blocks.length === 0) {
     return [];
   }
 
-  const conditions = blocks.map(() => "(vnum >= ? AND vnum <= ?)").join(" OR ");
-  const params = blocks.flatMap((b) => [b.start, b.end]);
-
-  const [rows] = await immortalPool.execute<RoomRow[]>(
-    `SELECT vnum, name FROM room WHERE ${conditions} ORDER BY vnum`,
-    params,
-  );
-
-  return rows.map((r) => ({ name: r.name, vnum: r.vnum }));
+  return immortalDb
+    .select({ name: room.name, vnum: room.vnum })
+    .from(room)
+    .where(vnumBlockFilter(blocks))
+    .orderBy(room.vnum);
 }
 
 export async function getRoom(vnum: number): Promise<null | Room> {
-  const [rooms] = await immortalPool.execute<RoomRow[]>(
-    "SELECT * FROM room WHERE vnum = ?",
-    [vnum],
-  );
+  const [row] = await immortalDb.select().from(room).where(eq(room.vnum, vnum));
 
-  const row = rooms[0];
   if (!row) {
     return null;
   }
 
-  const [exits] = await immortalPool.execute<ExitRow[]>(
-    "SELECT * FROM roomexit WHERE vnum = ? ORDER BY direction",
-    [vnum],
-  );
+  const exits = await immortalDb
+    .select()
+    .from(roomexit)
+    .where(eq(roomexit.vnum, vnum))
+    .orderBy(roomexit.direction);
 
   return {
     capacity: row.capacity,
@@ -106,116 +67,105 @@ export async function getRoom(vnum: number): Promise<null | Room> {
 }
 
 export async function createRoom(vnum: number, owner: string): Promise<void> {
-  await immortalPool.execute(
-    `INSERT INTO room (vnum, x, y, z, name, description, zone, room_flag, sector,
-       teletime, teletarg, telelook, river_speed, river_dir, capacity, height, spec, owner)
-     VALUES (?, 0, 0, 0, '', '', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?)`,
-    [vnum, owner],
-  );
+  await immortalDb.insert(room).values({
+    capacity: 0,
+    description: "",
+    height: 0,
+    name: "",
+    owner,
+    river_dir: 0,
+    river_speed: 0,
+    room_flag: 0,
+    sector: 0,
+    spec: 0,
+    telelook: 0,
+    teletarg: 0,
+    teletime: 0,
+    vnum,
+    x: 0,
+    y: 0,
+    z: 0,
+    zone: 1,
+  });
 }
 
 export async function updateRoom(
   vnum: number,
-  room: Room,
+  data: Room,
   owner: string,
   block: number,
 ): Promise<void> {
-  const conn = await immortalPool.getConnection();
-  try {
-    await conn.beginTransaction();
-
-    await conn.execute(
-      `UPDATE room SET name = ?, description = ?, zone = ?, room_flag = ?, sector = ?,
-         teletime = ?, teletarg = ?, telelook = ?, river_speed = ?, river_dir = ?,
-         capacity = ?, height = ?, spec = ?, x = ?, y = ?, z = ?
-       WHERE vnum = ?`,
-      [
-        room.name,
-        room.description,
-        room.zone,
-        room.room_flag,
-        room.sector,
-        room.teletime,
-        room.teletarg,
-        room.telelook,
-        room.river_speed,
-        room.river_dir,
-        room.capacity,
-        room.height,
-        room.spec,
-        room.x,
-        room.y,
-        room.z,
-        vnum,
-      ],
-    );
+  await immortalDb.transaction(async (tx) => {
+    await tx
+      .update(room)
+      .set({
+        capacity: data.capacity,
+        description: data.description,
+        height: data.height,
+        name: data.name,
+        river_dir: data.river_dir,
+        river_speed: data.river_speed,
+        room_flag: data.room_flag,
+        sector: data.sector,
+        spec: data.spec,
+        telelook: data.telelook,
+        teletarg: data.teletarg,
+        teletime: data.teletime,
+        x: data.x,
+        y: data.y,
+        z: data.z,
+        zone: data.zone,
+      })
+      .where(eq(room.vnum, vnum));
 
     // Replace all exits atomically
-    await conn.execute("DELETE FROM roomexit WHERE vnum = ?", [vnum]);
+    await tx.delete(roomexit).where(eq(roomexit.vnum, vnum));
 
-    for (const exit of room.exits) {
-      await conn.execute(
-        `INSERT INTO roomexit (vnum, direction, name, description, type, condition_flag,
-           lock_difficulty, weight, key_num, destination, owner, block)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          vnum,
-          exit.direction,
-          exit.name,
-          exit.description,
-          exit.type,
-          exit.condition_flag,
-          exit.lock_difficulty,
-          exit.weight,
-          exit.key_num,
-          exit.destination,
-          owner,
-          block,
-        ],
-      );
+    for (const exit of data.exits) {
+      await tx.insert(roomexit).values({
+        block,
+        condition_flag: exit.condition_flag,
+        description: exit.description,
+        destination: exit.destination,
+        direction: exit.direction,
+        key_num: exit.key_num,
+        lock_difficulty: exit.lock_difficulty,
+        name: exit.name,
+        owner,
+        type: exit.type,
+        vnum,
+        weight: exit.weight,
+      });
     }
-
-    await conn.commit();
-  } catch (error) {
-    await conn.rollback();
-    throw error;
-  } finally {
-    conn.release();
-  }
+  });
 }
 
 export async function deleteRoom(vnum: number): Promise<void> {
-  const conn = await immortalPool.getConnection();
-  try {
-    await conn.beginTransaction();
-    await conn.execute("DELETE FROM roomexit WHERE vnum = ?", [vnum]);
-    await conn.execute("DELETE FROM room WHERE vnum = ?", [vnum]);
-    await conn.commit();
-  } catch (error) {
-    await conn.rollback();
-    throw error;
-  } finally {
-    conn.release();
-  }
+  await immortalDb.transaction(async (tx) => {
+    await tx.delete(roomexit).where(eq(roomexit.vnum, vnum));
+    await tx.delete(room).where(eq(room.vnum, vnum));
+  });
 }
 
 export async function getRoomName(vnum: number): Promise<null | string> {
   // Try immortal first (builder workspace), then sneezy (production)
   // Exits can point to rooms outside the builder's assigned blocks
-  const [immortalRows] = await immortalPool.execute<RoomRow[]>(
-    "SELECT name FROM room WHERE vnum = ? LIMIT 1",
-    [vnum],
-  );
-  const immortalRow = immortalRows[0];
+  const [immortalRow] = await immortalDb
+    .select({ name: room.name })
+    .from(room)
+    .where(eq(room.vnum, vnum))
+    .limit(1);
+
   if (immortalRow) {
     return immortalRow.name;
   }
 
-  const [sneezyRows] = await sneezyPool.execute<RoomRow[]>(
-    "SELECT name FROM room WHERE vnum = ? LIMIT 1",
-    [vnum],
-  );
-  const sneezyRow = sneezyRows[0];
+  const [sneezyRow] = await sneezyDb
+    .select({ name: sneezyRoom.name })
+    .from(sneezyRoom)
+    .where(eq(sneezyRoom.vnum, vnum))
+    .limit(1);
+
   if (sneezyRow) {
     return sneezyRow.name;
   }
@@ -230,32 +180,57 @@ export async function searchRooms(
   const likeParam = `%${query}%`;
   const isNumeric = /^\d+$/.test(query);
 
-  const sql = isNumeric
-    ? `(SELECT vnum, name FROM immortal.room WHERE vnum = ? LIMIT 10)
-       UNION
-       (SELECT vnum, name FROM immortal.room WHERE name LIKE ? LIMIT 10)
-       UNION
-       (SELECT vnum, name FROM sneezy.room WHERE vnum = ? LIMIT 10)
-       UNION
-       (SELECT vnum, name FROM sneezy.room WHERE name LIKE ? LIMIT 10)
-       ORDER BY vnum LIMIT 20`
-    : `(SELECT vnum, name FROM immortal.room WHERE name LIKE ? LIMIT 10)
-       UNION
-       (SELECT vnum, name FROM sneezy.room WHERE name LIKE ? LIMIT 10)
-       ORDER BY vnum LIMIT 20`;
+  const nameFilter = like(room.name, likeParam);
+  const sneezyNameFilter = like(sneezyRoom.name, likeParam);
 
-  const params = isNumeric
-    ? [Number(query), likeParam, Number(query), likeParam]
-    : [likeParam, likeParam];
+  const [immortalRows, sneezyRows] = await Promise.all([
+    immortalDb
+      .select({ name: room.name, vnum: room.vnum })
+      .from(room)
+      .where(
+        isNumeric ? or(eq(room.vnum, Number(query)), nameFilter) : nameFilter,
+      )
+      .orderBy(room.vnum)
+      .limit(10),
+    sneezyDb
+      .select({ name: sneezyRoom.name, vnum: sneezyRoom.vnum })
+      .from(sneezyRoom)
+      .where(
+        isNumeric
+          ? or(eq(sneezyRoom.vnum, Number(query)), sneezyNameFilter)
+          : sneezyNameFilter,
+      )
+      .orderBy(sneezyRoom.vnum)
+      .limit(10),
+  ]);
 
-  const [rows] = await immortalPool.execute<RoomRow[]>(sql, params);
-  return rows.map((r) => ({ name: r.name, vnum: r.vnum }));
+  // Merge and deduplicate by vnum (immortal takes priority), then sort
+  const seen = new Set<number>();
+  const merged: Array<{ name: string; vnum: number }> = [];
+
+  for (const row of [...immortalRows, ...sneezyRows]) {
+    if (!seen.has(row.vnum)) {
+      seen.add(row.vnum);
+      merged.push({ name: row.name, vnum: row.vnum });
+    }
+  }
+
+  merged.sort((a, b) => a.vnum - b.vnum);
+  return merged.slice(0, 20);
 }
 
 export async function roomExists(vnum: number): Promise<boolean> {
-  const [rows] = await immortalPool.execute<RowDataPacket[]>(
-    "SELECT 1 FROM room WHERE vnum = ? LIMIT 1",
-    [vnum],
+  const [row] = await immortalDb
+    .select({ vnum: room.vnum })
+    .from(room)
+    .where(eq(room.vnum, vnum))
+    .limit(1);
+
+  return row !== undefined;
+}
+
+function vnumBlockFilter(blocks: VnumBlock[]) {
+  return or(
+    ...blocks.map((b) => and(gte(room.vnum, b.start), lte(room.vnum, b.end))),
   );
-  return rows.length > 0;
 }

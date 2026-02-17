@@ -1,108 +1,37 @@
-import type { RowDataPacket } from "mysql2/promise";
+import { and, eq, gte, lte, or } from "drizzle-orm";
 
 import type { VnumBlock } from "@/shared/schemas/auth.ts";
 import type { Mob, MobListItem } from "@/shared/schemas/mob.ts";
 
-import { immortalPool } from "../db.ts";
-
-interface MobRow extends RowDataPacket {
-  ac: number;
-  actions: number;
-  adjacent_sound: null | string;
-  affects: number;
-  agi: number;
-  attacks: number;
-  bra: number;
-  can_be_seen: number;
-  cha: number;
-  class: number;
-  con: number;
-  damage_level: number;
-  damage_precision: number;
-  def_position: number;
-  description: string;
-  dex: number;
-  fact_perc: number;
-  faction: number;
-  foc: number;
-  gold: number;
-  height: number;
-  hpbonus: number;
-  intel: number;
-  kar: number;
-  letter: string;
-  level: number;
-  local_sound: null | string;
-  long_desc: string;
-  max_exist: number;
-  name: string;
-  per: number;
-  pos: number;
-  race: number;
-  sex: number;
-  short_desc: string;
-  skin: number;
-  spe: number;
-  spec_proc: number;
-  str: number;
-  tohit: number;
-  vision: number;
-  vnum: number;
-  weight: number;
-  wis: number;
-}
-
-interface MobExtraRow extends RowDataPacket {
-  description: string;
-  keyword: string;
-  vnum: number;
-}
-
-interface MobImmRow extends RowDataPacket {
-  amt: number;
-  type: number;
-  vnum: number;
-}
+import { immortalDb } from "../db.ts";
+import { mob, mobExtra, mobImm, mobresponses } from "../schema/immortal.ts";
 
 export async function listMobs(blocks: VnumBlock[]): Promise<MobListItem[]> {
   if (blocks.length === 0) {
     return [];
   }
 
-  const conditions = blocks.map(() => "(vnum >= ? AND vnum <= ?)").join(" OR ");
-  const params = blocks.flatMap((b) => [b.start, b.end]);
-
-  const [rows] = await immortalPool.execute<MobRow[]>(
-    `SELECT vnum, name, short_desc FROM mob WHERE ${conditions} ORDER BY vnum`,
-    params,
-  );
-
-  return rows.map((r) => ({
-    name: r.name,
-    short_desc: r.short_desc,
-    vnum: r.vnum,
-  }));
+  return immortalDb
+    .select({ name: mob.name, short_desc: mob.short_desc, vnum: mob.vnum })
+    .from(mob)
+    .where(
+      or(
+        ...blocks.map((b) => and(gte(mob.vnum, b.start), lte(mob.vnum, b.end))),
+      ),
+    )
+    .orderBy(mob.vnum);
 }
 
 export async function getMob(vnum: number): Promise<Mob | null> {
-  const [mobs] = await immortalPool.execute<MobRow[]>(
-    "SELECT * FROM mob WHERE vnum = ?",
-    [vnum],
-  );
+  const [row] = await immortalDb.select().from(mob).where(eq(mob.vnum, vnum));
 
-  const row = mobs[0];
   if (!row) {
     return null;
   }
 
-  const [[extras], [immunities]] = await Promise.all([
-    immortalPool.execute<MobExtraRow[]>(
-      "SELECT * FROM mob_extra WHERE vnum = ?",
-      [vnum],
-    ),
-    immortalPool.execute<MobImmRow[]>("SELECT * FROM mob_imm WHERE vnum = ?", [
-      vnum,
-    ]),
+  const [extras, immunities] = await Promise.all([
+    immortalDb.select().from(mobExtra).where(eq(mobExtra.vnum, vnum)),
+    immortalDb.select().from(mobImm).where(eq(mobImm.vnum, vnum)),
   ]);
 
   return {
@@ -164,141 +93,149 @@ export async function getMob(vnum: number): Promise<Mob | null> {
 }
 
 export async function createMob(vnum: number, owner: string): Promise<void> {
-  await immortalPool.execute(
-    `INSERT INTO mob (vnum, owner, name, short_desc, long_desc, description,
-       actions, affects, faction, fact_perc, letter, attacks, class, level, tohit,
-       ac, hpbonus, damage_level, damage_precision, gold, race, weight, height,
-       str, bra, con, dex, agi, intel, wis, foc, per, cha, kar, spe,
-       pos, def_position, sex, spec_proc, skin, vision, can_be_seen, max_exist,
-       local_sound, adjacent_sound)
-     VALUES (?, ?, '', '', '', '', 0, 0, 0, 0, '', 1.0, 0, 1, 0,
-       0, 0, 0, 0, 0, 0, 0, 0,
-       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-       8, 8, 0, 0, 0, 0, 0, 0,
-       '', '')`,
-    [vnum, owner],
-  );
+  await immortalDb.insert(mob).values({
+    ac: 0,
+    actions: 0,
+    adjacent_sound: "",
+    affects: 0,
+    agi: 0,
+    attacks: 1,
+    bra: 0,
+    can_be_seen: 0,
+    cha: 0,
+    class: 0,
+    con: 0,
+    damage_level: 0,
+    damage_precision: 0,
+    def_position: 8,
+    description: "",
+    dex: 0,
+    fact_perc: 0,
+    faction: 0,
+    foc: 0,
+    gold: 0,
+    height: 0,
+    hpbonus: 0,
+    intel: 0,
+    kar: 0,
+    letter: "",
+    level: 1,
+    local_sound: "",
+    long_desc: "",
+    max_exist: 0,
+    name: "",
+    owner,
+    per: 0,
+    pos: 8,
+    race: 0,
+    sex: 0,
+    short_desc: "",
+    skin: 0,
+    spe: 0,
+    spec_proc: 0,
+    str: 0,
+    tohit: 0,
+    vision: 0,
+    vnum,
+    weight: 0,
+    wis: 0,
+  });
 }
 
 export async function updateMob(
   vnum: number,
-  mob: Mob,
+  data: Mob,
   owner: string,
 ): Promise<void> {
-  const conn = await immortalPool.getConnection();
-  try {
-    await conn.beginTransaction();
-
-    await conn.execute(
-      `UPDATE mob SET name = ?, short_desc = ?, long_desc = ?, description = ?,
-         actions = ?, affects = ?, faction = ?, fact_perc = ?, letter = ?,
-         attacks = ?, class = ?, level = ?, tohit = ?, ac = ?, hpbonus = ?,
-         damage_level = ?, damage_precision = ?, gold = ?, race = ?,
-         weight = ?, height = ?,
-         str = ?, bra = ?, con = ?, dex = ?, agi = ?, intel = ?, wis = ?,
-         foc = ?, per = ?, cha = ?, kar = ?, spe = ?,
-         pos = ?, def_position = ?, sex = ?, spec_proc = ?,
-         skin = ?, vision = ?, can_be_seen = ?, max_exist = ?,
-         local_sound = ?, adjacent_sound = ?
-       WHERE vnum = ?`,
-      [
-        mob.name,
-        mob.short_desc,
-        mob.long_desc,
-        mob.description,
-        mob.actions,
-        mob.affects,
-        mob.faction,
-        mob.fact_perc,
-        mob.letter,
-        mob.attacks,
-        mob.class,
-        mob.level,
-        mob.tohit,
-        mob.ac,
-        mob.hpbonus,
-        mob.damage_level,
-        mob.damage_precision,
-        mob.gold,
-        mob.race,
-        mob.weight,
-        mob.height,
-        mob.str,
-        mob.bra,
-        mob.con,
-        mob.dex,
-        mob.agi,
-        mob.intel,
-        mob.wis,
-        mob.foc,
-        mob.per,
-        mob.cha,
-        mob.kar,
-        mob.spe,
-        mob.pos,
-        mob.def_position,
-        mob.sex,
-        mob.spec_proc,
-        mob.skin,
-        mob.vision,
-        mob.can_be_seen,
-        mob.max_exist,
-        mob.local_sound,
-        mob.adjacent_sound,
-        vnum,
-      ],
-    );
+  await immortalDb.transaction(async (tx) => {
+    await tx
+      .update(mob)
+      .set({
+        ac: data.ac,
+        actions: data.actions,
+        adjacent_sound: data.adjacent_sound,
+        affects: data.affects,
+        agi: data.agi,
+        attacks: data.attacks,
+        bra: data.bra,
+        can_be_seen: data.can_be_seen,
+        cha: data.cha,
+        class: data.class,
+        con: data.con,
+        damage_level: data.damage_level,
+        damage_precision: data.damage_precision,
+        def_position: data.def_position,
+        description: data.description,
+        dex: data.dex,
+        fact_perc: data.fact_perc,
+        faction: data.faction,
+        foc: data.foc,
+        gold: data.gold,
+        height: data.height,
+        hpbonus: data.hpbonus,
+        intel: data.intel,
+        kar: data.kar,
+        letter: data.letter,
+        level: data.level,
+        local_sound: data.local_sound,
+        long_desc: data.long_desc,
+        max_exist: data.max_exist,
+        name: data.name,
+        per: data.per,
+        pos: data.pos,
+        race: data.race,
+        sex: data.sex,
+        short_desc: data.short_desc,
+        skin: data.skin,
+        spe: data.spe,
+        spec_proc: data.spec_proc,
+        str: data.str,
+        tohit: data.tohit,
+        vision: data.vision,
+        weight: data.weight,
+        wis: data.wis,
+      })
+      .where(eq(mob.vnum, vnum));
 
     // Replace extras atomically
-    await conn.execute("DELETE FROM mob_extra WHERE vnum = ?", [vnum]);
-    for (const extra of mob.extras) {
-      await conn.execute(
-        `INSERT INTO mob_extra (vnum, owner, keyword, description)
-         VALUES (?, ?, ?, ?)`,
-        [vnum, owner, extra.keyword, extra.description],
-      );
+    await tx.delete(mobExtra).where(eq(mobExtra.vnum, vnum));
+    for (const extra of data.extras) {
+      await tx.insert(mobExtra).values({
+        description: extra.description,
+        keyword: extra.keyword,
+        owner,
+        vnum,
+      });
     }
 
     // Replace immunities atomically
-    await conn.execute("DELETE FROM mob_imm WHERE vnum = ?", [vnum]);
-    for (const imm of mob.immunities) {
-      await conn.execute(
-        `INSERT INTO mob_imm (vnum, owner, type, amt)
-         VALUES (?, ?, ?, ?)`,
-        [vnum, owner, imm.type, imm.amt],
-      );
+    await tx.delete(mobImm).where(eq(mobImm.vnum, vnum));
+    for (const imm of data.immunities) {
+      await tx.insert(mobImm).values({
+        amt: imm.amt,
+        owner,
+        type: imm.type,
+        vnum,
+      });
     }
-
-    await conn.commit();
-  } catch (error) {
-    await conn.rollback();
-    throw error;
-  } finally {
-    conn.release();
-  }
+  });
 }
 
 export async function deleteMob(vnum: number): Promise<void> {
-  const conn = await immortalPool.getConnection();
-  try {
-    await conn.beginTransaction();
-    await conn.execute("DELETE FROM mob_extra WHERE vnum = ?", [vnum]);
-    await conn.execute("DELETE FROM mob_imm WHERE vnum = ?", [vnum]);
-    await conn.execute("DELETE FROM mobresponses WHERE vnum = ?", [vnum]);
-    await conn.execute("DELETE FROM mob WHERE vnum = ?", [vnum]);
-    await conn.commit();
-  } catch (error) {
-    await conn.rollback();
-    throw error;
-  } finally {
-    conn.release();
-  }
+  await immortalDb.transaction(async (tx) => {
+    await tx.delete(mobExtra).where(eq(mobExtra.vnum, vnum));
+    await tx.delete(mobImm).where(eq(mobImm.vnum, vnum));
+    await tx.delete(mobresponses).where(eq(mobresponses.vnum, vnum));
+    await tx.delete(mob).where(eq(mob.vnum, vnum));
+  });
 }
 
 export async function mobExists(vnum: number): Promise<boolean> {
-  const [rows] = await immortalPool.execute<RowDataPacket[]>(
-    "SELECT 1 FROM mob WHERE vnum = ? LIMIT 1",
-    [vnum],
-  );
-  return rows.length > 0;
+  const [row] = await immortalDb
+    .select({ vnum: mob.vnum })
+    .from(mob)
+    .where(eq(mob.vnum, vnum))
+    .limit(1);
+
+  return row !== undefined;
 }

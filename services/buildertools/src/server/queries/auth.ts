@@ -1,24 +1,16 @@
-import type { RowDataPacket } from "mysql2/promise";
+import { eq } from "drizzle-orm";
 
 import type { SessionUser, VnumBlock } from "@/shared/schemas/auth.ts";
 
 import { verifyPassword } from "../auth/crypt.ts";
-import { sneezyPool } from "../db.ts";
+import { sneezyDb } from "../db.ts";
+import { account, player, wizdata } from "../schema/sneezy.ts";
 
 export type AuthResult =
   | { kind: "no_blocks"; playerName: string }
   | { kind: "not_found" }
   | { kind: "success"; user: SessionUser }
   | { kind: "wrong_password" };
-
-interface AuthRow extends RowDataPacket {
-  blockaend: number;
-  blockastart: number;
-  blockbend: number;
-  blockbstart: number;
-  passwd: string;
-  player_name: string;
-}
 
 /**
  * Authenticate a builder account and return session data.
@@ -30,17 +22,20 @@ export async function authenticateBuilder(
   username: string,
   password: string,
 ): Promise<AuthResult> {
-  const [rows] = await sneezyPool.execute<AuthRow[]>(
-    `SELECT p.name AS player_name, a.passwd,
-            w.blockastart, w.blockaend, w.blockbstart, w.blockbend
-     FROM account a
-     JOIN player p ON p.account_id = a.account_id
-     JOIN wizdata w ON w.player_id = p.id
-     WHERE a.name = ?`,
-    [username],
-  );
+  const [row] = await sneezyDb
+    .select({
+      blockaend: wizdata.blockaend,
+      blockastart: wizdata.blockastart,
+      blockbend: wizdata.blockbend,
+      blockbstart: wizdata.blockbstart,
+      passwd: account.passwd,
+      player_name: player.name,
+    })
+    .from(account)
+    .innerJoin(player, eq(player.account_id, account.account_id))
+    .innerJoin(wizdata, eq(wizdata.player_id, player.id))
+    .where(eq(account.name, username));
 
-  const row = rows[0];
   if (!row) {
     return { kind: "not_found" };
   }
