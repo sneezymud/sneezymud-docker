@@ -5,6 +5,7 @@ import { z } from "zod";
 import { EntityList } from "@/components/entity-list.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
+import { roomKeys } from "@/shared/query-keys.ts";
 import { roomListSchema, roomSchema } from "@/shared/schemas/room.ts";
 import { toastError } from "@/shared/toast.ts";
 import { useAuthStore } from "@/state/auth.ts";
@@ -25,7 +26,7 @@ export const Route = createFileRoute("/_authenticated/rooms/")({
 });
 
 function RoomListPage() {
-  const user = useAuthStore((s) => s.user);
+  const blocks = useAuthStore((s) => s.user?.blocks);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { from, to } = Route.useSearch();
@@ -37,7 +38,7 @@ function RoomListPage() {
     isLoading,
   } = useQuery({
     queryFn: () => apiFetch("/api/rooms", roomListSchema),
-    queryKey: ["rooms"],
+    queryKey: roomKeys.all,
   });
 
   const createMutation = useMutation({
@@ -52,8 +53,8 @@ function RoomListPage() {
       );
     },
     onSuccess: async (data) => {
-      await queryClient.invalidateQueries({ queryKey: ["rooms"] });
-      await navigate({ to: `/rooms/${String(data.vnum)}` });
+      await queryClient.invalidateQueries({ queryKey: roomKeys.all });
+      await navigate({ to: `/rooms/${data.vnum}` });
     },
   });
 
@@ -78,7 +79,7 @@ function RoomListPage() {
       {from !== undefined && to !== undefined ? (
         <div className="mb-4 flex items-center gap-2 rounded border border-zinc-700/50 bg-zinc-800/30 px-4 py-2 text-sm text-zinc-400">
           <span>
-            Filtered to zone range {String(from)}&ndash;{String(to)}
+            Filtered to zone range {from}&ndash;{to}
           </span>
           <button
             className="text-xs text-zinc-400 underline hover:text-zinc-200"
@@ -99,7 +100,7 @@ function RoomListPage() {
         onCreateVnum={(vnum) => {
           createMutation.mutate(vnum);
         }}
-        vnumBlocks={user?.blocks}
+        vnumBlocks={blocks}
       />
     </div>
   );

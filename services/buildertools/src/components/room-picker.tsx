@@ -4,6 +4,7 @@ import { useId, useRef, useState } from "react";
 import { z } from "zod";
 
 import { apiFetch } from "@/shared/api-client.ts";
+import { roomKeys } from "@/shared/query-keys.ts";
 
 import { NumberInput } from "./number-input.tsx";
 import { Z_DROPDOWN } from "./styles.ts";
@@ -38,7 +39,7 @@ export function RoomPicker({ id, onChange, value }: RoomPickerProps) {
         `/api/rooms/search?q=${encodeURIComponent(search)}`,
         roomSearchSchema,
       ),
-    queryKey: ["room-search", search],
+    queryKey: roomKeys.search(search),
     staleTime: 30_000,
   });
 

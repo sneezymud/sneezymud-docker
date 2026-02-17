@@ -5,6 +5,7 @@ import { z } from "zod";
 import { EntityList } from "@/components/entity-list.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
+import { mobKeys } from "@/shared/query-keys.ts";
 import { mobListSchema, mobSchema } from "@/shared/schemas/mob.ts";
 import { toastError } from "@/shared/toast.ts";
 import { useAuthStore } from "@/state/auth.ts";
@@ -37,7 +38,7 @@ function MobListPage() {
     isLoading,
   } = useQuery({
     queryFn: () => apiFetch("/api/mobs", mobListSchema),
-    queryKey: ["mobs"],
+    queryKey: mobKeys.all,
   });
 
   const createMutation = useMutation({
@@ -52,8 +53,8 @@ function MobListPage() {
       );
     },
     onSuccess: async (data) => {
-      await queryClient.invalidateQueries({ queryKey: ["mobs"] });
-      await navigate({ to: `/mobs/${String(data.vnum)}` });
+      await queryClient.invalidateQueries({ queryKey: mobKeys.all });
+      await navigate({ to: `/mobs/${data.vnum}` });
     },
   });
 
@@ -84,7 +85,7 @@ function MobListPage() {
       {from !== undefined && to !== undefined ? (
         <div className="mb-4 flex items-center gap-2 rounded border border-zinc-700/50 bg-zinc-800/30 px-4 py-2 text-sm text-zinc-400">
           <span>
-            Filtered to zone range {String(from)}&ndash;{String(to)}
+            Filtered to zone range {from}&ndash;{to}
           </span>
           <button
             className="text-xs text-zinc-400 underline hover:text-zinc-200"

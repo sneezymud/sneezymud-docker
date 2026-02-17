@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { QueryStatus } from "@/components/query-status.tsx";
 import { apiFetch } from "@/shared/api-client.ts";
+import { zoneKeys } from "@/shared/query-keys.ts";
 import { zoneListSchema } from "@/shared/schemas/zone.ts";
 
 export const Route = createFileRoute("/_authenticated/zones")({
@@ -20,7 +21,7 @@ function ZonesPage() {
     isLoading,
   } = useQuery({
     queryFn: () => apiFetch("/api/zones", zoneListSchema),
-    queryKey: ["zones"],
+    queryKey: zoneKeys.all,
   });
 
   if (isLoading || isError || !zones) {
@@ -115,7 +116,7 @@ function ZonesPage() {
                 <td className="px-3 py-2 text-zinc-200">{zone.zone_name}</td>
                 <td className="px-3 py-2 font-mono text-zinc-400">
                   {zone.bottom != null && zone.top != null
-                    ? `${String(zone.bottom)}-${String(zone.top)}`
+                    ? `${zone.bottom}-${zone.top}`
                     : "—"}
                 </td>
                 <td className="px-3 py-2 text-zinc-400">
@@ -175,8 +176,8 @@ function ZonesPage() {
 
       <p className="mt-2 text-xs text-zinc-400">
         {search
-          ? `${String(filtered.length)} results (${String(zones.length)} total)`
-          : `${String(zones.length)} zones`}
+          ? `${filtered.length} results (${zones.length} total)`
+          : `${zones.length} zones`}
       </p>
     </div>
   );

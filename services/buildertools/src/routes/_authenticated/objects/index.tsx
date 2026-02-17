@@ -5,6 +5,7 @@ import { z } from "zod";
 import { EntityList } from "@/components/entity-list.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
+import { objectKeys } from "@/shared/query-keys.ts";
 import { objListSchema, objSchema } from "@/shared/schemas/obj.ts";
 import { toastError } from "@/shared/toast.ts";
 import { useAuthStore } from "@/state/auth.ts";
@@ -37,7 +38,7 @@ function ObjectListPage() {
     isLoading,
   } = useQuery({
     queryFn: () => apiFetch("/api/objects", objListSchema),
-    queryKey: ["objects"],
+    queryKey: objectKeys.all,
   });
 
   const createMutation = useMutation({
@@ -54,8 +55,8 @@ function ObjectListPage() {
       );
     },
     onSuccess: async (data) => {
-      await queryClient.invalidateQueries({ queryKey: ["objects"] });
-      await navigate({ to: `/objects/${String(data.vnum)}` });
+      await queryClient.invalidateQueries({ queryKey: objectKeys.all });
+      await navigate({ to: `/objects/${data.vnum}` });
     },
   });
 
@@ -86,7 +87,7 @@ function ObjectListPage() {
       {from !== undefined && to !== undefined ? (
         <div className="mb-4 flex items-center gap-2 rounded border border-zinc-700/50 bg-zinc-800/30 px-4 py-2 text-sm text-zinc-400">
           <span>
-            Filtered to zone range {String(from)}&ndash;{String(to)}
+            Filtered to zone range {from}&ndash;{to}
           </span>
           <button
             className="text-xs text-zinc-400 underline hover:text-zinc-200"
