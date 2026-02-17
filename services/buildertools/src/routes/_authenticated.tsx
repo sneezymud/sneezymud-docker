@@ -111,7 +111,7 @@ function AuthenticatedLayout() {
             </svg>
           </button>
         </div>
-        <div className="mx-auto max-w-6xl transition-opacity duration-100">
+        <div className="mx-auto max-w-screen-2xl transition-opacity duration-100">
           <Outlet />
         </div>
       </main>

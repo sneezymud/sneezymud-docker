@@ -136,17 +136,19 @@ export function EntityForm({
           ) : null}
         </div>
 
-        {groups.map((group) => (
-          <FieldGroup
-            fields={group.fields}
-            key={group.title}
-            labelClass={group.labelClass}
-            onChange={onChange}
-            originalValues={originalValues}
-            title={group.title}
-            values={values}
-          />
-        ))}
+        <div className="space-y-6 xl:columns-2 xl:gap-6">
+          {groups.map((group) => (
+            <FieldGroup
+              fields={group.fields}
+              key={group.title}
+              labelClass={group.labelClass}
+              onChange={onChange}
+              originalValues={originalValues}
+              title={group.title}
+              values={values}
+            />
+          ))}
+        </div>
 
         {children}
 
@@ -317,11 +319,11 @@ function FieldGroup({
   values: Record<string, number | string>;
 }) {
   return (
-    <fieldset className="rounded border border-zinc-700 p-4">
+    <fieldset className="break-inside-avoid rounded border border-zinc-700 p-4">
       <legend className="px-2 text-sm font-medium text-zinc-300">
         {title}
       </legend>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {fields.map((field) => {
           const fieldDirty =
             originalValues !== undefined &&
