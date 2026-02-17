@@ -31,7 +31,7 @@ export function QueryStatus({
   if (isError) {
     const message =
       error instanceof ApiResponseError
-        ? `${String(error.status)}: ${error.message}`
+        ? `${error.status}: ${error.message}`
         : "An unexpected error occurred";
 
     return (

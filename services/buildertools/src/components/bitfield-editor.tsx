@@ -52,7 +52,7 @@ export function BitfieldEditor({
             type="button"
           >
             {collapsed
-              ? `Show ${String(activeCount)} flag${activeCount === 1 ? "" : "s"}`
+              ? `Show ${activeCount} flag${activeCount === 1 ? "" : "s"}`
               : "Hide flags"}
           </button>
         </Collapsible.Trigger>

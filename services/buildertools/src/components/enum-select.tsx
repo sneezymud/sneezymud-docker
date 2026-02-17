@@ -63,7 +63,7 @@ function NativeEnumSelect({ entries, id, onChange, value }: EnumSelectProps) {
                 className="data-[highlighted]:bg-accent/20 cursor-pointer px-3 py-1.5 text-sm text-zinc-300 outline-none data-[highlighted]:text-zinc-100"
                 value={String(value)}
               >
-                <Select.ItemText>Unknown ({String(value)})</Select.ItemText>
+                <Select.ItemText>Unknown ({value})</Select.ItemText>
               </Select.Item>
             )}
             {entries.map((entry) => (
@@ -73,7 +73,7 @@ function NativeEnumSelect({ entries, id, onChange, value }: EnumSelectProps) {
                 value={String(entry.value)}
               >
                 <Select.ItemText>
-                  {entry.label} ({String(entry.value)})
+                  {entry.label} ({entry.value})
                 </Select.ItemText>
               </Select.Item>
             ))}
@@ -98,8 +98,8 @@ function SearchableEnumSelect({
 
   const current = entries.find((e) => e.value === value);
   const displayText = current
-    ? `${current.label} (${String(current.value)})`
-    : `Unknown (${String(value)})`;
+    ? `${current.label} (${current.value})`
+    : `Unknown (${value})`;
 
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -197,9 +197,7 @@ function SearchableEnumSelect({
         >
           <input
             aria-activedescendant={
-              highlightIndex >= 0
-                ? `${listboxId}-${String(highlightIndex)}`
-                : undefined
+              highlightIndex >= 0 ? `${listboxId}-${highlightIndex}` : undefined
             }
             aria-autocomplete="list"
             aria-controls={listboxId}
@@ -235,7 +233,7 @@ function SearchableEnumSelect({
                         ? "bg-zinc-700/50 text-zinc-100"
                         : "text-zinc-300 hover:bg-zinc-700/30"
                   }`}
-                  id={`${listboxId}-${String(index)}`}
+                  id={`${listboxId}-${index}`}
                   key={entry.value}
                   onClick={() => {
                     select(entry);
@@ -249,7 +247,7 @@ function SearchableEnumSelect({
                   role="option"
                 >
                   {entry.label}{" "}
-                  <span className="text-zinc-400">({String(entry.value)})</span>
+                  <span className="text-zinc-400">({entry.value})</span>
                 </li>
               ))
             )}

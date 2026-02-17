@@ -41,4 +41,4 @@ Bun.serve({
   port,
 });
 
-console.log(`API server listening on http://localhost:${String(port)}`);
+console.log(`API server listening on http://localhost:${port}`);

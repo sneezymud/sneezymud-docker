@@ -38,7 +38,7 @@ export async function apiFetch<T extends z.ZodType>(
   } catch {
     throw new ApiResponseError(
       response.status,
-      `Server returned non-JSON response (${String(response.status)})`,
+      `Server returned non-JSON response (${response.status})`,
     );
   }
 

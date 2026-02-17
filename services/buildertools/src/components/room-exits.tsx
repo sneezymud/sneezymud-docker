@@ -85,7 +85,7 @@ function ExitSlot({
   vnum: number;
 }) {
   const enabled = exit !== null;
-  const prefix = `exit-${String(direction)}`;
+  const prefix = `exit-${direction}`;
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const destRef = useRef<HTMLDivElement>(null);
 

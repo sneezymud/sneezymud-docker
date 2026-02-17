@@ -107,7 +107,7 @@ export function VnumPicker({
                 placeholder={
                   suggestedVnum === null
                     ? "Enter vnum"
-                    : `Next available: ${String(suggestedVnum)}`
+                    : `Next available: ${suggestedVnum}`
                 }
                 ref={inputRef}
                 type="number"
@@ -115,9 +115,7 @@ export function VnumPicker({
               />
               <p className="mt-1 text-xs text-zinc-400">
                 Ranges:{" "}
-                {vnumBlocks
-                  .map((b) => `${String(b.start)}-${String(b.end)}`)
-                  .join(", ")}
+                {vnumBlocks.map((b) => `${b.start}-${b.end}`).join(", ")}
               </p>
             </div>
             <button

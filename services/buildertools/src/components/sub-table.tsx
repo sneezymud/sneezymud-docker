@@ -103,7 +103,7 @@ export function SubTable<T extends Record<string, number | string>>({
               </span>
               {label}
               <span className="text-xs font-normal text-zinc-400">
-                ({String(rows.length)})
+                ({rows.length})
               </span>
             </button>
           </Collapsible.Trigger>
@@ -134,14 +134,14 @@ export function SubTable<T extends Record<string, number | string>>({
                     <div key={col.key}>
                       <label
                         className={LABEL_CLASS}
-                        htmlFor={`${label}-${String(index)}-${col.key}`}
+                        htmlFor={`${label}-${index}-${col.key}`}
                       >
                         {col.label}
                       </label>
                       {col.type === "textarea" ? (
                         <textarea
                           className={`${inputClass} min-h-[40px] resize-y`}
-                          id={`${label}-${String(index)}-${col.key}`}
+                          id={`${label}-${index}-${col.key}`}
                           onChange={(e) => {
                             updateTextRow(index, col.key, e.target.value);
                           }}
@@ -150,7 +150,7 @@ export function SubTable<T extends Record<string, number | string>>({
                       ) : col.type === "number" ? (
                         <NumberInput
                           className={`${inputClass} font-mono`}
-                          id={`${label}-${String(index)}-${col.key}`}
+                          id={`${label}-${index}-${col.key}`}
                           onValueChange={(v) => {
                             updateNumberRow(index, col.key, v);
                           }}
@@ -162,7 +162,7 @@ export function SubTable<T extends Record<string, number | string>>({
                       ) : (
                         <input
                           className={inputClass}
-                          id={`${label}-${String(index)}-${col.key}`}
+                          id={`${label}-${index}-${col.key}`}
                           onChange={(e) => {
                             updateTextRow(index, col.key, e.target.value);
                           }}
@@ -174,7 +174,7 @@ export function SubTable<T extends Record<string, number | string>>({
                   ))}
                 </div>
                 <button
-                  aria-label={`Remove row ${String(index + 1)}`}
+                  aria-label={`Remove row ${index + 1}`}
                   className="focus-visible:ring-accent mt-[1.375rem] shrink-0 rounded px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-red-900/30 hover:text-red-400 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
                   onClick={() => {
                     setPendingRemove(index);
