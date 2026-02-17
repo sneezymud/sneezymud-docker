@@ -165,11 +165,7 @@ export function EntityList({
                         header.column.columnDef.header,
                         header.getContext(),
                       )}
-                      {header.column.getIsSorted() === "asc"
-                        ? " \u25B2"
-                        : header.column.getIsSorted() === "desc"
-                          ? " \u25BC"
-                          : ""}
+                      {sortIndicator(header.column.getIsSorted())}
                     </button>
                   ) : (
                     flexRender(
@@ -228,24 +224,14 @@ export function EntityList({
                 className="px-3 py-8 text-center text-zinc-400"
                 colSpan={secondaryLabel ? 3 : 2}
               >
-                {search ? (
-                  "No matches found"
-                ) : onCreateVnum && vnumBlocks ? (
-                  <span>
-                    No {label.toLowerCase()} yet.{" "}
-                    <button
-                      className="text-accent hover:underline"
-                      onClick={() => {
-                        setShowCreate(true);
-                      }}
-                      type="button"
-                    >
-                      Create your first {label.slice(0, -1).toLowerCase()}
-                    </button>
-                  </span>
-                ) : (
-                  `No ${label.toLowerCase()} yet`
-                )}
+                <EmptyMessage
+                  canCreate={Boolean(onCreateVnum && vnumBlocks)}
+                  label={label}
+                  onShowCreate={() => {
+                    setShowCreate(true);
+                  }}
+                  searching={search !== ""}
+                />
               </td>
             </tr>
           ) : null}
@@ -287,4 +273,43 @@ export function EntityList({
       </p>
     </div>
   );
+}
+
+function sortIndicator(sorted: "asc" | "desc" | false): string {
+  if (sorted === "asc") return " \u25B2";
+  if (sorted === "desc") return " \u25BC";
+  return "";
+}
+
+function EmptyMessage({
+  canCreate,
+  label,
+  onShowCreate,
+  searching,
+}: {
+  canCreate: boolean;
+  label: string;
+  onShowCreate: () => void;
+  searching: boolean;
+}) {
+  if (searching) {
+    return <>No matches found</>;
+  }
+
+  if (canCreate) {
+    return (
+      <span>
+        No {label.toLowerCase()} yet.{" "}
+        <button
+          className="text-accent hover:underline"
+          onClick={onShowCreate}
+          type="button"
+        >
+          Create your first {label.slice(0, -1).toLowerCase()}
+        </button>
+      </span>
+    );
+  }
+
+  return <>No {label.toLowerCase()} yet</>;
 }

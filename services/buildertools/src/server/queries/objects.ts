@@ -34,40 +34,11 @@ export async function getObject(vnum: number): Promise<null | Obj> {
     immortalDb.select().from(objextra).where(eq(objextra.vnum, vnum)),
   ]);
 
+  const { owner: _owner, ...objFields } = row;
   return {
-    action_desc: row.action_desc,
-    action_flag: row.action_flag,
-    affects: affects.map((a) => ({
-      mod1: a.mod1,
-      mod2: a.mod2,
-      type: a.type,
-      vnum: a.vnum,
-    })),
-    can_be_seen: row.can_be_seen,
-    cur_struct: row.cur_struct,
-    decay: row.decay,
-    extras: extras.map((e) => ({
-      description: e.description,
-      name: e.name,
-      vnum: e.vnum,
-    })),
-    long_desc: row.long_desc,
-    material: row.material,
-    max_exist: row.max_exist,
-    max_struct: row.max_struct,
-    name: row.name,
-    price: row.price,
-    short_desc: row.short_desc,
-    spec_proc: row.spec_proc,
-    type: row.type,
-    val0: row.val0,
-    val1: row.val1,
-    val2: row.val2,
-    val3: row.val3,
-    vnum: row.vnum,
-    volume: row.volume,
-    wear_flag: row.wear_flag,
-    weight: row.weight,
+    ...objFields,
+    affects: affects.map(({ owner: _ao, ...fields }) => fields),
+    extras: extras.map(({ owner: _eo, ...fields }) => fields),
   };
 }
 
@@ -104,55 +75,23 @@ export async function updateObject(
   data: Obj,
   owner: string,
 ): Promise<void> {
+  const { affects, extras, vnum: _vnum, ...objFields } = data;
+
   await immortalDb.transaction(async (tx) => {
-    await tx
-      .update(obj)
-      .set({
-        action_desc: data.action_desc,
-        action_flag: data.action_flag,
-        can_be_seen: data.can_be_seen,
-        cur_struct: data.cur_struct,
-        decay: data.decay,
-        long_desc: data.long_desc,
-        material: data.material,
-        max_exist: data.max_exist,
-        max_struct: data.max_struct,
-        name: data.name,
-        price: data.price,
-        short_desc: data.short_desc,
-        spec_proc: data.spec_proc,
-        type: data.type,
-        val0: data.val0,
-        val1: data.val1,
-        val2: data.val2,
-        val3: data.val3,
-        volume: data.volume,
-        wear_flag: data.wear_flag,
-        weight: data.weight,
-      })
-      .where(eq(obj.vnum, vnum));
+    await tx.update(obj).set(objFields).where(eq(obj.vnum, vnum));
 
     // Replace affects atomically
     await tx.delete(objaffect).where(eq(objaffect.vnum, vnum));
-    for (const affect of data.affects) {
-      await tx.insert(objaffect).values({
-        mod1: affect.mod1,
-        mod2: affect.mod2,
-        owner,
-        type: affect.type,
-        vnum,
-      });
+    for (const affect of affects) {
+      const { vnum: _av, ...fields } = affect;
+      await tx.insert(objaffect).values({ ...fields, owner, vnum });
     }
 
     // Replace extras atomically
     await tx.delete(objextra).where(eq(objextra.vnum, vnum));
-    for (const extra of data.extras) {
-      await tx.insert(objextra).values({
-        description: extra.description,
-        name: extra.name,
-        owner,
-        vnum,
-      });
+    for (const extra of extras) {
+      const { vnum: _ev, ...fields } = extra;
+      await tx.insert(objextra).values({ ...fields, owner, vnum });
     }
   });
 }

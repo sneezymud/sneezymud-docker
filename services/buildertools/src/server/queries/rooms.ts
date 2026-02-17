@@ -32,37 +32,10 @@ export async function getRoom(vnum: number): Promise<null | Room> {
     .where(eq(roomexit.vnum, vnum))
     .orderBy(roomexit.direction);
 
+  const { owner: _owner, ...roomFields } = row;
   return {
-    capacity: row.capacity,
-    description: row.description,
-    exits: exits.map((e) => ({
-      block: e.block,
-      condition_flag: e.condition_flag,
-      description: e.description,
-      destination: e.destination,
-      direction: e.direction,
-      key_num: e.key_num,
-      lock_difficulty: e.lock_difficulty,
-      name: e.name,
-      type: e.type,
-      vnum: e.vnum,
-      weight: e.weight,
-    })),
-    height: row.height,
-    name: row.name,
-    river_dir: row.river_dir,
-    river_speed: row.river_speed,
-    room_flag: row.room_flag,
-    sector: row.sector,
-    spec: row.spec,
-    telelook: row.telelook,
-    teletarg: row.teletarg,
-    teletime: row.teletime,
-    vnum: row.vnum,
-    x: row.x,
-    y: row.y,
-    z: row.z,
-    zone: row.zone,
+    ...roomFields,
+    exits: exits.map(({ owner: _exitOwner, ...exitFields }) => exitFields),
   };
 }
 
@@ -95,46 +68,21 @@ export async function updateRoom(
   owner: string,
   block: number,
 ): Promise<void> {
+  const { exits, vnum: _vnum, ...roomFields } = data;
+
   await immortalDb.transaction(async (tx) => {
-    await tx
-      .update(room)
-      .set({
-        capacity: data.capacity,
-        description: data.description,
-        height: data.height,
-        name: data.name,
-        river_dir: data.river_dir,
-        river_speed: data.river_speed,
-        room_flag: data.room_flag,
-        sector: data.sector,
-        spec: data.spec,
-        telelook: data.telelook,
-        teletarg: data.teletarg,
-        teletime: data.teletime,
-        x: data.x,
-        y: data.y,
-        z: data.z,
-        zone: data.zone,
-      })
-      .where(eq(room.vnum, vnum));
+    await tx.update(room).set(roomFields).where(eq(room.vnum, vnum));
 
     // Replace all exits atomically
     await tx.delete(roomexit).where(eq(roomexit.vnum, vnum));
 
-    for (const exit of data.exits) {
+    for (const exit of exits) {
+      const { block: _block, vnum: _exitVnum, ...exitFields } = exit;
       await tx.insert(roomexit).values({
+        ...exitFields,
         block,
-        condition_flag: exit.condition_flag,
-        description: exit.description,
-        destination: exit.destination,
-        direction: exit.direction,
-        key_num: exit.key_num,
-        lock_difficulty: exit.lock_difficulty,
-        name: exit.name,
         owner,
-        type: exit.type,
         vnum,
-        weight: exit.weight,
       });
     }
   });

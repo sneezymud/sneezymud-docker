@@ -34,61 +34,13 @@ export async function getMob(vnum: number): Promise<Mob | null> {
     immortalDb.select().from(mobImm).where(eq(mobImm.vnum, vnum)),
   ]);
 
+  const { owner: _owner, ...mobFields } = row;
   return {
-    ac: row.ac,
-    actions: row.actions,
-    adjacent_sound: row.adjacent_sound ?? "",
-    affects: row.affects,
-    agi: row.agi,
-    attacks: row.attacks,
-    bra: row.bra,
-    can_be_seen: row.can_be_seen,
-    cha: row.cha,
-    class: row.class,
-    con: row.con,
-    damage_level: row.damage_level,
-    damage_precision: row.damage_precision,
-    def_position: row.def_position,
-    description: row.description,
-    dex: row.dex,
-    extras: extras.map((e) => ({
-      description: e.description,
-      keyword: e.keyword,
-      vnum: e.vnum,
-    })),
-    fact_perc: row.fact_perc,
-    faction: row.faction,
-    foc: row.foc,
-    gold: row.gold,
-    height: row.height,
-    hpbonus: row.hpbonus,
-    immunities: immunities.map((i) => ({
-      amt: i.amt,
-      type: i.type,
-      vnum: i.vnum,
-    })),
-    intel: row.intel,
-    kar: row.kar,
-    letter: row.letter,
-    level: row.level,
-    local_sound: row.local_sound ?? "",
-    long_desc: row.long_desc,
-    max_exist: row.max_exist,
-    name: row.name,
-    per: row.per,
-    pos: row.pos,
-    race: row.race,
-    sex: row.sex,
-    short_desc: row.short_desc,
-    skin: row.skin,
-    spe: row.spe,
-    spec_proc: row.spec_proc,
-    str: row.str,
-    tohit: row.tohit,
-    vision: row.vision,
-    vnum: row.vnum,
-    weight: row.weight,
-    wis: row.wis,
+    ...mobFields,
+    adjacent_sound: mobFields.adjacent_sound ?? "",
+    extras: extras.map(({ owner: _eo, ...fields }) => fields),
+    immunities: immunities.map(({ owner: _io, ...fields }) => fields),
+    local_sound: mobFields.local_sound ?? "",
   };
 }
 
@@ -147,76 +99,23 @@ export async function updateMob(
   data: Mob,
   owner: string,
 ): Promise<void> {
+  const { extras, immunities, vnum: _vnum, ...mobFields } = data;
+
   await immortalDb.transaction(async (tx) => {
-    await tx
-      .update(mob)
-      .set({
-        ac: data.ac,
-        actions: data.actions,
-        adjacent_sound: data.adjacent_sound,
-        affects: data.affects,
-        agi: data.agi,
-        attacks: data.attacks,
-        bra: data.bra,
-        can_be_seen: data.can_be_seen,
-        cha: data.cha,
-        class: data.class,
-        con: data.con,
-        damage_level: data.damage_level,
-        damage_precision: data.damage_precision,
-        def_position: data.def_position,
-        description: data.description,
-        dex: data.dex,
-        fact_perc: data.fact_perc,
-        faction: data.faction,
-        foc: data.foc,
-        gold: data.gold,
-        height: data.height,
-        hpbonus: data.hpbonus,
-        intel: data.intel,
-        kar: data.kar,
-        letter: data.letter,
-        level: data.level,
-        local_sound: data.local_sound,
-        long_desc: data.long_desc,
-        max_exist: data.max_exist,
-        name: data.name,
-        per: data.per,
-        pos: data.pos,
-        race: data.race,
-        sex: data.sex,
-        short_desc: data.short_desc,
-        skin: data.skin,
-        spe: data.spe,
-        spec_proc: data.spec_proc,
-        str: data.str,
-        tohit: data.tohit,
-        vision: data.vision,
-        weight: data.weight,
-        wis: data.wis,
-      })
-      .where(eq(mob.vnum, vnum));
+    await tx.update(mob).set(mobFields).where(eq(mob.vnum, vnum));
 
     // Replace extras atomically
     await tx.delete(mobExtra).where(eq(mobExtra.vnum, vnum));
-    for (const extra of data.extras) {
-      await tx.insert(mobExtra).values({
-        description: extra.description,
-        keyword: extra.keyword,
-        owner,
-        vnum,
-      });
+    for (const extra of extras) {
+      const { vnum: _ev, ...fields } = extra;
+      await tx.insert(mobExtra).values({ ...fields, owner, vnum });
     }
 
     // Replace immunities atomically
     await tx.delete(mobImm).where(eq(mobImm.vnum, vnum));
-    for (const imm of data.immunities) {
-      await tx.insert(mobImm).values({
-        amt: imm.amt,
-        owner,
-        type: imm.type,
-        vnum,
-      });
+    for (const imm of immunities) {
+      const { vnum: _iv, ...fields } = imm;
+      await tx.insert(mobImm).values({ ...fields, owner, vnum });
     }
   });
 }
