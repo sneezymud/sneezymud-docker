@@ -7,7 +7,6 @@ import { useDirtyStore } from "@/state/dirty.ts";
 import { useSidebarStore } from "@/state/sidebar.ts";
 
 import { ConfirmDialog } from "./confirm-dialog.tsx";
-import { Z_MOBILE_SIDEBAR } from "./styles.ts";
 
 export function Nav() {
   const user = useAuthStore((s) => s.user);
@@ -52,7 +51,7 @@ export function Nav() {
 
   return (
     <nav
-      className={`fixed inset-y-0 left-0 ${Z_MOBILE_SIDEBAR} flex w-56 transform flex-col border-r border-zinc-700/50 bg-zinc-900 p-4 transition-transform md:static md:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-40 flex w-56 transform flex-col border-r border-zinc-700/50 bg-zinc-900 p-4 transition-transform md:static md:translate-x-0 ${
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       }`}
     >
@@ -153,12 +152,10 @@ function NavLink({
   );
 }
 
-const iconClass = "h-4 w-4 shrink-0";
-
 function DoorIcon() {
   return (
     <svg
-      className={iconClass}
+      className="h-4 w-4 shrink-0"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.5"
@@ -176,7 +173,7 @@ function DoorIcon() {
 function PersonIcon() {
   return (
     <svg
-      className={iconClass}
+      className="h-4 w-4 shrink-0"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.5"
@@ -194,7 +191,7 @@ function PersonIcon() {
 function BoxIcon() {
   return (
     <svg
-      className={iconClass}
+      className="h-4 w-4 shrink-0"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.5"
@@ -217,7 +214,7 @@ function BoxIcon() {
 function MapIcon() {
   return (
     <svg
-      className={iconClass}
+      className="h-4 w-4 shrink-0"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.5"

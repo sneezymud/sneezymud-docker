@@ -6,14 +6,9 @@ import type { BitfieldEntry, EnumEntry } from "@/shared/enums/types.ts";
 import { BitfieldEditor } from "./bitfield-editor.tsx";
 import { ConfirmDialog } from "./confirm-dialog.tsx";
 import { EnumSelect } from "./enum-select.tsx";
+import { Input, Textarea } from "./input.tsx";
+import { Label } from "./label.tsx";
 import { NumberInput } from "./number-input.tsx";
-import {
-  BUTTON_DANGER_CLASS,
-  BUTTON_PRIMARY_CLASS,
-  INPUT_CLASS,
-  LABEL_CLASS,
-  Z_STICKY_BAR,
-} from "./styles.ts";
 
 interface FieldDefBase {
   help?: string;
@@ -94,11 +89,9 @@ export function EntityForm({
       className="space-y-6"
       onSubmit={handleSubmit}
     >
-      <div
-        className={`sticky top-0 ${Z_STICKY_BAR} flex items-center gap-3 border-b border-zinc-700/30 bg-zinc-950/95 py-3 backdrop-blur-sm`}
-      >
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-zinc-700/30 bg-zinc-950/95 py-3 backdrop-blur-sm">
         <button
-          className={BUTTON_PRIMARY_CLASS}
+          className="bg-accent hover:bg-accent/80 focus-visible:ring-accent rounded px-4 py-2 text-sm text-white transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
           disabled={!dirty || saving}
           type="submit"
         >
@@ -128,7 +121,7 @@ export function EntityForm({
 
         {onDelete ? (
           <button
-            className={`ml-auto ${BUTTON_DANGER_CLASS}`}
+            className="focus-visible:ring-accent ml-auto rounded border border-red-800/50 px-3 py-1.5 text-sm text-red-400 transition-colors hover:bg-red-900/20 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
             disabled={deletePending}
             onClick={() => {
               setShowDeleteConfirm(true);
@@ -189,16 +182,14 @@ function FormField({
   onChange: (key: string, value: number | string) => void;
   value: number | string | undefined;
 }) {
-  const baseClass = INPUT_CLASS;
-
   const isFullWidth = field.type === "textarea" || field.type === "bitfield";
 
   return (
     <div
       className={`${isFullWidth ? "col-span-full" : ""} ${isDirty ? "border-l-2 border-l-amber-400/50 pl-2" : ""}`}
     >
-      <label
-        className={labelClass ? `${LABEL_CLASS} ${labelClass}` : LABEL_CLASS}
+      <Label
+        className={labelClass}
         htmlFor={field.key}
       >
         {field.label}
@@ -208,11 +199,11 @@ function FormField({
             className="ml-1 inline-block h-1 w-1 rounded-full bg-amber-400 align-super"
           />
         ) : null}
-      </label>
+      </Label>
       {field.type === "textarea" ? (
         <>
-          <textarea
-            className={`${baseClass} min-h-[160px] resize-y text-base`}
+          <Textarea
+            className="min-h-[160px] resize-y text-base"
             id={field.key}
             onChange={(e) => {
               onChange(field.key, e.target.value);
@@ -243,7 +234,7 @@ function FormField({
         />
       ) : field.type === "number" ? (
         <NumberInput
-          className={`${baseClass} font-mono`}
+          className="font-mono"
           id={field.key}
           max={field.max}
           min={field.min}
@@ -254,8 +245,7 @@ function FormField({
           value={typeof value === "number" ? value : Number(value) || 0}
         />
       ) : (
-        <input
-          className={baseClass}
+        <Input
           id={field.key}
           onChange={(e) => {
             onChange(field.key, e.target.value);

@@ -1,5 +1,10 @@
 import { useState } from "react";
 
+import { cn } from "@/lib/cn.ts";
+
+const baseClass =
+  "w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950";
+
 interface NumberInputProps extends Omit<
   React.ComponentProps<"input">,
   "onChange" | "type" | "value"
@@ -12,6 +17,7 @@ interface NumberInputProps extends Omit<
 }
 
 export function NumberInput({
+  className,
   max,
   min,
   onValueChange,
@@ -53,6 +59,7 @@ export function NumberInput({
   return (
     <input
       {...rest}
+      className={cn(baseClass, className)}
       max={max}
       min={min}
       onBlur={handleBlur}

@@ -8,9 +8,10 @@ import { EXIT_FLAGS } from "@/shared/enums/index.ts";
 
 import { BitfieldEditor } from "./bitfield-editor.tsx";
 import { ConfirmDialog } from "./confirm-dialog.tsx";
+import { Input, Textarea } from "./input.tsx";
+import { Label } from "./label.tsx";
 import { NumberInput } from "./number-input.tsx";
 import { RoomPicker } from "./room-picker.tsx";
-import { LABEL_CLASS } from "./styles.ts";
 
 const DIRECTIONS = ["North", "East", "South", "West", "Up", "Down"];
 
@@ -131,9 +132,6 @@ function ExitSlot({
     onChange({ ...exit, [field]: value });
   };
 
-  const inputClass =
-    "w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100 outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 disabled:opacity-30";
-
   return (
     <div
       className={`rounded border border-zinc-700/30 bg-zinc-800/20 p-3 transition-shadow hover:shadow-md hover:shadow-zinc-900/50 ${
@@ -158,12 +156,7 @@ function ExitSlot({
       {enabled ? (
         <div className="grid grid-cols-2 gap-2">
           <div ref={destRef}>
-            <label
-              className={LABEL_CLASS}
-              htmlFor={`${prefix}-dest`}
-            >
-              Destination
-            </label>
+            <Label htmlFor={`${prefix}-dest`}>Destination</Label>
             <RoomPicker
               id={`${prefix}-dest`}
               onChange={(v) => {
@@ -174,14 +167,9 @@ function ExitSlot({
             <DestinationPreview vnum={exit.destination} />
           </div>
           <div>
-            <label
-              className={LABEL_CLASS}
-              htmlFor={`${prefix}-type`}
-            >
-              Type
-            </label>
+            <Label htmlFor={`${prefix}-type`}>Type</Label>
             <NumberInput
-              className={inputClass}
+              className="px-2 py-1 disabled:opacity-30"
               id={`${prefix}-type`}
               onValueChange={(v) => {
                 update("type", v);
@@ -190,14 +178,9 @@ function ExitSlot({
             />
           </div>
           <div className="col-span-2">
-            <label
-              className={LABEL_CLASS}
-              htmlFor={`${prefix}-name`}
-            >
-              Door name
-            </label>
-            <input
-              className={inputClass}
+            <Label htmlFor={`${prefix}-name`}>Door name</Label>
+            <Input
+              className="px-2 py-1 disabled:opacity-30"
               id={`${prefix}-name`}
               onChange={(e) => {
                 update("name", e.target.value);
@@ -207,14 +190,9 @@ function ExitSlot({
             />
           </div>
           <div className="col-span-2">
-            <label
-              className={LABEL_CLASS}
-              htmlFor={`${prefix}-desc`}
-            >
-              Description
-            </label>
-            <textarea
-              className={`${inputClass} min-h-[40px] resize-y`}
+            <Label htmlFor={`${prefix}-desc`}>Description</Label>
+            <Textarea
+              className="min-h-[40px] resize-y px-2 py-1 disabled:opacity-30"
               id={`${prefix}-desc`}
               onChange={(e) => {
                 update("description", e.target.value);
@@ -223,14 +201,9 @@ function ExitSlot({
             />
           </div>
           <div>
-            <label
-              className={LABEL_CLASS}
-              htmlFor={`${prefix}-lock`}
-            >
-              Lock difficulty
-            </label>
+            <Label htmlFor={`${prefix}-lock`}>Lock difficulty</Label>
             <NumberInput
-              className={inputClass}
+              className="px-2 py-1 disabled:opacity-30"
               id={`${prefix}-lock`}
               onValueChange={(v) => {
                 update("lock_difficulty", v);
@@ -239,14 +212,9 @@ function ExitSlot({
             />
           </div>
           <div>
-            <label
-              className={LABEL_CLASS}
-              htmlFor={`${prefix}-key`}
-            >
-              Key vnum
-            </label>
+            <Label htmlFor={`${prefix}-key`}>Key vnum</Label>
             <NumberInput
-              className={inputClass}
+              className="px-2 py-1 disabled:opacity-30"
               id={`${prefix}-key`}
               onValueChange={(v) => {
                 update("key_num", v);
@@ -255,12 +223,7 @@ function ExitSlot({
             />
           </div>
           <div className="col-span-2">
-            <label
-              className={LABEL_CLASS}
-              htmlFor={`${prefix}-cond`}
-            >
-              Condition Flags
-            </label>
+            <Label htmlFor={`${prefix}-cond`}>Condition Flags</Label>
             <BitfieldEditor
               entries={EXIT_FLAGS}
               id={`${prefix}-cond`}

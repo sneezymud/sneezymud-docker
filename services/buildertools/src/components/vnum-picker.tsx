@@ -1,8 +1,6 @@
 import * as Popover from "@radix-ui/react-popover";
 import { useRef, useState } from "react";
 
-import { BUTTON_SECONDARY_CLASS, Z_DROPDOWN } from "./styles.ts";
-
 interface VnumPickerProps {
   createPending?: boolean | undefined;
   existingVnums: Set<number>;
@@ -69,7 +67,7 @@ export function VnumPicker({
     >
       <Popover.Trigger asChild>
         <button
-          className={BUTTON_SECONDARY_CLASS}
+          className="focus-visible:ring-accent rounded bg-zinc-700 px-3 py-1.5 text-sm text-zinc-200 transition-colors hover:bg-zinc-600 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 active:scale-[0.98]"
           type="button"
         >
           {triggerLabel}
@@ -78,7 +76,7 @@ export function VnumPicker({
       <Popover.Portal>
         <Popover.Content
           align="end"
-          className={`${Z_DROPDOWN} w-80 rounded border border-zinc-700 bg-zinc-800 p-4 shadow-lg`}
+          className="z-20 w-80 rounded border border-zinc-700 bg-zinc-800 p-4 shadow-lg"
           onOpenAutoFocus={(e) => {
             e.preventDefault();
             inputRef.current?.focus();

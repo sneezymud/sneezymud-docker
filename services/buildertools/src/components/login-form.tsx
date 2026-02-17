@@ -1,11 +1,8 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
-import {
-  ERROR_BOX_CLASS,
-  INPUT_CLASS,
-  LABEL_CLASS,
-} from "@/components/styles.ts";
+import { Input } from "@/components/input.tsx";
+import { Label } from "@/components/label.tsx";
 import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
 import { sessionUserSchema } from "@/shared/schemas/auth.ts";
 import { useAuthStore } from "@/state/auth.ts";
@@ -54,15 +51,9 @@ export function LoginForm() {
       onSubmit={handleSubmit}
     >
       <div>
-        <label
-          className={LABEL_CLASS}
-          htmlFor="username"
-        >
-          Username
-        </label>
-        <input
+        <Label htmlFor="username">Username</Label>
+        <Input
           autoComplete="username"
-          className={INPUT_CLASS}
           id="username"
           onChange={(e) => {
             setUsername(e.target.value);
@@ -75,15 +66,9 @@ export function LoginForm() {
       </div>
 
       <div>
-        <label
-          className={LABEL_CLASS}
-          htmlFor="password"
-        >
-          Password
-        </label>
-        <input
+        <Label htmlFor="password">Password</Label>
+        <Input
           autoComplete="current-password"
-          className={INPUT_CLASS}
           id="password"
           onChange={(e) => {
             setPassword(e.target.value);
@@ -130,7 +115,7 @@ export function LoginForm() {
       {error ? (
         <div
           aria-live="assertive"
-          className={ERROR_BOX_CLASS}
+          className="rounded border border-red-800/50 bg-red-900/20 px-4 py-3 text-sm text-red-400"
         >
           {error}
         </div>

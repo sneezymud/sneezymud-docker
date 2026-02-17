@@ -7,7 +7,6 @@ import { apiFetch } from "@/shared/api-client.ts";
 import { roomKeys } from "@/shared/query-keys.ts";
 
 import { NumberInput } from "./number-input.tsx";
-import { Z_DROPDOWN } from "./styles.ts";
 
 const roomSearchSchema = z.array(
   z.object({
@@ -121,7 +120,7 @@ export function RoomPicker({ id, onChange, value }: RoomPickerProps) {
       <Popover.Portal>
         <Popover.Content
           align="start"
-          className={`${Z_DROPDOWN} w-64 rounded border border-zinc-700 bg-zinc-800 p-2 shadow-lg`}
+          className="z-20 w-64 rounded border border-zinc-700 bg-zinc-800 p-2 shadow-lg"
           onOpenAutoFocus={(e) => {
             e.preventDefault();
             searchRef.current?.focus();

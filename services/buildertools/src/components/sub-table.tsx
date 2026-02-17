@@ -2,8 +2,9 @@ import * as Collapsible from "@radix-ui/react-collapsible";
 import { useState } from "react";
 
 import { ConfirmDialog } from "./confirm-dialog.tsx";
+import { Input, Textarea } from "./input.tsx";
+import { Label } from "./label.tsx";
 import { NumberInput } from "./number-input.tsx";
-import { LABEL_CLASS } from "./styles.ts";
 
 export interface ColumnDef<T> {
   key: keyof T & string;
@@ -80,9 +81,6 @@ export function SubTable<T extends Record<string, number | string>>({
     onChange(updated);
   };
 
-  const inputClass =
-    "w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100 outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950";
-
   return (
     <Collapsible.Root
       asChild
@@ -130,48 +128,25 @@ export function SubTable<T extends Record<string, number | string>>({
                       .join(" "),
                   }}
                 >
-                  {columns.map((col) => (
-                    <div key={col.key}>
-                      <label
-                        className={LABEL_CLASS}
-                        htmlFor={`${label}-${index}-${col.key}`}
-                      >
-                        {col.label}
-                      </label>
-                      {col.type === "textarea" ? (
-                        <textarea
-                          className={`${inputClass} min-h-[40px] resize-y`}
-                          id={`${label}-${index}-${col.key}`}
-                          onChange={(e) => {
-                            updateTextRow(index, col.key, e.target.value);
-                          }}
-                          value={String(row[col.key])}
-                        />
-                      ) : col.type === "number" ? (
-                        <NumberInput
-                          className={`${inputClass} font-mono`}
-                          id={`${label}-${index}-${col.key}`}
-                          onValueChange={(v) => {
+                  {columns.map((col) => {
+                    const cellId = `${label}-${index}-${col.key}`;
+                    return (
+                      <div key={col.key}>
+                        <Label htmlFor={cellId}>{col.label}</Label>
+                        <CellInput
+                          id={cellId}
+                          onNumberChange={(v) => {
                             updateNumberRow(index, col.key, v);
                           }}
-                          value={(() => {
-                            const v = row[col.key];
-                            return typeof v === "number" ? v : Number(v) || 0;
-                          })()}
-                        />
-                      ) : (
-                        <input
-                          className={inputClass}
-                          id={`${label}-${index}-${col.key}`}
-                          onChange={(e) => {
-                            updateTextRow(index, col.key, e.target.value);
+                          onTextChange={(v) => {
+                            updateTextRow(index, col.key, v);
                           }}
-                          type="text"
-                          value={String(row[col.key])}
+                          type={col.type}
+                          value={row[col.key] ?? ""}
                         />
-                      )}
-                    </div>
-                  ))}
+                      </div>
+                    );
+                  })}
                 </div>
                 <button
                   aria-label={`Remove row ${index + 1}`}
@@ -213,5 +188,55 @@ export function SubTable<T extends Record<string, number | string>>({
         />
       </fieldset>
     </Collapsible.Root>
+  );
+}
+
+function CellInput({
+  id,
+  onNumberChange,
+  onTextChange,
+  type,
+  value,
+}: {
+  id: string;
+  onNumberChange: (v: number) => void;
+  onTextChange: (v: string) => void;
+  type: "number" | "text" | "textarea";
+  value: number | string;
+}) {
+  if (type === "textarea") {
+    return (
+      <Textarea
+        className="min-h-10 resize-y px-2 py-1"
+        id={id}
+        onChange={(e) => {
+          onTextChange(e.target.value);
+        }}
+        value={String(value)}
+      />
+    );
+  }
+
+  if (type === "number") {
+    return (
+      <NumberInput
+        className="px-2 py-1 font-mono"
+        id={id}
+        onValueChange={onNumberChange}
+        value={typeof value === "number" ? value : Number(value) || 0}
+      />
+    );
+  }
+
+  return (
+    <Input
+      className="px-2 py-1"
+      id={id}
+      onChange={(e) => {
+        onTextChange(e.target.value);
+      }}
+      type="text"
+      value={String(value)}
+    />
   );
 }

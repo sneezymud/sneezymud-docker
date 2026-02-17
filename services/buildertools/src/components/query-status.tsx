@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
 
-import { ERROR_BOX_CLASS } from "@/components/styles.ts";
 import { ApiResponseError } from "@/shared/api-client.ts";
 
 interface QueryStatusProps {
@@ -36,7 +35,7 @@ export function QueryStatus({
 
     return (
       <div className="space-y-3">
-        <div className={ERROR_BOX_CLASS}>
+        <div className="rounded border border-red-800/50 bg-red-900/20 px-4 py-3 text-sm text-red-400">
           <p>{message}</p>
         </div>
         {backTo ? (

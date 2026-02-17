@@ -203,6 +203,14 @@ const config: Config = defineConfig([
     },
   },
 
+  // Reusable <Label> wrapper — htmlFor arrives via ...props spread
+  {
+    files: ["src/components/label.tsx"],
+    rules: {
+      "jsx-a11y/label-has-associated-control": "off",
+    },
+  },
+
   regExp.recommended,
 
   eslintComments.recommended,

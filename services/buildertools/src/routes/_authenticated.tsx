@@ -7,7 +7,6 @@ import {
 import { useEffect } from "react";
 
 import { Nav } from "@/components/nav.tsx";
-import { Z_MOBILE_BACKDROP } from "@/components/styles.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import { sessionUserSchema } from "@/shared/schemas/auth.ts";
 import { useAuthStore } from "@/state/auth.ts";
@@ -79,7 +78,7 @@ function AuthenticatedLayout() {
       {sidebarOpen ? (
         <div
           aria-hidden
-          className={`fixed inset-0 ${Z_MOBILE_BACKDROP} bg-black/50 md:hidden`}
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
           onClick={closeSidebar}
         />
       ) : null}
