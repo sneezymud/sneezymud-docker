@@ -4,6 +4,7 @@ import {
   redirect,
   useRouterState,
 } from "@tanstack/react-router";
+import { Menu } from "lucide-react";
 import { useEffect } from "react";
 
 import { Nav } from "@/components/nav.tsx";
@@ -96,19 +97,7 @@ function AuthenticatedLayout() {
             onClick={toggleSidebar}
             type="button"
           >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-            >
-              <path
-                d="M4 6h16M4 12h16M4 18h16"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <Menu className="h-5 w-5" />
           </button>
         </div>
         <div className="mx-auto max-w-screen-2xl transition-opacity duration-100">

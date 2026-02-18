@@ -1,5 +1,6 @@
 import * as Popover from "@radix-ui/react-popover";
 import { useQuery } from "@tanstack/react-query";
+import { Search } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { z } from "zod";
 
@@ -100,20 +101,7 @@ export function RoomPicker({ id, onChange, value }: RoomPickerProps) {
               className="shrink-0 rounded border border-zinc-700 px-1.5 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
               type="button"
             >
-              <svg
-                className="h-3.5 w-3.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  cx="11"
-                  cy="11"
-                  r="8"
-                />
-                <path d="M21 21l-4.35-4.35" />
-              </svg>
+              <Search className="h-3.5 w-3.5" />
             </button>
           </Popover.Trigger>
         </div>

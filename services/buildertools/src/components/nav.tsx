@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { Box, DoorOpen, Map, User } from "lucide-react";
 import { useState } from "react";
 
 import { cn } from "@/lib/cn.ts";
@@ -64,28 +65,28 @@ export function Nav() {
 
       <div className="flex flex-1 flex-col gap-1">
         <NavLink
-          icon={<DoorIcon />}
+          icon={<DoorOpen className="h-4 w-4 shrink-0" />}
           onClick={handleNavClick}
           to="/rooms"
         >
           Rooms
         </NavLink>
         <NavLink
-          icon={<PersonIcon />}
+          icon={<User className="h-4 w-4 shrink-0" />}
           onClick={handleNavClick}
           to="/mobs"
         >
           Mobs
         </NavLink>
         <NavLink
-          icon={<BoxIcon />}
+          icon={<Box className="h-4 w-4 shrink-0" />}
           onClick={handleNavClick}
           to="/objects"
         >
           Objects
         </NavLink>
         <NavLink
-          icon={<MapIcon />}
+          icon={<Map className="h-4 w-4 shrink-0" />}
           onClick={handleNavClick}
           to="/zones"
         >
@@ -151,82 +152,5 @@ function NavLink({
       {icon}
       {children}
     </Link>
-  );
-}
-
-function DoorIcon() {
-  return (
-    <svg
-      className="h-4 w-4 shrink-0"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      viewBox="0 0 24 24"
-    >
-      <path
-        d="M3 21h18M5 21V5a2 2 0 012-2h10a2 2 0 012 2v16M9 12h.01"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function PersonIcon() {
-  return (
-    <svg
-      className="h-4 w-4 shrink-0"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      viewBox="0 0 24 24"
-    >
-      <path
-        d="M12 11a4 4 0 100-8 4 4 0 000 8zM6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function BoxIcon() {
-  return (
-    <svg
-      className="h-4 w-4 shrink-0"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      viewBox="0 0 24 24"
-    >
-      <path
-        d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function MapIcon() {
-  return (
-    <svg
-      className="h-4 w-4 shrink-0"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      viewBox="0 0 24 24"
-    >
-      <path
-        d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4zM8 2v16M16 6v16"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
