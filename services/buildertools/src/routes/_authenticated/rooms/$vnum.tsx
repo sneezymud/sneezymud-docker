@@ -102,10 +102,13 @@ function getRoomFieldGroups(
         { key: "teletime", label: "Teleport Time", type: "number" },
         { key: "teletarg", label: "Teleport Target", type: "number" },
         {
-          help: "0 = show new room desc, 1 = silent",
+          enumEntries: [
+            { label: "Show room description", value: 0 },
+            { label: "Silent", value: 1 },
+          ],
           key: "telelook",
           label: "Teleport Look",
-          type: "number",
+          type: "enum",
         },
       ],
       title: "Teleport",
@@ -119,10 +122,17 @@ function getRoomFieldGroups(
           type: "number",
         },
         {
-          help: "Exit direction for river flow (0-5)",
+          enumEntries: [
+            { label: "North", value: 0 },
+            { label: "East", value: 1 },
+            { label: "South", value: 2 },
+            { label: "West", value: 3 },
+            { label: "Up", value: 4 },
+            { label: "Down", value: 5 },
+          ],
           key: "river_dir",
           label: "River Direction",
-          type: "number",
+          type: "enum",
         },
       ],
       title: "River",
@@ -246,7 +256,7 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
             { label: `Room ${vnum}: ${room.name || "(unnamed)"}` },
           ]}
         />
-        <h2 className="text-xl font-bold text-zinc-100">
+        <h2 className="text-foreground text-xl font-bold">
           Room {vnum}: {room.name || "(unnamed)"}
         </h2>
       </div>

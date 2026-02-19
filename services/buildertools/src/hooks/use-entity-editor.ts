@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useBlocker, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -46,10 +47,23 @@ export function useEntityEditor<T>({
   useConcurrentEditWarning(data, dirty);
 
   const { proceed, reset, status } = useBlocker({
-    enableBeforeUnload: true,
     shouldBlockFn: () => dirty,
     withResolver: true,
   });
+
+  // Manual beforeunload — only register when there are actual unsaved changes.
+  // useBlocker's enableBeforeUnload always registers the handler regardless of
+  // shouldBlockFn, causing false "unsaved changes" prompts on clean pages.
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => {
+      window.removeEventListener("beforeunload", handler);
+    };
+  }, [dirty]);
 
   const saveMutation = useMutation({
     mutationFn: saveFn,

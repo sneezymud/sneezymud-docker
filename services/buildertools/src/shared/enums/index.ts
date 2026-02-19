@@ -1,7 +1,9 @@
 export { CLASS_TYPES } from "./class-types.ts";
+export { DOOR_TYPES } from "./door-types.ts";
 export { EXIT_FLAGS } from "./exit-flags.ts";
 export { EXTRA_FLAGS } from "./extra-flags.ts";
 export { FACTION_TYPES } from "./faction-types.ts";
+export { IMMUNITY_TYPES } from "./immunity-types.ts";
 export { ITEM_TYPES } from "./item-types.ts";
 export { MATERIAL_TYPES } from "./material-types.ts";
 export { MOB_ACTIONS } from "./mob-actions.ts";

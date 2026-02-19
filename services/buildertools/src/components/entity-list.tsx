@@ -9,7 +9,26 @@ import {
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
+import { FolderOpen, SearchX } from "lucide-react";
 import { useDeferredValue, useState } from "react";
+
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination.tsx";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table.tsx";
 
 import { VnumPicker } from "./vnum-picker.tsx";
 
@@ -74,7 +93,8 @@ export function EntityList({
       const searchLower = filterValue.toLowerCase();
       return (
         row.original.name.toLowerCase().includes(searchLower) ||
-        String(row.original.vnum).includes(filterValue)
+        String(row.original.vnum).includes(filterValue) ||
+        (row.original.secondary?.toLowerCase().includes(searchLower) ?? false)
       );
     },
     initialState: {
@@ -95,9 +115,9 @@ export function EntityList({
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-bold text-zinc-100">
+        <h2 className="text-foreground text-2xl font-bold">
           {label}{" "}
-          <span className="text-sm font-normal text-zinc-400">
+          <span className="text-muted-foreground text-sm font-normal">
             ({entities.length})
           </span>
         </h2>
@@ -114,10 +134,10 @@ export function EntityList({
         ) : null}
       </div>
 
-      <div className="relative mb-4 max-w-md">
-        <input
+      <div className="relative mb-4 max-w-lg">
+        <Input
           aria-label="Search by vnum or name"
-          className="focus-visible:ring-accent w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-2 pr-8 text-sm text-zinc-100 outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
+          className="pr-8"
           onChange={(e) => {
             setSearch(e.target.value);
           }}
@@ -126,103 +146,97 @@ export function EntityList({
           value={search}
         />
         {search ? (
-          <button
+          <Button
             aria-label="Clear search"
-            className="absolute top-1/2 right-2 -translate-y-1/2 text-sm text-zinc-400 hover:text-zinc-200"
+            className="absolute top-1/2 right-1 -translate-y-1/2"
             onClick={() => {
               setSearch("");
             }}
-            type="button"
+            size="icon-xs"
+            variant="ghost"
           >
             {"\u2715"}
-          </button>
+          </Button>
         ) : null}
       </div>
 
-      <table className="w-full text-sm">
-        <thead>
+      <Table>
+        <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
-            <tr
-              className="border-b border-zinc-700/50 text-left text-zinc-400"
-              key={headerGroup.id}
-            >
+            <TableRow key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
-                <th
-                  className={
-                    header.column.id === "vnum"
-                      ? "w-24 px-3 py-2 font-medium"
-                      : "px-3 py-2 font-medium"
-                  }
+                <TableHead
+                  className={header.column.id === "vnum" ? "w-24" : undefined}
                   key={header.id}
-                  scope="col"
                 >
                   {header.column.getCanSort() ? (
-                    <button
-                      className="hover:text-zinc-200"
+                    <Button
+                      className="h-auto p-0"
                       onClick={header.column.getToggleSortingHandler()}
-                      type="button"
+                      variant="ghost"
                     >
                       {flexRender(
                         header.column.columnDef.header,
                         header.getContext(),
                       )}
                       {sortIndicator(header.column.getIsSorted())}
-                    </button>
+                    </Button>
                   ) : (
                     flexRender(
                       header.column.columnDef.header,
                       header.getContext(),
                     )
                   )}
-                </th>
+                </TableHead>
               ))}
-            </tr>
+            </TableRow>
           ))}
-        </thead>
-        <tbody>
+        </TableHeader>
+        <TableBody>
           {rows.map((row) => {
             const entity = row.original;
             const to = `${basePath}/${entity.vnum}`;
             return (
-              <tr
-                className="has-[a:focus-visible]:ring-accent group border-b border-zinc-800/50 transition-colors hover:bg-zinc-800/30 has-[a:focus-visible]:bg-zinc-800/30 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-inset"
+              <TableRow
+                aria-label={`${entity.name || "(unnamed)"} (vnum ${entity.vnum})`}
+                className="has-[a:focus-visible]:ring-accent group hover:bg-muted/50 has-[a:focus-visible]:bg-muted/30 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-inset"
                 key={entity.vnum}
               >
-                <td className="p-0">
+                <TableCell className="p-0">
                   <Link
-                    className="block px-3 py-2 font-mono text-zinc-400 outline-none"
+                    className="text-muted-foreground block px-2 py-2 font-mono outline-none"
                     to={to}
                   >
                     {entity.vnum}
                   </Link>
-                </td>
-                <td className="p-0">
+                </TableCell>
+                <TableCell className="p-0">
                   <Link
-                    className="block px-3 py-2 text-zinc-200 outline-none group-hover:text-zinc-100"
+                    className="text-foreground group-hover:text-foreground block px-2 py-2 outline-none"
                     tabIndex={-1}
                     to={to}
                   >
                     {entity.name || "(unnamed)"}
                   </Link>
-                </td>
+                </TableCell>
                 {secondaryLabel ? (
-                  <td className="p-0">
+                  <TableCell className="p-0">
                     <Link
-                      className="block px-3 py-2 text-zinc-400 outline-none"
+                      className="text-muted-foreground block px-2 py-2 outline-none"
                       tabIndex={-1}
                       to={to}
                     >
                       {entity.secondary ?? ""}
                     </Link>
-                  </td>
+                  </TableCell>
                 ) : null}
-              </tr>
+              </TableRow>
             );
           })}
           {rows.length === 0 ? (
-            <tr>
-              <td
-                className="px-3 py-8 text-center text-zinc-400"
+            <TableRow>
+              <TableCell
+                className="py-8 text-center"
                 colSpan={secondaryLabel ? 3 : 2}
               >
                 <EmptyMessage
@@ -233,41 +247,51 @@ export function EntityList({
                   }}
                   searching={search !== ""}
                 />
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ) : null}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
 
       {totalPages > 1 ? (
-        <div className="mt-3 flex items-center justify-between text-sm text-zinc-400">
-          <button
-            className="rounded px-3 py-1 hover:bg-zinc-800 disabled:opacity-40"
-            disabled={!table.getCanPreviousPage()}
-            onClick={() => {
-              table.previousPage();
-            }}
-            type="button"
-          >
-            {"\u2190"} Previous
-          </button>
-          <span>
-            Page {pageIndex + 1} of {totalPages}
-          </span>
-          <button
-            className="rounded px-3 py-1 hover:bg-zinc-800 disabled:opacity-40"
-            disabled={!table.getCanNextPage()}
-            onClick={() => {
-              table.nextPage();
-            }}
-            type="button"
-          >
-            Next {"\u2192"}
-          </button>
-        </div>
+        <Pagination className="mt-3">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                aria-disabled={!table.getCanPreviousPage()}
+                className={
+                  table.getCanPreviousPage()
+                    ? "cursor-pointer"
+                    : "pointer-events-none opacity-50"
+                }
+                onClick={() => {
+                  table.previousPage();
+                }}
+              />
+            </PaginationItem>
+            <PaginationItem>
+              <span className="text-muted-foreground text-sm">
+                Page {pageIndex + 1} of {totalPages}
+              </span>
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext
+                aria-disabled={!table.getCanNextPage()}
+                className={
+                  table.getCanNextPage()
+                    ? "cursor-pointer"
+                    : "pointer-events-none opacity-50"
+                }
+                onClick={() => {
+                  table.nextPage();
+                }}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       ) : null}
 
-      <p className="mt-2 text-xs text-zinc-400">
+      <p className="text-muted-foreground mt-2 text-xs">
         {search
           ? `${filteredCount} results (${entities.length} total)`
           : `${entities.length} ${label.toLowerCase()}`}
@@ -294,23 +318,36 @@ function EmptyMessage({
   searching: boolean;
 }) {
   if (searching) {
-    return <>No matches found</>;
+    return (
+      <div className="text-muted-foreground flex flex-col items-center gap-2 py-4">
+        <SearchX className="h-8 w-8 opacity-40" />
+        No matches found
+      </div>
+    );
   }
 
   if (canCreate) {
     return (
-      <span>
-        No {label.toLowerCase()} yet.{" "}
-        <button
-          className="text-accent hover:underline"
-          onClick={onShowCreate}
-          type="button"
-        >
-          Create your first {label.slice(0, -1).toLowerCase()}
-        </button>
-      </span>
+      <div className="text-muted-foreground flex flex-col items-center gap-2 py-4">
+        <FolderOpen className="h-8 w-8 opacity-40" />
+        <span>
+          No {label.toLowerCase()} yet.{" "}
+          <Button
+            className="h-auto p-0"
+            onClick={onShowCreate}
+            variant="link"
+          >
+            Create your first {label.slice(0, -1).toLowerCase()}
+          </Button>
+        </span>
+      </div>
     );
   }
 
-  return <>No {label.toLowerCase()} yet</>;
+  return (
+    <div className="text-muted-foreground flex flex-col items-center gap-2 py-4">
+      <FolderOpen className="h-8 w-8 opacity-40" />
+      No {label.toLowerCase()} yet
+    </div>
+  );
 }

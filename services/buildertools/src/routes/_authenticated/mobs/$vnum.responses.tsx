@@ -6,6 +6,15 @@ import { Breadcrumbs } from "@/components/breadcrumbs.tsx";
 import { CodeEditor } from "@/components/code-editor/code-editor.tsx";
 import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import { mobKeys } from "@/shared/query-keys.ts";
@@ -85,19 +94,18 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
 
   const { blockerProceed, blockerReset, blockerStatus, handleSave, saving } =
     useEntityEditor({
-      allKey: mobKeys.all,
+      allKey: mobKeys.response(vnum),
       data,
+      detailKey: mobKeys.response(vnum),
       dirty,
       onReset: () => {
         setDraft(null);
       },
-      saveFn: async () => {
-        await apiFetch(`/api/mob-responses/${vnum}`, mobResponseSchema, {
+      saveFn: async () =>
+        apiFetch(`/api/mob-responses/${vnum}`, mobResponseSchema, {
           body: JSON.stringify({ response: currentText, vnum }),
           method: "PUT",
-        });
-        return null;
-      },
+        }),
     });
 
   if (isLoading || isError) {
@@ -115,52 +123,59 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-4 flex items-center gap-3">
-        <div className="space-y-1">
-          <Breadcrumbs
-            items={[
-              { label: "Mobs", to: "/mobs" },
-              { label: mobName, to: `/mobs/${vnum}` },
-              { label: "Responses" },
-            ]}
-          />
-          <h2 className="text-xl font-bold text-zinc-100">
-            Responses — {mobName}
-            <span className="ml-1 text-sm font-normal text-zinc-400">
-              (#{vnum})
-            </span>
-          </h2>
-        </div>
-        <div className="ml-auto flex items-center gap-3">
+      <div className="mb-4 space-y-1">
+        <Breadcrumbs
+          items={[
+            { label: "Mobs", to: "/mobs" },
+            { label: mobName, to: `/mobs/${vnum}` },
+            { label: "Responses" },
+          ]}
+        />
+        <h2 className="text-foreground text-2xl font-bold">
+          Responses — {mobName}
+          <span className="text-muted-foreground ml-1 text-sm font-normal">
+            (#{vnum})
+          </span>
+        </h2>
+      </div>
+      <div className="border-border bg-background/95 mb-4 flex items-center gap-3 border-b py-3 shadow-sm backdrop-blur-sm">
+        <Button
+          disabled={!dirty || saving}
+          onClick={handleSave}
+        >
+          {saving ? "Saving..." : "Save"}
+        </Button>
+        <span
+          aria-live="polite"
+          className="contents"
+        >
           {dirty ? (
-            <span className="flex items-center gap-1.5 text-sm font-medium text-amber-400">
+            <Badge
+              className="animate-in fade-in slide-in-from-top-1 gap-1.5 text-amber-400 duration-150"
+              variant="outline"
+            >
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
               Unsaved changes
-              <button
-                className="ml-1 text-xs text-zinc-400 underline hover:text-zinc-200"
+              <Button
+                className="ml-1"
                 onClick={() => {
                   setDraft(null);
                 }}
-                type="button"
+                size="xs"
+                variant="link"
               >
                 Discard
-              </button>
-            </span>
+              </Button>
+            </Badge>
           ) : null}
-          <button
-            className="bg-accent hover:bg-accent/80 focus-visible:ring-accent rounded px-4 py-2 text-sm text-white transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!dirty || saving}
-            onClick={handleSave}
-            type="button"
-          >
-            {saving ? "Saving..." : "Save"}
-          </button>
-        </div>
+        </span>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col">
-          <span className="mb-1 text-xs text-zinc-400">Response Script</span>
+          <span className="text-muted-foreground mb-1 text-xs">
+            Response Script
+          </span>
           <CodeEditor
             onChange={setDraft}
             onSave={dirty && !saving ? handleSave : undefined}
@@ -168,26 +183,33 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
           />
         </div>
 
-        <div className="overflow-y-auto rounded border border-zinc-700/50 bg-zinc-800/30 p-4">
-          <h3 className="mb-3 text-sm font-medium text-zinc-300">
-            Syntax Reference
-          </h3>
-          <div className="space-y-1">
-            {SYNTAX_SECTIONS.map((section) => (
-              <details
-                className="group"
-                key={section.title}
-              >
-                <summary className="cursor-pointer rounded px-2 py-1.5 text-xs font-medium text-zinc-400 hover:bg-zinc-700/30 hover:text-zinc-300">
-                  {section.title}
-                </summary>
-                <pre className="mt-1 px-2 pb-2 text-xs leading-relaxed whitespace-pre-wrap text-zinc-400">
-                  {section.content}
-                </pre>
-              </details>
-            ))}
+        <ScrollArea className="border-border/50 bg-muted/30 rounded border">
+          <div className="p-4">
+            <h3 className="text-foreground mb-3 text-sm font-medium">
+              Syntax Reference
+            </h3>
+            <Accordion
+              collapsible
+              type="single"
+            >
+              {SYNTAX_SECTIONS.map((section) => (
+                <AccordionItem
+                  key={section.title}
+                  value={section.title}
+                >
+                  <AccordionTrigger className="text-muted-foreground hover:text-foreground py-1.5 text-xs font-medium">
+                    {section.title}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <pre className="text-muted-foreground text-xs leading-relaxed whitespace-pre-wrap">
+                      {section.content}
+                    </pre>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </div>
-        </div>
+        </ScrollArea>
       </div>
 
       <ConfirmDialog

@@ -47,8 +47,6 @@ const config: Config = defineConfig([
       "import-x": importX,
     },
     rules: {
-      // Turn on periodically to check for issues; too slow for regular use
-      "import-x/no-cycle": "off",
       "import-x/no-default-export": "error",
       "import-x/no-duplicates": "error",
       "import-x/no-named-as-default": "error",
@@ -167,6 +165,23 @@ const config: Config = defineConfig([
       tanstackRouter.configs["flat/recommended"],
     ],
     files: ["**/*.{jsx,tsx,ts,js}"],
+    rules: {
+      "react-refresh/only-export-components": [
+        "error",
+        {
+          allowConstantExport: true,
+        },
+      ],
+    },
+  },
+
+  {
+    files: ["src/routes/**/*.tsx"],
+    rules: {
+      // TanStack Router's Vite plugin handles HMR for route files via its own
+      // import.meta.hot.accept() handler — React Fast Refresh is not involved
+      "react-refresh/only-export-components": "off",
+    },
   },
 
   {
@@ -193,22 +208,6 @@ const config: Config = defineConfig([
   {
     extends: [playwright.configs["flat/recommended"]],
     files: e2eGlobs,
-  },
-
-  // TanStack Router route files export both Route config and components
-  {
-    files: ["src/routes/**/*.tsx"],
-    rules: {
-      "react-refresh/only-export-components": "off",
-    },
-  },
-
-  // Reusable <Label> wrapper — htmlFor arrives via ...props spread
-  {
-    files: ["src/components/label.tsx"],
-    rules: {
-      "jsx-a11y/label-has-associated-control": "off",
-    },
   },
 
   regExp.recommended,

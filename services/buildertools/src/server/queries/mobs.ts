@@ -102,7 +102,10 @@ export async function updateMob(
   const { extras, immunities, vnum: _vnum, ...mobFields } = data;
 
   await immortalDb.transaction(async (tx) => {
-    await tx.update(mob).set(mobFields).where(eq(mob.vnum, vnum));
+    await tx
+      .update(mob)
+      .set({ ...mobFields, owner })
+      .where(eq(mob.vnum, vnum));
 
     // Replace extras atomically
     await tx.delete(mobExtra).where(eq(mobExtra.vnum, vnum));

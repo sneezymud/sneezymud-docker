@@ -1,6 +1,13 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import { LoginForm } from "@/components/login-form.tsx";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card.tsx";
 import { useAuthStore } from "@/state/auth.ts";
 
 export const Route = createFileRoute("/login")({
@@ -15,18 +22,16 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-950">
-      <div className="flex flex-col items-center gap-6">
-        <div className="text-center">
-          <h1 className="text-xl font-semibold text-zinc-100">
-            SneezyMUD Builder Tools
-          </h1>
-          <p className="mt-1 text-sm text-zinc-400">
-            Log in with your game account
-          </p>
-        </div>
-        <LoginForm />
-      </div>
+    <div className="bg-background flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="text-center">
+          <CardTitle className="text-xl">SneezyMUD Builder Tools</CardTitle>
+          <CardDescription>Log in with your game account</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <LoginForm />
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { BitfieldEntry } from "@/shared/enums/types.ts";
 
-import { cn } from "@/lib/cn.ts";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
+import { cn } from "@/lib/utils.ts";
 
 interface BitfieldEditorProps {
   entries: BitfieldEntry[];
@@ -32,22 +33,20 @@ export function BitfieldEditor({
             className={cn(
               "flex items-center gap-1.5 rounded px-1.5 py-0.5 text-xs",
               isDisabled
-                ? "cursor-not-allowed text-zinc-600"
-                : "cursor-pointer text-zinc-400 hover:bg-zinc-800",
+                ? "text-muted-foreground/60 cursor-not-allowed"
+                : "text-muted-foreground hover:bg-muted cursor-pointer",
             )}
             key={entry.bit}
             title={entry.disabledReason}
           >
-            <input
+            <Checkbox
               checked={isSet}
-              className="accent-accent"
               disabled={isDisabled}
-              onChange={() => {
+              onCheckedChange={() => {
                 onChange(toggleBitValue(value, entry.bit));
               }}
-              type="checkbox"
             />
-            {entry.label}
+            <span className="truncate">{entry.label}</span>
           </label>
         );
       })}

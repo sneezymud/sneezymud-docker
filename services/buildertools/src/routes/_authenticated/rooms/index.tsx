@@ -4,6 +4,8 @@ import { z } from "zod";
 
 import { EntityList } from "@/components/entity-list.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
 import { roomKeys } from "@/shared/query-keys.ts";
 import { roomListSchema, roomSchema } from "@/shared/schemas/room.ts";
@@ -77,20 +79,20 @@ function RoomListPage() {
   return (
     <div>
       {from !== undefined && to !== undefined ? (
-        <div className="mb-4 flex items-center gap-2 rounded border border-zinc-700/50 bg-zinc-800/30 px-4 py-2 text-sm text-zinc-400">
-          <span>
+        <Alert className="mb-4">
+          <AlertDescription className="flex items-center gap-2">
             Filtered to zone range {from}&ndash;{to}
-          </span>
-          <button
-            className="text-xs text-zinc-400 underline hover:text-zinc-200"
-            onClick={() => {
-              void navigate({ search: {}, to: "/rooms" });
-            }}
-            type="button"
-          >
-            Clear filter
-          </button>
-        </div>
+            <Button
+              onClick={() => {
+                void navigate({ search: {}, to: "/rooms" });
+              }}
+              size="xs"
+              variant="link"
+            >
+              Clear filter
+            </Button>
+          </AlertDescription>
+        </Alert>
       ) : null}
       <EntityList
         basePath="/rooms"

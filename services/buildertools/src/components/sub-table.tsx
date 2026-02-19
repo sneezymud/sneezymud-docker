@@ -2,11 +2,15 @@ import { useState } from "react";
 
 import type { EnumEntry } from "@/shared/enums/types.ts";
 
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
+
 import { ConfirmDialog } from "./confirm-dialog.tsx";
 import { EnumSelect } from "./enum-select.tsx";
-import { Input, Textarea } from "./input.tsx";
-import { Label } from "./label.tsx";
 import { NumberInput } from "./number-input.tsx";
+import { TagInput } from "./tag-input.tsx";
 
 export type ColumnDef<T> = EnumColumnDef<T> | TextColumnDef<T>;
 
@@ -17,7 +21,7 @@ interface ColumnDefBase<T> {
 }
 
 interface TextColumnDef<T> extends ColumnDefBase<T> {
-  type: "number" | "text" | "textarea";
+  type: "number" | "tags" | "text" | "textarea";
 }
 
 interface EnumColumnDef<T> extends ColumnDefBase<T> {
@@ -28,6 +32,7 @@ interface EnumColumnDef<T> extends ColumnDefBase<T> {
 interface SubTableProps<T extends Record<string, number | string>> {
   columns: Array<ColumnDef<T>>;
   emptyRow: T;
+  help?: string;
   label: string;
   onChange: (rows: T[]) => void;
   rows: T[];
@@ -37,6 +42,7 @@ interface SubTableProps<T extends Record<string, number | string>> {
 export function SubTable<T extends Record<string, number | string>>({
   columns,
   emptyRow,
+  help,
   label,
   onChange,
   rows,
@@ -92,24 +98,28 @@ export function SubTable<T extends Record<string, number | string>>({
   };
 
   return (
-    <fieldset className="rounded border border-zinc-700 p-4">
-      <legend className="flex items-center gap-1.5 px-2 text-sm font-medium text-zinc-300">
+    <fieldset className="border-border rounded border p-4">
+      <legend className="text-foreground flex items-center gap-1.5 px-2 text-base font-semibold">
         {label}
-        <span className="text-xs font-normal text-zinc-400">
+        <span className="text-muted-foreground text-xs font-normal">
           ({rows.length})
         </span>
       </legend>
 
+      {help ? (
+        <p className="text-muted-foreground mb-2 text-xs">{help}</p>
+      ) : null}
+
       <div className="space-y-2">
         {rows.length === 0 ? (
-          <p className="py-2 text-sm text-zinc-400">
-            No {label.toLowerCase()} yet. Click + to add.
+          <p className="text-muted-foreground py-4 text-center text-sm">
+            No {label.toLowerCase()} yet - use + to add.
           </p>
         ) : null}
 
         {rows.map((row, index) => (
           <div
-            className="flex items-start gap-2 rounded border border-zinc-700/30 bg-zinc-800/20 p-2 transition-shadow hover:shadow-md hover:shadow-zinc-900/50"
+            className="border-border/30 bg-muted/20 flex items-start gap-2 rounded border p-2 transition-shadow hover:shadow-md hover:shadow-black/20"
             key={rowKeys[index]}
           >
             <div
@@ -141,26 +151,28 @@ export function SubTable<T extends Record<string, number | string>>({
                 );
               })}
             </div>
-            <button
+            <Button
               aria-label={`Remove row ${index + 1}`}
-              className="focus-visible:ring-accent mt-[1.375rem] shrink-0 rounded px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-red-900/30 hover:text-red-400 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
+              className="mt-[1.375rem] shrink-0"
               onClick={() => {
                 setPendingRemove(index);
               }}
-              type="button"
+              size="xs"
+              variant="ghost"
             >
               Remove
-            </button>
+            </Button>
           </div>
         ))}
 
-        <button
-          className="focus-visible:ring-accent rounded border border-dashed border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-200 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
+        <Button
+          className="border-dashed"
           onClick={addRow}
-          type="button"
+          size="sm"
+          variant="outline"
         >
           + Add {singularLabel.toLowerCase()}
-        </button>
+        </Button>
       </div>
       <ConfirmDialog
         confirmLabel="Remove"
@@ -193,7 +205,7 @@ function CellInput({
   id: string;
   onNumberChange: (v: number) => void;
   onTextChange: (v: string) => void;
-  type: "enum" | "number" | "text" | "textarea";
+  type: "enum" | "number" | "tags" | "text" | "textarea";
   value: number | string;
 }) {
   if (type === "enum" && entries) {
@@ -202,7 +214,23 @@ function CellInput({
         entries={entries}
         id={id}
         onChange={onNumberChange}
-        value={typeof value === "number" ? value : Number(value) || 0}
+        value={
+          typeof value === "number"
+            ? value
+            : Number.isFinite(Number(value))
+              ? Number(value)
+              : 0
+        }
+      />
+    );
+  }
+
+  if (type === "tags") {
+    return (
+      <TagInput
+        id={id}
+        onChange={onTextChange}
+        value={String(value)}
       />
     );
   }
@@ -210,7 +238,7 @@ function CellInput({
   if (type === "textarea") {
     return (
       <Textarea
-        className="min-h-10 resize-y px-2 py-1"
+        className="min-h-10 px-2 py-1"
         id={id}
         onChange={(e) => {
           onTextChange(e.target.value);
@@ -226,7 +254,13 @@ function CellInput({
         className="px-2 py-1 font-mono"
         id={id}
         onValueChange={onNumberChange}
-        value={typeof value === "number" ? value : Number(value) || 0}
+        value={
+          typeof value === "number"
+            ? value
+            : Number.isFinite(Number(value))
+              ? Number(value)
+              : 0
+        }
       />
     );
   }

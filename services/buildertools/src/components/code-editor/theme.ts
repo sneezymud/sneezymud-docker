@@ -2,12 +2,13 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { EditorView } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 
-/** Editor chrome: background, gutter, selection, cursor. */
+/** Editor chrome: background, gutter, selection, cursor. Uses CSS variables
+ *  so the editor adapts if the app palette changes. */
 export const zincDarkTheme = EditorView.theme(
   {
     "&": {
-      backgroundColor: "rgb(39 39 42)", // zinc-800
-      color: "rgb(244 244 245)", // zinc-100
+      backgroundColor: "var(--secondary)",
+      color: "var(--foreground)",
       fontSize: "14px",
     },
     "&.cm-focused": {
@@ -15,10 +16,12 @@ export const zincDarkTheme = EditorView.theme(
       outlineOffset: "1px",
     },
     ".cm-activeLine": {
-      backgroundColor: "rgb(63 63 70 / 0.3)", // zinc-700/30
+      backgroundColor:
+        "color-mix(in oklch, var(--muted-foreground) 15%, transparent)",
     },
     ".cm-activeLineGutter": {
-      backgroundColor: "rgb(63 63 70 / 0.3)",
+      backgroundColor:
+        "color-mix(in oklch, var(--muted-foreground) 15%, transparent)",
     },
     ".cm-content": {
       fontFamily:
@@ -27,22 +30,24 @@ export const zincDarkTheme = EditorView.theme(
       padding: "8px 0",
     },
     ".cm-cursor": {
-      borderLeftColor: "rgb(244 244 245)", // zinc-100
+      borderLeftColor: "var(--foreground)",
     },
     ".cm-gutterElement": {
       padding: "0 8px 0 16px",
     },
     ".cm-gutters": {
-      backgroundColor: "rgb(39 39 42)", // zinc-800
-      borderRight: "1px solid rgb(63 63 70)", // zinc-700
-      color: "rgb(113 113 122)", // zinc-500
+      backgroundColor: "var(--secondary)",
+      borderRight: "1px solid var(--border)",
+      color: "var(--muted-foreground)",
     },
     ".cm-matchingBracket": {
-      backgroundColor: "rgb(63 63 70 / 0.5)", // zinc-700/50
-      outline: "1px solid rgb(113 113 122)", // zinc-500
+      backgroundColor:
+        "color-mix(in oklch, var(--muted-foreground) 25%, transparent)",
+      outline: "1px solid var(--muted-foreground)",
     },
     ".cm-selectionBackground": {
-      backgroundColor: "rgb(63 63 70 / 0.6) !important", // zinc-700/60
+      backgroundColor:
+        "color-mix(in oklch, var(--muted-foreground) 30%, transparent) !important",
     },
   },
   { dark: true },

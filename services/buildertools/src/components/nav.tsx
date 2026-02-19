@@ -3,21 +3,24 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Box, DoorOpen, Map, User } from "lucide-react";
 import { useState } from "react";
 
-import { cn } from "@/lib/cn.ts";
+import { Button } from "@/components/ui/button.tsx";
+import { cn } from "@/lib/utils.ts";
 import { useAuthStore } from "@/state/auth.ts";
 import { useDirtyStore } from "@/state/dirty.ts";
-import { useSidebarStore } from "@/state/sidebar.ts";
 
 import { ConfirmDialog } from "./confirm-dialog.tsx";
 
-export function Nav() {
+interface NavProps {
+  className?: string | undefined;
+  onNavClick?: (() => void) | undefined;
+}
+
+export function Nav({ className, onNavClick }: NavProps) {
   const user = useAuthStore((s) => s.user);
   const clearUser = useAuthStore((s) => s.clearUser);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const sidebarOpen = useSidebarStore((s) => s.open);
-  const closeSidebar = useSidebarStore((s) => s.close);
 
   if (!user) {
     return null;
@@ -29,6 +32,7 @@ export function Nav() {
         await fetch("/api/auth/logout", {
           headers: { "X-Requested-With": "XMLHttpRequest" },
           method: "POST",
+          signal: AbortSignal.timeout(5000),
         });
       } catch {
         // Proceed with client-side logout even if the server call fails
@@ -47,67 +51,71 @@ export function Nav() {
     }
   };
 
-  const handleNavClick = () => {
-    closeSidebar();
-  };
-
   return (
     <nav
       className={cn(
-        "fixed inset-y-0 left-0 z-40 flex w-56 transform flex-col border-r border-zinc-700/50 bg-zinc-900 p-4 transition-transform md:sticky md:top-0 md:h-screen md:translate-x-0 md:overflow-y-auto",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full",
+        "border-border/50 bg-card flex w-56 flex-col p-4",
+        className,
       )}
     >
       <div className="mb-6">
-        <p className="text-base font-semibold text-zinc-400">SneezyMUD</p>
-        <p className="text-sm text-zinc-400">Builder Tools</p>
+        <p className="text-foreground font-mono text-lg font-bold tracking-tight">
+          SneezyMUD
+        </p>
+        <p className="text-muted-foreground text-xs tracking-wide uppercase">
+          Builder Tools
+        </p>
       </div>
 
       <div className="flex flex-1 flex-col gap-1">
         <NavLink
           icon={<DoorOpen className="h-4 w-4 shrink-0" />}
-          onClick={handleNavClick}
+          onClick={onNavClick}
           to="/rooms"
         >
           Rooms
         </NavLink>
         <NavLink
           icon={<User className="h-4 w-4 shrink-0" />}
-          onClick={handleNavClick}
+          onClick={onNavClick}
           to="/mobs"
         >
           Mobs
         </NavLink>
         <NavLink
           icon={<Box className="h-4 w-4 shrink-0" />}
-          onClick={handleNavClick}
+          onClick={onNavClick}
           to="/objects"
         >
           Objects
         </NavLink>
         <NavLink
           icon={<Map className="h-4 w-4 shrink-0" />}
-          onClick={handleNavClick}
+          onClick={onNavClick}
           to="/zones"
         >
           Zones
         </NavLink>
       </div>
 
-      <div className="border-t border-zinc-700/50 pt-4">
-        <p className="mb-0.5 text-xs text-zinc-400">{user.playerName}</p>
+      <div className="border-border/50 border-t pt-4">
+        <p className="text-muted-foreground mb-0.5 text-xs">
+          {user.playerName}
+        </p>
         {user.username === user.playerName ? (
           <div className="mb-2" />
         ) : (
-          <p className="mb-2 text-xs text-zinc-400">({user.username})</p>
+          <p className="text-muted-foreground mb-2 text-xs">
+            ({user.username})
+          </p>
         )}
-        <button
-          className="focus-visible:ring-accent text-xs text-zinc-400 hover:text-zinc-200 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
+        <Button
+          className="h-auto p-0"
           onClick={handleLogout}
-          type="button"
+          variant="link"
         >
           Log out
-        </button>
+        </Button>
       </div>
 
       <ConfirmDialog
@@ -143,9 +151,9 @@ function NavLink({
     <Link
       activeProps={{
         "aria-current": "page" as const,
-        className: "bg-zinc-800 text-zinc-100",
+        className: "bg-muted text-foreground",
       }}
-      className="focus-visible:ring-accent flex items-center gap-2 rounded px-3 py-2 text-sm text-zinc-400 transition-colors hover:bg-zinc-800/50 hover:text-zinc-200 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
+      className="focus-visible:ring-accent text-muted-foreground hover:bg-muted/50 hover:text-foreground focus-visible:ring-offset-background flex items-center gap-2 rounded px-3 py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-1"
       onClick={onClick}
       to={to}
     >

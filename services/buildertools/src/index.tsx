@@ -7,6 +7,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { toast } from "sonner";
 
 import "./index.css";
 import { routeTree } from "./routeTree.gen";
@@ -16,6 +17,7 @@ import { useAuthStore } from "./state/auth.ts";
 function handleAuthError(error: Error): void {
   if (error instanceof ApiResponseError && error.status === 401) {
     useAuthStore.getState().clearUser();
+    toast.warning("Your session has expired. Please log in again.");
     void router.navigate({ to: "/login" });
   }
 }
@@ -36,7 +38,12 @@ const queryClient = new QueryClient({
     },
   },
   queryCache: new QueryCache({
-    onError: handleAuthError,
+    onError: (error) => {
+      handleAuthError(error);
+      if (!(error instanceof ApiResponseError && error.status === 401)) {
+        toast.error("Connection issue — data may be outdated");
+      }
+    },
   }),
 });
 

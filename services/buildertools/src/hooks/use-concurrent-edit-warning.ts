@@ -3,37 +3,35 @@ import { toast } from "sonner";
 
 /**
  * Warns the user when server data changes while they have unsaved edits.
- * Compares a stable snapshot of the data at the time edits began against
- * the latest server data.
+ * Captures a snapshot of the data when editing begins, then compares
+ * against subsequent server data to detect concurrent modifications.
  */
 export function useConcurrentEditWarning(data: unknown, dirty: boolean): void {
-  const baseSnapshotRef = useRef<null | string>(null);
+  const snapshotRef = useRef<null | string>(null);
   const hasWarnedRef = useRef(false);
+  const prevDirtyRef = useRef(false);
 
-  // Capture a snapshot when the user first makes edits
   useEffect(() => {
-    if (dirty && baseSnapshotRef.current === null) {
-      baseSnapshotRef.current = JSON.stringify(data);
+    if (dirty && !prevDirtyRef.current) {
+      // Just became dirty: capture baseline snapshot
+      snapshotRef.current = JSON.stringify(data);
       hasWarnedRef.current = false;
-    }
-    if (!dirty) {
-      baseSnapshotRef.current = null;
+    } else if (!dirty && prevDirtyRef.current) {
+      // Just became clean: clear snapshot
+      snapshotRef.current = null;
       hasWarnedRef.current = false;
-    }
-  }, [dirty, data]);
-
-  // When data changes while dirty, compare against snapshot
-  useEffect(() => {
-    if (!dirty || baseSnapshotRef.current === null || hasWarnedRef.current) {
-      return;
-    }
-    const currentData = JSON.stringify(data);
-    if (currentData !== baseSnapshotRef.current) {
+    } else if (
+      dirty &&
+      snapshotRef.current !== null &&
+      !hasWarnedRef.current && // Still dirty: check for server-side changes
+      JSON.stringify(data) !== snapshotRef.current
+    ) {
       hasWarnedRef.current = true;
       toast.warning(
         "This entity was updated by another builder. Your unsaved changes may conflict.",
         { duration: 10_000 },
       );
     }
+    prevDirtyRef.current = dirty;
   }, [data, dirty]);
 }

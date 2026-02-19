@@ -1,5 +1,6 @@
 import {
   createFileRoute,
+  Link,
   Outlet,
   redirect,
   useRouterState,
@@ -8,7 +9,9 @@ import { Menu } from "lucide-react";
 import { useEffect } from "react";
 
 import { Nav } from "@/components/nav.tsx";
-import { apiFetch } from "@/shared/api-client.ts";
+import { Button } from "@/components/ui/button.tsx";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet.tsx";
+import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
 import { sessionUserSchema } from "@/shared/schemas/auth.ts";
 import { useAuthStore } from "@/state/auth.ts";
 import { useSidebarStore } from "@/state/sidebar.ts";
@@ -27,7 +30,11 @@ export const Route = createFileRoute("/_authenticated")({
     try {
       const sessionUser = await apiFetch("/api/auth/me", sessionUserSchema);
       setUser(sessionUser);
-    } catch {
+    } catch (error) {
+      // 401 = genuine session expiry — redirect immediately
+      if (error instanceof ApiResponseError && error.status === 401) {
+        throw redirect({ to: "/login" });
+      }
       // Retry once after a brief delay (handles transient network failures)
       try {
         await new Promise((r) => setTimeout(r, 1000));
@@ -39,6 +46,17 @@ export const Route = createFileRoute("/_authenticated")({
     }
   },
   component: AuthenticatedLayout,
+  notFoundComponent: () => (
+    <div className="text-muted-foreground flex flex-col items-center gap-4 py-16">
+      <p>Page not found</p>
+      <Button
+        asChild
+        variant="link"
+      >
+        <Link to="/rooms">&larr; Back to rooms</Link>
+      </Button>
+    </div>
+  ),
 });
 
 function AuthenticatedLayout() {
@@ -51,24 +69,8 @@ function AuthenticatedLayout() {
     saveLastSection(pathname);
   }, [pathname]);
 
-  // Dismiss mobile sidebar on Escape key
-  useEffect(() => {
-    if (!sidebarOpen) {
-      return;
-    }
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        closeSidebar();
-      }
-    };
-    document.addEventListener("keydown", handler);
-    return () => {
-      document.removeEventListener("keydown", handler);
-    };
-  }, [sidebarOpen, closeSidebar]);
-
   return (
-    <div className="flex min-h-screen bg-zinc-950">
+    <div className="bg-background flex min-h-screen">
       <a
         className="focus:bg-accent sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded focus:px-4 focus:py-2 focus:text-sm focus:text-white"
         href="#main-content"
@@ -76,31 +78,45 @@ function AuthenticatedLayout() {
         Skip to content
       </a>
 
-      {sidebarOpen ? (
-        <div
-          aria-hidden
-          className="fixed inset-0 z-30 bg-black/50 md:hidden"
-          onClick={closeSidebar}
-        />
-      ) : null}
+      {/* Desktop sidebar */}
+      <Nav className="sticky top-0 hidden h-screen overflow-y-auto border-r lg:flex" />
 
-      <Nav />
+      {/* Mobile sidebar */}
+      <Sheet
+        modal={false}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) closeSidebar();
+        }}
+        open={sidebarOpen}
+      >
+        <SheetContent
+          className="w-56 p-0"
+          showCloseButton={false}
+          side="left"
+        >
+          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <Nav
+            className="flex h-full border-r-0"
+            onNavClick={closeSidebar}
+          />
+        </SheetContent>
+      </Sheet>
 
       <main
         className="min-w-0 flex-1 p-6"
         id="main-content"
       >
-        <div className="mb-4 md:hidden">
-          <button
+        <div className="mb-4 lg:hidden">
+          <Button
             aria-label="Open navigation"
-            className="focus-visible:ring-accent rounded border border-zinc-700 p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950"
             onClick={toggleSidebar}
-            type="button"
+            size="icon"
+            variant="outline"
           >
             <Menu className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
-        <div className="mx-auto max-w-screen-2xl transition-opacity duration-100">
+        <div className="3xl:max-w-none mx-auto max-w-screen-2xl transition-opacity duration-100">
           <Outlet />
         </div>
       </main>

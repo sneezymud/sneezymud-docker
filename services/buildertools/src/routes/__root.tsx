@@ -7,38 +7,46 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
-import { Toaster } from "@/components/toaster.tsx";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Toaster } from "@/components/ui/sonner.tsx";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
 }>()({
   component: RootLayout,
   errorComponent: ({ error }) => (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-zinc-950 text-zinc-400">
-      <p className="text-lg text-red-400">Something went wrong</p>
-      <pre className="max-w-lg overflow-auto rounded border border-zinc-800 bg-zinc-900 p-4 text-xs text-zinc-400">
-        {error instanceof Error ? error.message : "Unknown error"}
-      </pre>
-      <button
-        className="rounded bg-zinc-700 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600"
+    <div className="bg-background flex min-h-screen flex-col items-center justify-center gap-4">
+      <Alert
+        className="max-w-lg"
+        variant="destructive"
+      >
+        <AlertTitle>Something went wrong</AlertTitle>
+        <AlertDescription>
+          <pre className="overflow-auto text-xs whitespace-pre-wrap">
+            {error instanceof Error ? error.message : "Unknown error"}
+          </pre>
+        </AlertDescription>
+      </Alert>
+      <Button
         onClick={() => {
           globalThis.location.reload();
         }}
-        type="button"
+        variant="secondary"
       >
         Reload
-      </button>
+      </Button>
     </div>
   ),
   notFoundComponent: () => (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-zinc-950 text-zinc-400">
+    <div className="bg-background text-muted-foreground flex min-h-screen flex-col items-center justify-center gap-4">
       <p>404 Not Found</p>
-      <Link
-        className="text-sm text-zinc-400 hover:text-zinc-200"
-        to="/"
+      <Button
+        asChild
+        variant="link"
       >
-        &larr; Back to Builder Tools
-      </Link>
+        <Link to="/">&larr; Back to Builder Tools</Link>
+      </Button>
     </div>
   ),
 });

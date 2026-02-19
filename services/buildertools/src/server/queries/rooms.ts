@@ -5,7 +5,7 @@ import type { Room, RoomListItem } from "@/shared/schemas/room.ts";
 
 import { immortalDb, sneezyDb } from "../db.ts";
 import { room, roomexit } from "../schema/immortal.ts";
-import { room as sneezyRoom } from "../schema/sneezy.ts";
+import { room as sneezyRoom, zone } from "../schema/sneezy.ts";
 
 export async function listRooms(blocks: VnumBlock[]): Promise<RoomListItem[]> {
   if (blocks.length === 0) {
@@ -40,6 +40,14 @@ export async function getRoom(vnum: number): Promise<null | Room> {
 }
 
 export async function createRoom(vnum: number, owner: string): Promise<void> {
+  // Derive zone from vnum (first zone where top >= vnum), matching C++ redit
+  const [matchingZone] = await sneezyDb
+    .select({ zone_nr: zone.zone_nr })
+    .from(zone)
+    .where(gte(zone.top, vnum))
+    .orderBy(zone.zone_nr)
+    .limit(1);
+
   await immortalDb.insert(room).values({
     capacity: 0,
     description: "",
@@ -58,7 +66,7 @@ export async function createRoom(vnum: number, owner: string): Promise<void> {
     x: 0,
     y: 0,
     z: 0,
-    zone: 1,
+    zone: matchingZone?.zone_nr ?? 1,
   });
 }
 
@@ -71,7 +79,10 @@ export async function updateRoom(
   const { exits, vnum: _vnum, ...roomFields } = data;
 
   await immortalDb.transaction(async (tx) => {
-    await tx.update(room).set(roomFields).where(eq(room.vnum, vnum));
+    await tx
+      .update(room)
+      .set({ ...roomFields, owner })
+      .where(eq(room.vnum, vnum));
 
     // Replace all exits atomically
     await tx.delete(roomexit).where(eq(roomexit.vnum, vnum));

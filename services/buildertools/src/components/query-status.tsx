@@ -1,5 +1,7 @@
 import { Link } from "@tanstack/react-router";
 
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { ApiResponseError } from "@/shared/api-client.ts";
 
 interface QueryStatusProps {
@@ -23,7 +25,9 @@ export function QueryStatus({
 }: QueryStatusProps) {
   if (isLoading) {
     return (
-      skeleton ?? <p className="text-sm text-zinc-400">Loading {label}...</p>
+      skeleton ?? (
+        <p className="text-muted-foreground text-sm">Loading {label}...</p>
+      )
     );
   }
 
@@ -35,16 +39,16 @@ export function QueryStatus({
 
     return (
       <div className="space-y-3">
-        <div className="rounded border border-red-800/50 bg-red-900/20 px-4 py-3 text-sm text-red-400">
-          <p>{message}</p>
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{message}</AlertDescription>
+        </Alert>
         {backTo ? (
-          <Link
-            className="inline-block text-sm text-zinc-400 hover:text-zinc-200"
-            to={backTo}
+          <Button
+            asChild
+            variant="link"
           >
-            &larr; {backLabel ?? "Go back"}
-          </Link>
+            <Link to={backTo}>&larr; {backLabel ?? "Go back"}</Link>
+          </Button>
         ) : null}
       </div>
     );

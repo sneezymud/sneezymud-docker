@@ -95,8 +95,10 @@ export function CodeEditor({ onChange, onSave, value }: CodeEditorProps) {
 
   return (
     <div
-      className="min-h-[400px] flex-1 overflow-hidden rounded border border-zinc-700"
+      aria-label="Response script editor"
+      className="border-border min-h-[400px] flex-1 overflow-hidden rounded border"
       ref={containerRef}
+      role="textbox"
     />
   );
 }

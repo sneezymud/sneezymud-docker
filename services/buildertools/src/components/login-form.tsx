@@ -2,8 +2,10 @@ import { useNavigate } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { Input } from "@/components/input.tsx";
-import { Label } from "@/components/label.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
 import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
 import { sessionUserSchema } from "@/shared/schemas/auth.ts";
 import { useAuthStore } from "@/state/auth.ts";
@@ -48,7 +50,7 @@ export function LoginForm() {
 
   return (
     <form
-      className="w-full max-w-sm space-y-4"
+      className="space-y-4"
       onSubmit={handleSubmit}
     >
       <div>
@@ -80,31 +82,31 @@ export function LoginForm() {
         />
       </div>
 
-      <button
-        className="focus-visible:ring-accent w-full rounded bg-zinc-700 px-4 py-2 text-sm text-zinc-100 transition-colors hover:bg-zinc-600 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 disabled:opacity-50"
+      {error ? (
+        <Alert
+          aria-live="assertive"
+          variant="destructive"
+        >
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      <Button
+        className="w-full"
         disabled={loading}
         type="submit"
       >
         {loading ? (
-          <span className="flex items-center justify-center gap-2">
+          <>
             <Loader2 className="h-4 w-4 animate-spin" />
             Logging in...
-          </span>
+          </>
         ) : (
           "Log in"
         )}
-      </button>
+      </Button>
 
-      {error ? (
-        <div
-          aria-live="assertive"
-          className="rounded border border-red-800/50 bg-red-900/20 px-4 py-3 text-sm text-red-400"
-        >
-          {error}
-        </div>
-      ) : null}
-
-      <p className="text-center text-xs text-zinc-400">
+      <p className="text-muted-foreground text-center text-xs">
         Need an account? Contact a MUD admin.
       </p>
     </form>

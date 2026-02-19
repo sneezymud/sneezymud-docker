@@ -79,7 +79,10 @@ export async function updateObject(
   const { affects, extras, vnum: _vnum, ...objFields } = data;
 
   await immortalDb.transaction(async (tx) => {
-    await tx.update(obj).set(objFields).where(eq(obj.vnum, vnum));
+    await tx
+      .update(obj)
+      .set({ ...objFields, owner })
+      .where(eq(obj.vnum, vnum));
 
     // Replace affects atomically
     await tx.delete(objaffect).where(eq(objaffect.vnum, vnum));

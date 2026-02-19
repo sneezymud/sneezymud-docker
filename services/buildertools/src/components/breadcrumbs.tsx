@@ -1,52 +1,43 @@
 import { Link } from "@tanstack/react-router";
+import React from "react";
 
-interface BreadcrumbItem {
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb.tsx";
+
+interface BreadcrumbEntry {
   label: string;
   to?: string | undefined;
 }
 
 interface BreadcrumbsProps {
-  items: BreadcrumbItem[];
+  items: BreadcrumbEntry[];
 }
 
 export function Breadcrumbs({ items }: BreadcrumbsProps) {
   return (
-    <nav
-      aria-label="Breadcrumb"
-      className="text-sm text-zinc-400"
-    >
-      <ol className="flex items-center gap-1">
+    <Breadcrumb>
+      <BreadcrumbList>
         {items.map((item, index) => (
-          <li
-            className="flex items-center gap-1"
-            key={item.to ?? item.label}
-          >
-            {index > 0 ? (
-              <span
-                aria-hidden="true"
-                className="text-zinc-600"
-              >
-                /
-              </span>
-            ) : null}
-            {item.to ? (
-              <Link
-                className="hover:text-zinc-200"
-                to={item.to}
-              >
-                {item.label}
-              </Link>
-            ) : (
-              <span
-                aria-current="page"
-                className="text-zinc-200"
-              >
-                {item.label}
-              </span>
-            )}
-          </li>
+          <React.Fragment key={item.to ?? item.label}>
+            {index > 0 ? <BreadcrumbSeparator /> : null}
+            <BreadcrumbItem>
+              {item.to ? (
+                <BreadcrumbLink asChild>
+                  <Link to={item.to}>{item.label}</Link>
+                </BreadcrumbLink>
+              ) : (
+                <BreadcrumbPage>{item.label}</BreadcrumbPage>
+              )}
+            </BreadcrumbItem>
+          </React.Fragment>
         ))}
-      </ol>
-    </nav>
+      </BreadcrumbList>
+    </Breadcrumb>
   );
 }

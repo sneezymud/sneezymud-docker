@@ -1,15 +1,25 @@
-import * as Tooltip from "@radix-ui/react-tooltip";
-import { useState } from "react";
+import { Info } from "lucide-react";
+import { Fragment, useState } from "react";
 
 import type { BitfieldEntry, EnumEntry } from "@/shared/enums/types.ts";
 
-import { cn } from "@/lib/cn.ts";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Separator } from "@/components/ui/separator.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip.tsx";
+import { cn } from "@/lib/utils.ts";
 
 import { BitfieldEditor } from "./bitfield-editor.tsx";
 import { ConfirmDialog } from "./confirm-dialog.tsx";
 import { EnumSelect } from "./enum-select.tsx";
-import { Input, Textarea } from "./input.tsx";
-import { Label } from "./label.tsx";
 import { NumberInput } from "./number-input.tsx";
 
 interface FieldDefBase {
@@ -18,7 +28,7 @@ interface FieldDefBase {
   key: string;
   label: string;
   required?: boolean | undefined;
-  tooltip?: string;
+  tooltip?: React.ReactNode;
 }
 
 interface TextFieldDef extends FieldDefBase {
@@ -45,9 +55,13 @@ interface BitfieldFieldDef extends FieldDefBase {
 type FieldDef = BitfieldFieldDef | EnumFieldDef | NumberFieldDef | TextFieldDef;
 
 interface FieldGroupDef {
+  colSpan?: "full";
+  fieldGroupSize?: number;
   fields: FieldDef[];
+  gridCols?: string;
   labelClass?: string | undefined;
   title: string;
+  tooltip?: React.ReactNode;
 }
 
 interface EntityFormProps {
@@ -87,64 +101,72 @@ export function EntityForm({
   };
 
   return (
-    <Tooltip.Provider delayDuration={300}>
+    <TooltipProvider delayDuration={300}>
       <form
         className="space-y-6"
         onSubmit={handleSubmit}
       >
-        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-zinc-700/30 bg-zinc-950/95 py-3 backdrop-blur-sm">
-          <button
-            className="bg-accent hover:bg-accent/80 focus-visible:ring-accent rounded px-4 py-2 text-sm text-white transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+        <div className="border-border bg-background/95 sticky top-0 z-10 flex items-center gap-3 border-b py-3 shadow-sm backdrop-blur-sm">
+          <Button
             disabled={!dirty || saving}
             type="submit"
           >
             {saving ? "Saving..." : "Save"}
-          </button>
+          </Button>
 
           <span
             aria-live="polite"
             className="contents"
           >
             {dirty ? (
-              <span className="flex items-center gap-1.5 text-sm font-medium text-amber-400">
+              <Badge
+                className="animate-in fade-in slide-in-from-top-1 gap-1.5 text-amber-400 duration-150"
+                variant="outline"
+              >
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
                 Unsaved changes
                 {onReset ? (
-                  <button
-                    className="ml-1 text-xs text-zinc-400 underline hover:text-zinc-200"
+                  <Button
+                    className="ml-1"
                     onClick={onReset}
-                    type="button"
+                    size="xs"
+                    variant="link"
                   >
                     Discard
-                  </button>
+                  </Button>
                 ) : null}
-              </span>
+              </Badge>
             ) : null}
           </span>
 
           {onDelete ? (
-            <button
-              className="focus-visible:ring-accent ml-auto rounded border border-red-800/50 px-3 py-1.5 text-sm text-red-400 transition-colors hover:bg-red-900/20 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+            <Button
+              className="ml-6"
               disabled={deletePending}
               onClick={() => {
                 setShowDeleteConfirm(true);
               }}
-              type="button"
+              size="sm"
+              variant="destructive"
             >
               {deletePending ? "Deleting..." : "Delete"}
-            </button>
+            </Button>
           ) : null}
         </div>
 
-        <div className="space-y-6 xl:columns-2 xl:gap-6">
+        <div className="3xl:grid-cols-3 grid gap-6 lg:grid-cols-2">
           {groups.map((group) => (
             <FieldGroup
+              colSpan={group.colSpan}
+              fieldGroupSize={group.fieldGroupSize}
               fields={group.fields}
+              gridCols={group.gridCols}
               key={group.title}
               labelClass={group.labelClass}
               onChange={onChange}
               originalValues={originalValues}
               title={group.title}
+              tooltip={group.tooltip}
               values={values}
             />
           ))}
@@ -169,45 +191,31 @@ export function EntityForm({
           />
         ) : null}
       </form>
-    </Tooltip.Provider>
+    </TooltipProvider>
   );
 }
 
-function FieldTooltip({ text }: { text: string }) {
+function FieldTooltip({ children }: { children: React.ReactNode }) {
   return (
-    <Tooltip.Root>
-      <Tooltip.Trigger asChild>
-        <span className="ml-1 inline-flex cursor-help text-zinc-500 hover:text-zinc-300">
-          <svg
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          className="text-muted-foreground hover:text-foreground ml-1 inline-flex cursor-help"
+          type="button"
+        >
+          <Info
             aria-hidden="true"
             className="h-3.5 w-3.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              cx="12"
-              cy="12"
-              r="10"
-            />
-            <path
-              d="M12 16v-4M12 8h.01"
-              strokeLinecap="round"
-            />
-          </svg>
-        </span>
-      </Tooltip.Trigger>
-      <Tooltip.Portal>
-        <Tooltip.Content
-          className="tooltip-content z-50 max-w-xs rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 shadow-lg"
-          sideOffset={5}
-        >
-          {text}
-          <Tooltip.Arrow className="fill-zinc-800" />
-        </Tooltip.Content>
-      </Tooltip.Portal>
-    </Tooltip.Root>
+          />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent
+        className="max-w-sm text-sm [&_li]:mb-0.5 [&_p]:mb-1.5 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_ul]:ml-3 [&_ul]:list-disc"
+        sideOffset={5}
+      >
+        {children}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -242,10 +250,12 @@ function FormField({
         {field.required ? (
           <span
             aria-label="required"
-            className="ml-1 inline-block h-1 w-1 rounded-full bg-amber-400 align-super"
-          />
+            className="ml-0.5 text-amber-400"
+          >
+            *
+          </span>
         ) : null}
-        {field.tooltip ? <FieldTooltip text={field.tooltip} /> : null}
+        {field.tooltip ? <FieldTooltip>{field.tooltip}</FieldTooltip> : null}
       </Label>
       {field.type === "textarea" ? (
         <Textarea
@@ -263,7 +273,13 @@ function FormField({
           onChange={(v) => {
             onChange(field.key, v);
           }}
-          value={typeof value === "number" ? value : Number(value) || 0}
+          value={
+            typeof value === "number"
+              ? value
+              : Number.isFinite(Number(value))
+                ? Number(value)
+                : 0
+          }
         />
       ) : field.type === "bitfield" ? (
         <BitfieldEditor
@@ -272,7 +288,13 @@ function FormField({
           onChange={(v) => {
             onChange(field.key, v);
           }}
-          value={typeof value === "number" ? value : Number(value) || 0}
+          value={
+            typeof value === "number"
+              ? value
+              : Number.isFinite(Number(value))
+                ? Number(value)
+                : 0
+          }
         />
       ) : field.type === "number" ? (
         <NumberInput
@@ -284,7 +306,13 @@ function FormField({
             onChange(field.key, v);
           }}
           step={field.step}
-          value={typeof value === "number" ? value : Number(value) || 0}
+          value={
+            typeof value === "number"
+              ? value
+              : Number.isFinite(Number(value))
+                ? Number(value)
+                : 0
+          }
         />
       ) : (
         <Input
@@ -297,46 +325,66 @@ function FormField({
         />
       )}
       {field.help ? (
-        <p className="mt-0.5 text-xs text-zinc-400">{field.help}</p>
+        <p className="text-muted-foreground mt-0.5 text-xs">{field.help}</p>
       ) : null}
     </div>
   );
 }
 
 function FieldGroup({
+  colSpan,
+  fieldGroupSize,
   fields,
+  gridCols,
   labelClass,
   onChange,
   originalValues,
   title,
+  tooltip,
   values,
 }: {
+  colSpan?: "full" | undefined;
+  fieldGroupSize?: number | undefined;
   fields: FieldDef[];
+  gridCols?: string | undefined;
   labelClass?: string | undefined;
   onChange: (key: string, value: number | string) => void;
   originalValues?: Record<string, number | string> | undefined;
   title: string;
+  tooltip?: React.ReactNode;
   values: Record<string, number | string>;
 }) {
   return (
-    <fieldset className="break-inside-avoid rounded border border-zinc-700 p-4">
-      <legend className="px-2 text-sm font-medium text-zinc-300">
+    <fieldset
+      className={cn(
+        "border-border rounded border p-4",
+        colSpan === "full" && "col-span-full",
+      )}
+    >
+      <legend className="text-foreground px-2 text-base font-semibold">
         {title}
+        {tooltip ? <FieldTooltip>{tooltip}</FieldTooltip> : null}
       </legend>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {fields.map((field) => {
+      <div
+        className={cn("grid gap-4", gridCols ?? "grid-cols-1 sm:grid-cols-2")}
+      >
+        {fields.map((field, i) => {
           const fieldDirty =
             originalValues !== undefined &&
             values[field.key] !== originalValues[field.key];
+          const showSeparator =
+            fieldGroupSize !== undefined && i > 0 && i % fieldGroupSize === 0;
           return (
-            <FormField
-              field={field}
-              isDirty={fieldDirty}
-              key={field.key}
-              labelClass={labelClass}
-              onChange={onChange}
-              value={values[field.key]}
-            />
+            <Fragment key={field.key}>
+              {showSeparator ? <Separator className="col-span-full" /> : null}
+              <FormField
+                field={field}
+                isDirty={fieldDirty}
+                labelClass={labelClass}
+                onChange={onChange}
+                value={values[field.key]}
+              />
+            </Fragment>
           );
         })}
       </div>

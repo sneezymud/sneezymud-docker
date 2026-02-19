@@ -257,7 +257,7 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
             },
           ]}
         />
-        <h2 className="text-xl font-bold text-zinc-100">
+        <h2 className="text-foreground text-xl font-bold">
           Object {vnum}: {obj.short_desc || "(unnamed)"}
         </h2>
       </div>

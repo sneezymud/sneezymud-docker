@@ -1,14 +1,12 @@
 import { useState } from "react";
 
-import { cn } from "@/lib/cn.ts";
-
-const baseClass =
-  "w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950";
+import { Input } from "@/components/ui/input.tsx";
 
 interface NumberInputProps extends Omit<
   React.ComponentProps<"input">,
   "onChange" | "type" | "value"
 > {
+  integer?: boolean | undefined;
   max?: number | undefined;
   min?: number | undefined;
   onValueChange: (value: number) => void;
@@ -18,6 +16,7 @@ interface NumberInputProps extends Omit<
 
 export function NumberInput({
   className,
+  integer,
   max,
   min,
   onValueChange,
@@ -38,28 +37,41 @@ export function NumberInput({
     }
   }
 
+  const clamp = (n: number): number => {
+    let result = n;
+    if (integer) result = Math.round(result);
+    if (min !== undefined && result < min) result = min;
+    if (max !== undefined && result > max) result = max;
+    return result;
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
     setDisplay(raw);
 
     const parsed = Number(raw);
     if (raw !== "" && Number.isFinite(parsed)) {
-      onValueChange(parsed);
+      onValueChange(clamp(parsed));
     }
   };
 
   const handleBlur = () => {
-    // On blur, snap display back to the parent value if the input is empty or invalid
     const parsed = Number(display);
     if (display === "" || !Number.isFinite(parsed)) {
       setDisplay(String(value));
+      return;
+    }
+    const clamped = clamp(parsed);
+    if (clamped !== parsed) {
+      setDisplay(String(clamped));
+      onValueChange(clamped);
     }
   };
 
   return (
-    <input
+    <Input
       {...rest}
-      className={cn(baseClass, className)}
+      className={className}
       max={max}
       min={min}
       onBlur={handleBlur}
