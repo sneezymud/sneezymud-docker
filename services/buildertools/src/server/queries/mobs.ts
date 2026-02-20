@@ -3,6 +3,8 @@ import { and, eq, gte, lte, or } from "drizzle-orm";
 import type { VnumBlock } from "@/shared/schemas/auth.ts";
 import type { Mob, MobListItem } from "@/shared/schemas/mob.ts";
 
+import { mobExtraSchema } from "@/shared/schemas/mob.ts";
+
 import { immortalDb } from "../db.ts";
 import { mob, mobExtra, mobImm, mobresponses } from "../schema/immortal.ts";
 
@@ -34,11 +36,13 @@ export async function getMob(vnum: number): Promise<Mob | null> {
     immortalDb.select().from(mobImm).where(eq(mobImm.vnum, vnum)),
   ]);
 
-  const { owner: _owner, ...mobFields } = row;
+  const { letter: _letter, owner: _owner, pos: _pos, ...mobFields } = row;
   return {
     ...mobFields,
     adjacent_sound: mobFields.adjacent_sound ?? "",
-    extras: extras.map(({ owner: _eo, ...fields }) => fields),
+    extras: extras.map(({ owner: _eo, ...fields }) =>
+      mobExtraSchema.parse(fields),
+    ),
     immunities: immunities.map(({ owner: _io, ...fields }) => fields),
     local_sound: mobFields.local_sound ?? "",
   };
@@ -70,7 +74,7 @@ export async function createMob(vnum: number, owner: string): Promise<void> {
     hpbonus: 0,
     intel: 0,
     kar: 0,
-    letter: "",
+    letter: "L",
     level: 1,
     local_sound: "",
     long_desc: "",
@@ -100,11 +104,12 @@ export async function updateMob(
   owner: string,
 ): Promise<void> {
   const { extras, immunities, vnum: _vnum, ...mobFields } = data;
+  const letter = mobFields.local_sound && !mobFields.adjacent_sound ? "A" : "L";
 
   await immortalDb.transaction(async (tx) => {
     await tx
       .update(mob)
-      .set({ ...mobFields, owner })
+      .set({ ...mobFields, letter, owner, pos: mobFields.def_position })
       .where(eq(mob.vnum, vnum));
 
     // Replace extras atomically

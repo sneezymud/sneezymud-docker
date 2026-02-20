@@ -2,9 +2,20 @@ import { z } from "zod";
 
 import { vnumSchema } from "./common.ts";
 
+export const mobStringKeywords = [
+  "bamfin",
+  "bamfout",
+  "deathcry",
+  "movein",
+  "moveout",
+  "repop",
+] as const;
+
+export type MobStringKeyword = (typeof mobStringKeywords)[number];
+
 export const mobExtraSchema = z.object({
   description: z.string(),
-  keyword: z.string(),
+  keyword: z.enum(mobStringKeywords),
   vnum: vnumSchema,
 });
 
@@ -39,20 +50,18 @@ export const mobSchema = z.object({
   fact_perc: z.number().int(),
   faction: z.number().int(),
   foc: z.number().int(),
-  gold: z.number().int(),
+  gold: z.number().int().min(0).max(10),
   height: z.number().int(),
   hpbonus: z.number(),
   immunities: z.array(mobImmSchema),
   intel: z.number().int(),
   kar: z.number().int(),
-  letter: z.string().max(1),
   level: z.number().int(),
   local_sound: z.string(),
   long_desc: z.string(),
   max_exist: z.number().int(),
   name: z.string(),
   per: z.number().int(),
-  pos: z.number().int(),
   race: z.number().int(),
   sex: z.number().int(),
   short_desc: z.string(),
@@ -61,7 +70,7 @@ export const mobSchema = z.object({
   spec_proc: z.number().int(),
   str: z.number().int(),
   tohit: z.number().int(),
-  vision: z.number().int(),
+  vision: z.number().int().min(-100).max(100),
   vnum: vnumSchema,
   weight: z.number().int(),
   wis: z.number().int(),
