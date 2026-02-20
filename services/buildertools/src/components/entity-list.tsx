@@ -114,7 +114,7 @@ export function EntityList({
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center gap-3">
         <h2 className="text-foreground text-2xl font-bold">
           {label}{" "}
           <span className="text-muted-foreground text-sm font-normal">
@@ -166,7 +166,13 @@ export function EntityList({
             <TableRow key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
                 <TableHead
-                  className={header.column.id === "vnum" ? "w-24" : undefined}
+                  className={
+                    header.column.id === "vnum"
+                      ? "w-24"
+                      : header.column.id === "secondary"
+                        ? "hidden sm:table-cell"
+                        : undefined
+                  }
                   key={header.id}
                 >
                   {header.column.getCanSort() ? (
@@ -204,7 +210,7 @@ export function EntityList({
               >
                 <TableCell className="p-0">
                   <Link
-                    className="text-muted-foreground block px-2 py-2 font-mono outline-none"
+                    className="text-muted-foreground block px-2 py-2.5 font-mono outline-none"
                     to={to}
                   >
                     {entity.vnum}
@@ -212,7 +218,7 @@ export function EntityList({
                 </TableCell>
                 <TableCell className="p-0">
                   <Link
-                    className="text-foreground group-hover:text-foreground block px-2 py-2 outline-none"
+                    className="text-foreground group-hover:text-foreground block px-2 py-2.5 outline-none"
                     tabIndex={-1}
                     to={to}
                   >
@@ -220,9 +226,9 @@ export function EntityList({
                   </Link>
                 </TableCell>
                 {secondaryLabel ? (
-                  <TableCell className="p-0">
+                  <TableCell className="hidden p-0 sm:table-cell">
                     <Link
-                      className="text-muted-foreground block px-2 py-2 outline-none"
+                      className="text-muted-foreground block px-2 py-2.5 outline-none"
                       tabIndex={-1}
                       to={to}
                     >

@@ -58,16 +58,31 @@ export function Nav({ className, onNavClick }: NavProps) {
         className,
       )}
     >
-      <div className="mb-6">
-        <p className="text-foreground font-mono text-lg font-bold tracking-tight">
-          SneezyMUD
-        </p>
-        <p className="text-muted-foreground text-xs tracking-wide uppercase">
-          Builder Tools
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <p className="text-foreground font-mono text-lg font-bold tracking-tight">
+            SneezyMUD
+          </p>
+          <p className="text-muted-foreground text-xs tracking-wide uppercase">
+            Builder Tools
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-muted-foreground text-xs">{user.playerName}</p>
+          {user.username === user.playerName ? null : (
+            <p className="text-muted-foreground text-xs">({user.username})</p>
+          )}
+          <Button
+            className="h-auto p-0 text-xs"
+            onClick={handleLogout}
+            variant="link"
+          >
+            Log out
+          </Button>
+        </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-1">
+      <div className="flex flex-1 flex-col gap-1.5">
         <NavLink
           icon={<DoorOpen className="h-4 w-4 shrink-0" />}
           onClick={onNavClick}
@@ -96,26 +111,6 @@ export function Nav({ className, onNavClick }: NavProps) {
         >
           Zones
         </NavLink>
-      </div>
-
-      <div className="border-border/50 border-t pt-4">
-        <p className="text-muted-foreground mb-0.5 text-xs">
-          {user.playerName}
-        </p>
-        {user.username === user.playerName ? (
-          <div className="mb-2" />
-        ) : (
-          <p className="text-muted-foreground mb-2 text-xs">
-            ({user.username})
-          </p>
-        )}
-        <Button
-          className="h-auto p-0"
-          onClick={handleLogout}
-          variant="link"
-        >
-          Log out
-        </Button>
       </div>
 
       <ConfirmDialog
