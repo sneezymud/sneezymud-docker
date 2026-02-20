@@ -74,12 +74,7 @@ export function VnumPicker({
       open={open}
     >
       <PopoverTrigger asChild>
-        <Button
-          size="sm"
-          variant="outline"
-        >
-          {triggerLabel}
-        </Button>
+        <Button size="sm">{triggerLabel}</Button>
       </PopoverTrigger>
       <PopoverContent
         align="end"

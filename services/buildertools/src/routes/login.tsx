@@ -23,7 +23,7 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   return (
     <div className="bg-background flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
+      <Card className="w-full max-w-sm shadow-lg">
         <CardHeader className="text-center">
           <CardTitle className="text-xl">SneezyMUD Builder Tools</CardTitle>
           <CardDescription>Log in with your game account</CardDescription>

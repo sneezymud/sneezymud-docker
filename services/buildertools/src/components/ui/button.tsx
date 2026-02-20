@@ -9,6 +9,7 @@ function Button({
   asChild = false,
   className,
   size = "default",
+  type,
   variant = "default",
   ...props
 }: React.ComponentProps<"button"> &
@@ -23,6 +24,7 @@ function Button({
       data-size={size}
       data-slot="button"
       data-variant={variant}
+      type={asChild ? type : (type ?? "button")}
       {...props}
     />
   );
