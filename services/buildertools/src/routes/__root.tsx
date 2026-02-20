@@ -56,7 +56,7 @@ function RootLayout() {
     <>
       <Outlet />
       <Toaster />
-      {import.meta.env.DEV && <TanStackRouterDevtools />}
+      {/* {import.meta.env.DEV && <TanStackRouterDevtools />} */}
     </>
   );
 }

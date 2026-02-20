@@ -53,6 +53,7 @@ const router = createRouter({
   defaultPendingMs: 0,
   // Keep previous route visible during navigation until new route is ready
   defaultPreload: "intent",
+  defaultViewTransition: true,
   routeTree,
 });
 
@@ -69,7 +70,7 @@ if (container) {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
-        {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+        {/* {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />} */}
       </QueryClientProvider>
     </StrictMode>,
   );
