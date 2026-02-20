@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { Input } from "@/components/ui/input.tsx";
+import { cn } from "@/lib/utils.ts";
 
 interface NumberInputProps extends Omit<
   React.ComponentProps<"input">,
@@ -37,21 +38,13 @@ export function NumberInput({
     }
   }
 
-  const clamp = (n: number): number => {
-    let result = n;
-    if (integer) result = Math.round(result);
-    if (min !== undefined && result < min) result = min;
-    if (max !== undefined && result > max) result = max;
-    return result;
-  };
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
     setDisplay(raw);
 
     const parsed = Number(raw);
     if (raw !== "" && Number.isFinite(parsed)) {
-      onValueChange(clamp(parsed));
+      onValueChange(integer ? Math.round(parsed) : parsed);
     }
   };
 
@@ -59,26 +52,39 @@ export function NumberInput({
     const parsed = Number(display);
     if (display === "" || !Number.isFinite(parsed)) {
       setDisplay(String(value));
-      return;
-    }
-    const clamped = clamp(parsed);
-    if (clamped !== parsed) {
-      setDisplay(String(clamped));
-      onValueChange(clamped);
     }
   };
 
+  const parsed = Number(display);
+  const outOfRange =
+    display !== "" &&
+    Number.isFinite(parsed) &&
+    ((min !== undefined && parsed < min) ||
+      (max !== undefined && parsed > max));
+
   return (
-    <Input
-      {...rest}
-      className={className}
-      max={max}
-      min={min}
-      onBlur={handleBlur}
-      onChange={handleChange}
-      step={step}
-      type="number"
-      value={display}
-    />
+    <div>
+      <Input
+        {...rest}
+        aria-invalid={outOfRange || undefined}
+        className={cn(className, outOfRange && "border-destructive")}
+        max={max}
+        min={min}
+        onBlur={handleBlur}
+        onChange={handleChange}
+        step={step}
+        type="number"
+        value={display}
+      />
+      {outOfRange ? (
+        <p className="text-destructive mt-1 text-xs">
+          {min !== undefined && max !== undefined
+            ? `Must be between ${min} and ${max}`
+            : min === undefined
+              ? `Must be at most ${max}`
+              : `Must be at least ${min}`}
+        </p>
+      ) : null}
+    </div>
   );
 }

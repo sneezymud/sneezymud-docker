@@ -1,3 +1,4 @@
+import { Info } from "lucide-react";
 import { useState } from "react";
 
 import type { EnumEntry } from "@/shared/enums/types.ts";
@@ -6,6 +7,12 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip.tsx";
 
 import { ConfirmDialog } from "./confirm-dialog.tsx";
 import { EnumSelect } from "./enum-select.tsx";
@@ -98,32 +105,42 @@ export function SubTable<T extends Record<string, number | string>>({
   };
 
   return (
-    <fieldset className="border-border rounded border p-4">
-      <legend className="text-foreground flex items-center gap-1.5 px-2 text-base font-semibold">
+    <fieldset className="p-4">
+      <legend className="text-foreground text-lg font-semibold">
         {label}
-        <span className="text-muted-foreground text-xs font-normal">
-          ({rows.length})
-        </span>
+        {help ? (
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className="text-muted-foreground hover:text-foreground ml-1 inline-flex cursor-help align-middle"
+                  type="button"
+                >
+                  <Info
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5"
+                  />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent
+                className="max-w-sm text-sm text-wrap"
+                sideOffset={5}
+              >
+                {help}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : null}
       </legend>
 
-      {help ? (
-        <p className="text-muted-foreground mb-2 text-xs">{help}</p>
-      ) : null}
-
       <div className="space-y-2">
-        {rows.length === 0 ? (
-          <p className="text-muted-foreground py-4 text-center text-sm">
-            No {label.toLowerCase()} yet - use + to add.
-          </p>
-        ) : null}
-
         {rows.map((row, index) => (
           <div
             className="border-border/30 bg-muted/20 flex items-start gap-2 rounded border p-2 transition-shadow hover:shadow-md hover:shadow-black/20"
             key={rowKeys[index]}
           >
             <div
-              className="grid flex-1 gap-2"
+              className="grid gap-2"
               style={{
                 gridTemplateColumns: columns
                   .map((c) => c.width ?? "1fr")
@@ -153,7 +170,7 @@ export function SubTable<T extends Record<string, number | string>>({
             </div>
             <Button
               aria-label={`Remove row ${index + 1}`}
-              className="mt-[1.375rem] shrink-0"
+              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive dark:hover:bg-destructive/10 mt-[1.375rem] shrink-0"
               onClick={() => {
                 setPendingRemove(index);
               }}

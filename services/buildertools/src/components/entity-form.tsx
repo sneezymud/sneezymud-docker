@@ -7,7 +7,15 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
+import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import {
   Tooltip,
@@ -23,6 +31,7 @@ import { EnumSelect } from "./enum-select.tsx";
 import { NumberInput } from "./number-input.tsx";
 
 interface FieldDefBase {
+  detailedTooltip?: React.ReactNode;
   fullWidth?: boolean;
   help?: string;
   key: string;
@@ -56,6 +65,7 @@ type FieldDef = BitfieldFieldDef | EnumFieldDef | NumberFieldDef | TextFieldDef;
 
 interface FieldGroupDef {
   colSpan?: "full";
+  detailedTooltip?: React.ReactNode;
   fieldGroupSize?: number;
   fields: FieldDef[];
   gridCols?: string;
@@ -106,7 +116,7 @@ export function EntityForm({
         className="space-y-6"
         onSubmit={handleSubmit}
       >
-        <div className="border-border bg-background/95 sticky top-0 z-10 flex items-center gap-3 border-b py-3 shadow-sm backdrop-blur-sm">
+        <div className="border-border bg-background/95 sticky top-0 z-10 flex items-center gap-3 border-b py-3 shadow-md backdrop-blur-sm">
           <Button
             disabled={!dirty || saving}
             type="submit"
@@ -141,13 +151,12 @@ export function EntityForm({
 
           {onDelete ? (
             <Button
-              className="ml-6"
+              className="text-muted-foreground hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive ml-6"
               disabled={deletePending}
               onClick={() => {
                 setShowDeleteConfirm(true);
               }}
-              size="sm"
-              variant="destructive"
+              variant="outline"
             >
               {deletePending ? "Deleting..." : "Delete"}
             </Button>
@@ -158,6 +167,7 @@ export function EntityForm({
           {groups.map((group) => (
             <FieldGroup
               colSpan={group.colSpan}
+              detailedTooltip={group.detailedTooltip}
               fieldGroupSize={group.fieldGroupSize}
               fields={group.fields}
               gridCols={group.gridCols}
@@ -195,27 +205,81 @@ export function EntityForm({
   );
 }
 
-function FieldTooltip({ children }: { children: React.ReactNode }) {
+const richTextDescendants =
+  "[&_li]:mb-0.5 [&_p+p]:mt-1.5 [&_strong]:font-semibold [&_ul]:ml-3 [&_ul]:list-disc";
+
+function FieldTooltip({
+  children,
+  detailedTooltip,
+  label,
+}: {
+  children: React.ReactNode;
+  detailedTooltip?: React.ReactNode;
+  label?: string;
+}) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          className="text-muted-foreground hover:text-foreground ml-1 inline-flex cursor-help"
-          type="button"
+    <>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            className={cn(
+              "text-muted-foreground hover:text-foreground ml-1 inline-flex",
+              detailedTooltip ? "cursor-pointer" : "cursor-help",
+            )}
+            onClick={
+              detailedTooltip
+                ? () => {
+                    setSheetOpen(true);
+                  }
+                : undefined
+            }
+            type="button"
+          >
+            <Info
+              aria-hidden="true"
+              className="h-3.5 w-3.5"
+            />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent
+          className={cn("max-w-sm text-sm text-wrap", richTextDescendants)}
+          sideOffset={5}
         >
-          <Info
-            aria-hidden="true"
-            className="h-3.5 w-3.5"
-          />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent
-        className="max-w-sm text-sm [&_li]:mb-0.5 [&_p]:mb-1.5 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_ul]:ml-3 [&_ul]:list-disc"
-        sideOffset={5}
-      >
-        {children}
-      </TooltipContent>
-    </Tooltip>
+          {children}
+          {detailedTooltip ? (
+            <button
+              className="text-muted-foreground hover:text-foreground mt-2 block text-xs italic underline"
+              onClick={() => {
+                setSheetOpen(true);
+              }}
+              type="button"
+            >
+              Click for full details
+            </button>
+          ) : null}
+        </TooltipContent>
+      </Tooltip>
+      {detailedTooltip ? (
+        <Sheet
+          onOpenChange={setSheetOpen}
+          open={sheetOpen}
+        >
+          <SheetContent className="sm:max-w-lg lg:max-w-xl xl:max-w-2xl">
+            <SheetHeader>
+              <SheetTitle>{label ?? "Details"}</SheetTitle>
+              <SheetDescription>Detailed field reference</SheetDescription>
+            </SheetHeader>
+            <ScrollArea className="flex-1 overflow-hidden">
+              <div className={cn("px-4 pb-4 text-sm", richTextDescendants)}>
+                {detailedTooltip}
+              </div>
+            </ScrollArea>
+          </SheetContent>
+        </Sheet>
+      ) : null}
+    </>
   );
 }
 
@@ -234,29 +298,47 @@ function FormField({
 }) {
   const isFullWidth =
     field.fullWidth ?? (field.type === "textarea" || field.type === "bitfield");
+  const isNarrowField =
+    !isFullWidth && field.type !== "bitfield" && field.type !== "textarea";
 
   return (
     <div
       className={cn(
         isFullWidth && "col-span-full",
+        isNarrowField && "max-w-xs",
         isDirty && "border-l-2 border-l-amber-400/50 pl-2",
       )}
     >
-      <Label
-        className={labelClass}
-        htmlFor={field.key}
-      >
-        {field.label}
-        {field.required ? (
-          <span
-            aria-label="required"
-            className="ml-0.5 text-amber-400"
-          >
-            *
+      {field.label || field.tooltip || field.help || field.detailedTooltip ? (
+        <Label
+          className={labelClass}
+          htmlFor={field.key}
+        >
+          <span>
+            {field.label}
+            {field.required ? (
+              <span
+                aria-label="required"
+                className="text-amber-400"
+              >
+                *
+              </span>
+            ) : null}
           </span>
-        ) : null}
-        {field.tooltip ? <FieldTooltip>{field.tooltip}</FieldTooltip> : null}
-      </Label>
+          {field.tooltip || field.help || field.detailedTooltip ? (
+            <FieldTooltip
+              detailedTooltip={field.detailedTooltip}
+              label={field.label}
+            >
+              {field.help ? <p className="font-medium">{field.help}</p> : null}
+              {field.help && field.tooltip ? (
+                <Separator className="my-1.5" />
+              ) : null}
+              {field.tooltip}
+            </FieldTooltip>
+          ) : null}
+        </Label>
+      ) : null}
       {field.type === "textarea" ? (
         <Textarea
           className="min-h-16 text-base"
@@ -324,15 +406,13 @@ function FormField({
           value={value ?? ""}
         />
       )}
-      {field.help ? (
-        <p className="text-muted-foreground mt-0.5 text-xs">{field.help}</p>
-      ) : null}
     </div>
   );
 }
 
 function FieldGroup({
   colSpan,
+  detailedTooltip,
   fieldGroupSize,
   fields,
   gridCols,
@@ -344,6 +424,7 @@ function FieldGroup({
   values,
 }: {
   colSpan?: "full" | undefined;
+  detailedTooltip?: React.ReactNode;
   fieldGroupSize?: number | undefined;
   fields: FieldDef[];
   gridCols?: string | undefined;
@@ -355,15 +436,17 @@ function FieldGroup({
   values: Record<string, number | string>;
 }) {
   return (
-    <fieldset
-      className={cn(
-        "border-border rounded border p-4",
-        colSpan === "full" && "col-span-full",
-      )}
-    >
-      <legend className="text-foreground px-2 text-base font-semibold">
+    <fieldset className={cn("p-4 shadow-sm", colSpan === "full" && "col-span-full")}>
+      <legend className="text-foreground text-lg font-semibold">
         {title}
-        {tooltip ? <FieldTooltip>{tooltip}</FieldTooltip> : null}
+        {tooltip || detailedTooltip ? (
+          <FieldTooltip
+            detailedTooltip={detailedTooltip}
+            label={title}
+          >
+            {tooltip}
+          </FieldTooltip>
+        ) : null}
       </legend>
       <div
         className={cn("grid gap-4", gridCols ?? "grid-cols-1 sm:grid-cols-2")}
