@@ -130,6 +130,14 @@ export const room = mysqlTable("room", {
   zone: int().notNull(),
 });
 
+export const roomextra = mysqlTable("roomextra", {
+  block: int(),
+  description: text().notNull(),
+  name: text().notNull(),
+  owner: text(),
+  vnum: int().notNull(),
+});
+
 export const roomexit = mysqlTable("roomexit", {
   block: int().notNull(),
   condition_flag: int().notNull(),

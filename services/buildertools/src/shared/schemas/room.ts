@@ -6,29 +6,44 @@ export const roomExitSchema = z.object({
   block: z.number().int(),
   condition_flag: z.number().int().min(-2_147_483_648).max(2_147_483_647),
   description: z.string(),
-  destination: z.number().int(),
-  direction: z.number().int().gte(0).lte(5),
-  key_num: z.number().int(),
-  lock_difficulty: z.number().int(),
+  destination: z.number().int().min(0).max(49_999),
+  direction: z.number().int().gte(0).lte(9),
+  key_num: z
+    .number()
+    .int()
+    .min(-1)
+    .refine((v) => v !== 0, {
+      message: "Use -1 for no key, or enter a positive object vnum",
+    }),
+  lock_difficulty: z.number().int().min(0).max(100),
   name: z.string(),
   type: z.number().int(),
   vnum: vnumSchema,
-  weight: z.number().int(),
+  weight: z.number().int().min(0).max(50),
 });
 
 export type RoomExit = z.infer<typeof roomExitSchema>;
 
+export const roomExtraSchema = z.object({
+  description: z.string(),
+  name: z.string(),
+  vnum: vnumSchema,
+});
+
+export type RoomExtra = z.infer<typeof roomExtraSchema>;
+
 export const roomSchema = z.object({
-  capacity: z.number().int(),
+  capacity: z.number().int().min(0).max(100),
   description: z.string(),
   exits: z.array(roomExitSchema),
-  height: z.number().int(),
+  extras: z.array(roomExtraSchema),
+  height: z.number().int().min(-1).max(1000),
   name: z.string(),
   river_dir: z.number().int(),
   river_speed: z.number().int(),
   room_flag: z.number().int().min(-2_147_483_648).max(2_147_483_647),
   sector: z.number().int(),
-  spec: z.number().int(),
+  spec: z.number().int().min(0).max(34),
   telelook: z.number().int(),
   teletarg: z.number().int(),
   teletime: z.number().int(),

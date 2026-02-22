@@ -4,7 +4,7 @@ import type { VnumBlock } from "@/shared/schemas/auth.ts";
 import type { Room, RoomListItem } from "@/shared/schemas/room.ts";
 
 import { immortalDb, sneezyDb } from "../db.ts";
-import { room, roomexit } from "../schema/immortal.ts";
+import { room, roomexit, roomextra } from "../schema/immortal.ts";
 import { room as sneezyRoom, zone } from "../schema/sneezy.ts";
 
 export async function listRooms(blocks: VnumBlock[]): Promise<RoomListItem[]> {
@@ -26,16 +26,22 @@ export async function getRoom(vnum: number): Promise<null | Room> {
     return null;
   }
 
-  const exits = await immortalDb
-    .select()
-    .from(roomexit)
-    .where(eq(roomexit.vnum, vnum))
-    .orderBy(roomexit.direction);
+  const [exits, extras] = await Promise.all([
+    immortalDb
+      .select()
+      .from(roomexit)
+      .where(eq(roomexit.vnum, vnum))
+      .orderBy(roomexit.direction),
+    immortalDb.select().from(roomextra).where(eq(roomextra.vnum, vnum)),
+  ]);
 
   const { owner: _owner, ...roomFields } = row;
   return {
     ...roomFields,
     exits: exits.map(({ owner: _exitOwner, ...exitFields }) => exitFields),
+    extras: extras.map(
+      ({ block: _block, owner: _extraOwner, ...extraFields }) => extraFields,
+    ),
   };
 }
 
@@ -51,13 +57,13 @@ export async function createRoom(vnum: number, owner: string): Promise<void> {
   await immortalDb.insert(room).values({
     capacity: 0,
     description: "",
-    height: 0,
+    height: -1,
     name: "",
     owner,
     river_dir: 0,
     river_speed: 0,
-    room_flag: 0,
-    sector: 0,
+    room_flag: 1 << 17,
+    sector: 60,
     spec: 0,
     telelook: 0,
     teletarg: 0,
@@ -76,7 +82,7 @@ export async function updateRoom(
   owner: string,
   block: number,
 ): Promise<void> {
-  const { exits, vnum: _vnum, ...roomFields } = data;
+  const { exits, extras, vnum: _vnum, ...roomFields } = data;
 
   await immortalDb.transaction(async (tx) => {
     await tx
@@ -96,11 +102,25 @@ export async function updateRoom(
         vnum,
       });
     }
+
+    // Replace all extras atomically
+    await tx.delete(roomextra).where(eq(roomextra.vnum, vnum));
+
+    for (const extra of extras) {
+      const { vnum: _extraVnum, ...extraFields } = extra;
+      await tx.insert(roomextra).values({
+        ...extraFields,
+        block,
+        owner,
+        vnum,
+      });
+    }
   });
 }
 
 export async function deleteRoom(vnum: number): Promise<void> {
   await immortalDb.transaction(async (tx) => {
+    await tx.delete(roomextra).where(eq(roomextra.vnum, vnum));
     await tx.delete(roomexit).where(eq(roomexit.vnum, vnum));
     await tx.delete(room).where(eq(room.vnum, vnum));
   });
