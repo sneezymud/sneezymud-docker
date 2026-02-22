@@ -1,4 +1,5 @@
 export { CLASS_TYPES } from "./class-types.ts";
+export { DIRECTION_TYPES } from "./direction-types.ts";
 export { DOOR_TYPES } from "./door-types.ts";
 export { EXIT_FLAGS } from "./exit-flags.ts";
 export { EXTRA_FLAGS } from "./extra-flags.ts";
