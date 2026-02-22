@@ -70,7 +70,7 @@ function AuthenticatedLayout() {
   }, [pathname]);
 
   return (
-    <div className="bg-background flex min-h-screen">
+    <div className="bg-background flex h-screen overflow-y-auto">
       <a
         className="focus:bg-accent sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded focus:px-4 focus:py-2 focus:text-sm focus:text-white"
         href="#main-content"

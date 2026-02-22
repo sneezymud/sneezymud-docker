@@ -1,4 +1,3 @@
-import { Info } from "lucide-react";
 import { Fragment, useState } from "react";
 
 import type { BitfieldEntry, EnumEntry } from "@/shared/enums/types.ts";
@@ -7,28 +6,17 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
-import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip.tsx";
+import { TooltipProvider } from "@/components/ui/tooltip.tsx";
 import { cn } from "@/lib/utils.ts";
 
 import { BitfieldEditor } from "./bitfield-editor.tsx";
 import { ConfirmDialog } from "./confirm-dialog.tsx";
 import { EnumSelect } from "./enum-select.tsx";
+import { FieldTooltip } from "./info-tooltip.tsx";
 import { NumberInput } from "./number-input.tsx";
+import { RoomPicker } from "./room-picker.tsx";
 
 interface FieldDefBase {
   detailedTooltip?: React.ReactNode;
@@ -36,6 +24,7 @@ interface FieldDefBase {
   help?: string;
   key: string;
   label: string;
+  readOnly?: boolean;
   required?: boolean | undefined;
   tooltip?: React.ReactNode;
 }
@@ -61,7 +50,16 @@ interface BitfieldFieldDef extends FieldDefBase {
   type: "bitfield";
 }
 
-type FieldDef = BitfieldFieldDef | EnumFieldDef | NumberFieldDef | TextFieldDef;
+interface RoomFieldDef extends FieldDefBase {
+  type: "room";
+}
+
+type FieldDef =
+  | BitfieldFieldDef
+  | EnumFieldDef
+  | NumberFieldDef
+  | RoomFieldDef
+  | TextFieldDef;
 
 interface FieldGroupDef {
   colSpan?: "full";
@@ -205,84 +203,6 @@ export function EntityForm({
   );
 }
 
-const richTextDescendants =
-  "[&_li]:mb-0.5 [&_p+p]:mt-1.5 [&_strong]:font-semibold [&_ul]:ml-3 [&_ul]:list-disc";
-
-function FieldTooltip({
-  children,
-  detailedTooltip,
-  label,
-}: {
-  children: React.ReactNode;
-  detailedTooltip?: React.ReactNode;
-  label?: string;
-}) {
-  const [sheetOpen, setSheetOpen] = useState(false);
-
-  return (
-    <>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            className={cn(
-              "text-muted-foreground hover:text-foreground ml-1 inline-flex",
-              detailedTooltip ? "cursor-pointer" : "cursor-help",
-            )}
-            onClick={
-              detailedTooltip
-                ? () => {
-                    setSheetOpen(true);
-                  }
-                : undefined
-            }
-            type="button"
-          >
-            <Info
-              aria-hidden="true"
-              className="h-3.5 w-3.5"
-            />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent
-          className={cn("max-w-sm text-sm text-wrap", richTextDescendants)}
-          sideOffset={5}
-        >
-          {children}
-          {detailedTooltip ? (
-            <button
-              className="text-muted-foreground hover:text-foreground mt-2 block text-xs italic underline"
-              onClick={() => {
-                setSheetOpen(true);
-              }}
-              type="button"
-            >
-              Click for full details
-            </button>
-          ) : null}
-        </TooltipContent>
-      </Tooltip>
-      {detailedTooltip ? (
-        <Sheet
-          onOpenChange={setSheetOpen}
-          open={sheetOpen}
-        >
-          <SheetContent className="sm:max-w-lg lg:max-w-xl xl:max-w-2xl">
-            <SheetHeader>
-              <SheetTitle>{label ?? "Details"}</SheetTitle>
-              <SheetDescription>Detailed field reference</SheetDescription>
-            </SheetHeader>
-            <ScrollArea className="flex-1 overflow-hidden">
-              <div className={cn("px-4 pb-4 text-sm", richTextDescendants)}>
-                {detailedTooltip}
-              </div>
-            </ScrollArea>
-          </SheetContent>
-        </Sheet>
-      ) : null}
-    </>
-  );
-}
-
 function FormField({
   field,
   isDirty,
@@ -301,12 +221,19 @@ function FormField({
   const isNarrowField =
     !isFullWidth && field.type !== "bitfield" && field.type !== "textarea";
 
+  const handleChange = field.readOnly
+    ? undefined
+    : (key: string, v: number | string) => {
+        onChange(key, v);
+      };
+
   return (
     <div
       className={cn(
         isFullWidth && "col-span-full",
         isNarrowField && "max-w-xs",
         isDirty && "border-l-2 border-l-amber-400/50 pl-2",
+        field.readOnly && "opacity-60",
       )}
     >
       {field.label || field.tooltip || field.help || field.detailedTooltip ? (
@@ -341,19 +268,21 @@ function FormField({
       ) : null}
       {field.type === "textarea" ? (
         <Textarea
-          className="min-h-16 text-base"
+          className="min-h-[6.75rem] text-base"
+          disabled={field.readOnly}
           id={field.key}
           onChange={(e) => {
-            onChange(field.key, e.target.value);
+            handleChange?.(field.key, e.target.value);
           }}
           value={value ?? ""}
         />
       ) : field.type === "enum" ? (
         <EnumSelect
+          disabled={field.readOnly}
           entries={field.enumEntries}
           id={field.key}
           onChange={(v) => {
-            onChange(field.key, v);
+            handleChange?.(field.key, v);
           }}
           value={
             typeof value === "number"
@@ -368,7 +297,7 @@ function FormField({
           entries={field.bitfieldEntries}
           id={field.key}
           onChange={(v) => {
-            onChange(field.key, v);
+            handleChange?.(field.key, v);
           }}
           value={
             typeof value === "number"
@@ -381,11 +310,12 @@ function FormField({
       ) : field.type === "number" ? (
         <NumberInput
           className="font-mono"
+          disabled={field.readOnly}
           id={field.key}
           max={field.max}
           min={field.min}
           onValueChange={(v) => {
-            onChange(field.key, v);
+            handleChange?.(field.key, v);
           }}
           step={field.step}
           value={
@@ -396,11 +326,26 @@ function FormField({
                 : 0
           }
         />
+      ) : field.type === "room" ? (
+        <RoomPicker
+          id={field.key}
+          onChange={(v) => {
+            handleChange?.(field.key, v);
+          }}
+          value={
+            typeof value === "number"
+              ? value
+              : Number.isFinite(Number(value))
+                ? Number(value)
+                : 0
+          }
+        />
       ) : (
         <Input
+          disabled={field.readOnly}
           id={field.key}
           onChange={(e) => {
-            onChange(field.key, e.target.value);
+            handleChange?.(field.key, e.target.value);
           }}
           type="text"
           value={value ?? ""}
@@ -436,7 +381,9 @@ function FieldGroup({
   values: Record<string, number | string>;
 }) {
   return (
-    <fieldset className={cn("p-4 shadow-sm", colSpan === "full" && "col-span-full")}>
+    <fieldset
+      className={cn("p-4 shadow-sm", colSpan === "full" && "col-span-full")}
+    >
       <legend className="text-foreground text-lg font-semibold">
         {title}
         {tooltip || detailedTooltip ? (

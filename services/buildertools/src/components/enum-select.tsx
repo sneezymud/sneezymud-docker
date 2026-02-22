@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select.tsx";
 
 interface EnumSelectProps {
+  disabled?: boolean | undefined;
   entries: EnumEntry[];
   id?: string | undefined;
   onChange: (value: number) => void;
@@ -25,10 +26,17 @@ interface EnumSelectProps {
 
 const SEARCHABLE_THRESHOLD = 15;
 
-export function EnumSelect({ entries, id, onChange, value }: EnumSelectProps) {
+export function EnumSelect({
+  disabled,
+  entries,
+  id,
+  onChange,
+  value,
+}: EnumSelectProps) {
   if (entries.length > SEARCHABLE_THRESHOLD) {
     return (
       <SearchableEnumSelect
+        disabled={disabled}
         entries={entries}
         id={id}
         onChange={onChange}
@@ -39,6 +47,7 @@ export function EnumSelect({ entries, id, onChange, value }: EnumSelectProps) {
 
   return (
     <NativeEnumSelect
+      disabled={disabled}
       entries={entries}
       id={id}
       onChange={onChange}
@@ -47,11 +56,18 @@ export function EnumSelect({ entries, id, onChange, value }: EnumSelectProps) {
   );
 }
 
-function NativeEnumSelect({ entries, id, onChange, value }: EnumSelectProps) {
+function NativeEnumSelect({
+  disabled,
+  entries,
+  id,
+  onChange,
+  value,
+}: EnumSelectProps) {
   const known = entries.some((e) => e.value === value);
 
   return (
     <Select
+      disabled={disabled === true}
       onValueChange={(v) => {
         onChange(Number(v));
       }}
@@ -81,6 +97,7 @@ function NativeEnumSelect({ entries, id, onChange, value }: EnumSelectProps) {
 }
 
 function SearchableEnumSelect({
+  disabled,
   entries,
   id,
   onChange,
@@ -102,6 +119,7 @@ function SearchableEnumSelect({
     >
       <ComboboxInput
         className="w-full"
+        disabled={disabled === true}
         id={id}
         placeholder={current ? undefined : `Unknown (${value})`}
       />

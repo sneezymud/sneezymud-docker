@@ -106,14 +106,14 @@ export function SubTable<T extends Record<string, number | string>>({
 
   return (
     <fieldset className="p-4">
-      <legend className="text-foreground text-lg font-semibold">
-        {label}
+      <legend className="text-foreground flex w-full items-center gap-2 text-lg font-semibold">
+        <span>{label}</span>
         {help ? (
           <TooltipProvider delayDuration={300}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  className="text-muted-foreground hover:text-foreground ml-1 inline-flex cursor-help align-middle"
+                  className="text-muted-foreground hover:text-foreground inline-flex cursor-help align-middle"
                   type="button"
                 >
                   <Info
@@ -131,6 +131,14 @@ export function SubTable<T extends Record<string, number | string>>({
             </Tooltip>
           </TooltipProvider>
         ) : null}
+        <Button
+          className="ml-auto border-dashed"
+          onClick={addRow}
+          size="sm"
+          variant="outline"
+        >
+          + Add
+        </Button>
       </legend>
 
       <div className="space-y-2">
@@ -181,15 +189,6 @@ export function SubTable<T extends Record<string, number | string>>({
             </Button>
           </div>
         ))}
-
-        <Button
-          className="border-dashed"
-          onClick={addRow}
-          size="sm"
-          variant="outline"
-        >
-          + Add {singularLabel.toLowerCase()}
-        </Button>
       </div>
       <ConfirmDialog
         confirmLabel="Remove"
