@@ -14,6 +14,7 @@ export const mobKeys = {
 export const objectKeys = {
   all: ["objects"] as const,
   detail: (vnum: number) => [...objectKeys.all, "detail", vnum] as const,
+  name: (vnum: number) => [...objectKeys.all, "name", vnum] as const,
   search: (search: string) => [...objectKeys.all, "search", search] as const,
 };
 

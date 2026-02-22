@@ -152,6 +152,32 @@ export async function searchObjects(
   return merged.slice(0, 20);
 }
 
+export async function getObjectShortDesc(vnum: number): Promise<null | string> {
+  // Try immortal first (builder workspace), then sneezy (production)
+  // Key vnums can reference objects outside the builder's assigned blocks
+  const [immortalRow] = await immortalDb
+    .select({ short_desc: obj.short_desc })
+    .from(obj)
+    .where(eq(obj.vnum, vnum))
+    .limit(1);
+
+  if (immortalRow) {
+    return immortalRow.short_desc;
+  }
+
+  const [sneezyRow] = await sneezyDb
+    .select({ short_desc: sneezyObj.short_desc })
+    .from(sneezyObj)
+    .where(eq(sneezyObj.vnum, vnum))
+    .limit(1);
+
+  if (sneezyRow) {
+    return sneezyRow.short_desc;
+  }
+
+  return null;
+}
+
 export async function objectExists(vnum: number): Promise<boolean> {
   const [row] = await immortalDb
     .select({ vnum: obj.vnum })

@@ -12,6 +12,7 @@ import {
   createObject,
   deleteObject,
   getObject,
+  getObjectShortDesc,
   listObjects,
   objectExists,
   searchObjects,
@@ -44,6 +45,12 @@ objectRoutes.post("/", jsonValidator(objCreateSchema), async (c) => {
   await createObject(data.vnum, user.playerName);
   const obj = await getObject(data.vnum);
   return c.json(obj, 201);
+});
+
+objectRoutes.get("/name/:vnum", async (c) => {
+  const vnum = Number(c.req.param("vnum"));
+  const name = await getObjectShortDesc(vnum);
+  return c.json({ name, vnum });
 });
 
 objectRoutes.get("/search", async (c) => {
