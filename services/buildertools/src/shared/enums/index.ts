@@ -11,7 +11,7 @@ export { MOB_ACTIONS } from "./mob-actions.ts";
 export { MOB_AFFECTS } from "./mob-affects.ts";
 export { MOB_SPEC_PROCS } from "./mob-spec-procs.ts";
 export { OBJ_SPEC_PROCS } from "./obj-spec-procs.ts";
-export { POSITION_TYPES } from "./position-types.ts";
+export { DEFAULT_POSITION_TYPES, POSITION_TYPES } from "./position-types.ts";
 export { RACE_TYPES } from "./race-types.ts";
 export { ROOM_FLAGS } from "./room-flags.ts";
 export { ROOM_SPEC_PROCS } from "./room-spec-procs.ts";

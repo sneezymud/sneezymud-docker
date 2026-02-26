@@ -37,13 +37,13 @@ import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import {
   CLASS_TYPES,
+  DEFAULT_POSITION_TYPES,
   FACTION_TYPES,
   IMMUNITY_TYPES,
   MATERIAL_TYPES,
   MOB_ACTIONS,
   MOB_AFFECTS,
   MOB_SPEC_PROCS,
-  POSITION_TYPES,
   RACE_TYPES,
   SEX_TYPES,
 } from "@/shared/enums/index.ts";
@@ -150,6 +150,8 @@ const mobFieldGroups: FieldGroupDef[] = [
       {
         key: "level",
         label: "Level",
+        max: 100,
+        min: 1,
         required: true,
         tooltip: (
           <p>
@@ -163,6 +165,7 @@ const mobFieldGroups: FieldGroupDef[] = [
       {
         key: "attacks",
         label: "Attacks",
+        min: 0,
         step: 0.1,
         tooltip: (
           <>
@@ -189,6 +192,8 @@ const mobFieldGroups: FieldGroupDef[] = [
       {
         key: "tohit",
         label: "To-Hit",
+        max: 50,
+        min: -50,
         tooltip: (
           <>
             <p>
@@ -214,6 +219,8 @@ const mobFieldGroups: FieldGroupDef[] = [
       {
         key: "ac",
         label: "AC Level",
+        max: 127,
+        min: 0,
         step: 0.1,
         tooltip: (
           <>
@@ -246,6 +253,8 @@ const mobFieldGroups: FieldGroupDef[] = [
       {
         key: "hpbonus",
         label: "HP Bonus",
+        max: 127,
+        min: 0,
         step: 0.1,
         tooltip: (
           <>
@@ -272,6 +281,8 @@ const mobFieldGroups: FieldGroupDef[] = [
       {
         key: "damage_level",
         label: "Damage Level",
+        max: 127,
+        min: 0,
         step: 0.1,
         tooltip: (
           <>
@@ -298,6 +309,8 @@ const mobFieldGroups: FieldGroupDef[] = [
       {
         key: "damage_precision",
         label: "Damage Precision",
+        max: 100,
+        min: 0,
         tooltip: (
           <>
             <p>
@@ -361,6 +374,20 @@ const mobFieldGroups: FieldGroupDef[] = [
           </li>
           <li>
             <strong>-25</strong> = maximum penalty
+          </li>
+        </ul>
+        <p className="mt-1.5">
+          <strong>Stat group sums</strong> should generally be 0 or less:
+        </p>
+        <ul>
+          <li>
+            <strong>Physical:</strong> STR + BRA + CON
+          </li>
+          <li>
+            <strong>Mental:</strong> INT + WIS + FOC
+          </li>
+          <li>
+            <strong>Utility:</strong> DEX + AGI + SPE + PER + CHA + KAR
           </li>
         </ul>
       </>
@@ -652,6 +679,8 @@ const mobFieldGroups: FieldGroupDef[] = [
       {
         key: "max_exist",
         label: "Max Exist",
+        max: 9999,
+        min: 0,
         tooltip: (
           <p>
             Maximum concurrent instances of this mob in the world. When the
@@ -665,6 +694,8 @@ const mobFieldGroups: FieldGroupDef[] = [
       {
         key: "can_be_seen",
         label: "Can Be Seen",
+        max: 10_000,
+        min: 0,
         tooltip: (
           <>
             <p>
@@ -820,6 +851,8 @@ const mobFieldGroups: FieldGroupDef[] = [
       {
         key: "fact_perc",
         label: "Faction %",
+        max: 100,
+        min: 0,
         tooltip: (
           <>
             <p>
@@ -839,7 +872,7 @@ const mobFieldGroups: FieldGroupDef[] = [
         type: "number",
       },
       {
-        enumEntries: POSITION_TYPES,
+        enumEntries: DEFAULT_POSITION_TYPES,
         key: "def_position",
         label: "Default Position",
         tooltip: (
