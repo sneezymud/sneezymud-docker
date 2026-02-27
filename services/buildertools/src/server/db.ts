@@ -11,7 +11,7 @@ async function resolveHost(): Promise<string> {
   const testPool = mysql.createPool({
     connectionLimit: 1,
     connectTimeout: 2000,
-    database: "immortal",
+    database: process.env["DB_NAME_IMMORTAL"] ?? "immortal",
     host: configuredHost,
     password: process.env["DB_PASS"] ?? "password",
     user: process.env["DB_USER"] ?? "sneezy",
@@ -49,14 +49,18 @@ const poolConfig: mysql.PoolOptions = {
 // Builder workspace — rooms, mobs, objects, mob responses
 const immortalPool = mysql.createPool({
   ...poolConfig,
-  database: "immortal",
+  database: process.env["DB_NAME_IMMORTAL"] ?? "immortal",
 });
 
 // Production game database — accounts, players, wizdata, zones (read-only from this app)
 const sneezyPool = mysql.createPool({
   ...poolConfig,
-  database: "sneezy",
+  database: process.env["DB_NAME_SNEEZY"] ?? "sneezy",
 });
 
 export const immortalDb = drizzle(immortalPool);
 export const sneezyDb = drizzle(sneezyPool);
+
+export async function closePools(): Promise<void> {
+  await Promise.all([immortalPool.end(), sneezyPool.end()]);
+}
