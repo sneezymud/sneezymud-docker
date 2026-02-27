@@ -87,7 +87,7 @@
     "lint": "bun --bun eslint .",
     "lint:fix": "bun --bun eslint . --fix",
     "start": "NODE_ENV=production bun src/server/index.ts",
-    "test": "bun test",
+    "test": "bun test --preload ./src/server/test-preload.ts",
     "typecheck": "tsc"
   },
   "overrides": {
