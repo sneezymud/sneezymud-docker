@@ -6,6 +6,7 @@ import type { Room, RoomListItem } from "@/shared/schemas/room.ts";
 import { immortalDb, sneezyDb } from "../db.ts";
 import { room, roomexit, roomextra } from "../schema/immortal.ts";
 import { room as sneezyRoom, zone } from "../schema/sneezy.ts";
+import { escapeLike } from "./like-escape.ts";
 
 export async function listRooms(blocks: VnumBlock[]): Promise<RoomListItem[]> {
   if (blocks.length === 0) {
@@ -156,7 +157,7 @@ export async function searchRooms(
   query: string,
 ): Promise<Array<{ name: string; vnum: number }>> {
   // Search both immortal and sneezy since exits can point to any room
-  const likeParam = `%${query}%`;
+  const likeParam = `%${escapeLike(query)}%`;
   const isNumeric = /^\d+$/.test(query);
 
   const nameFilter = like(room.name, likeParam);

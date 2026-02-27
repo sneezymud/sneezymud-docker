@@ -6,6 +6,7 @@ import type { Obj, ObjListItem } from "@/shared/schemas/obj.ts";
 import { immortalDb, sneezyDb } from "../db.ts";
 import { obj, objaffect, objextra } from "../schema/immortal.ts";
 import { obj as sneezyObj } from "../schema/sneezy.ts";
+import { escapeLike } from "./like-escape.ts";
 
 export async function listObjects(blocks: VnumBlock[]): Promise<ObjListItem[]> {
   if (blocks.length === 0) {
@@ -111,7 +112,7 @@ export async function deleteObject(vnum: number): Promise<void> {
 export async function searchObjects(
   query: string,
 ): Promise<Array<{ short_desc: string; vnum: number }>> {
-  const likeParam = `%${query}%`;
+  const likeParam = `%${escapeLike(query)}%`;
   const isNumeric = /^\d+$/.test(query);
 
   const nameFilter = like(obj.short_desc, likeParam);

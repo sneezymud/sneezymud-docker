@@ -1,4 +1,5 @@
 import { CString, dlopen, FFIType } from "bun:ffi";
+import { timingSafeEqual } from "node:crypto";
 
 // DES crypt via system libcrypt — same algorithm the C++ game server uses
 const lib = dlopen("libcrypt.so.1", {
@@ -24,7 +25,10 @@ export function verifyPassword(
     return false;
   }
   const hashed = new CString(resultPtr).toString().slice(0, 10);
-  return hashed === storedHash;
+  if (hashed.length !== storedHash.length) {
+    return false;
+  }
+  return timingSafeEqual(Buffer.from(hashed), Buffer.from(storedHash));
 }
 
 function toCString(str: string): Buffer {
