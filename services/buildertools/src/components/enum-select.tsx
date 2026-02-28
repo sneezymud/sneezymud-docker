@@ -63,7 +63,13 @@ function NativeEnumSelect({
   onChange,
   value,
 }: EnumSelectProps) {
+  const selectable = entries.filter((e) => !e.disabledReason);
   const known = entries.some((e) => e.value === value);
+  const knownSelectable = selectable.some((e) => e.value === value);
+  const displayLabel =
+    known && !knownSelectable
+      ? entries.find((e) => e.value === value)?.label
+      : null;
 
   return (
     <Select
@@ -80,10 +86,14 @@ function NativeEnumSelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent position="popper">
-        {known ? null : (
+        {displayLabel ? (
+          <SelectItem value={String(value)}>
+            {displayLabel} ({value})
+          </SelectItem>
+        ) : known ? null : (
           <SelectItem value={String(value)}>Unknown ({value})</SelectItem>
         )}
-        {entries.map((entry) => (
+        {selectable.map((entry) => (
           <SelectItem
             key={entry.value}
             value={String(entry.value)}
@@ -103,7 +113,9 @@ function SearchableEnumSelect({
   onChange,
   value,
 }: EnumSelectProps) {
+  const selectable = entries.filter((e) => !e.disabledReason);
   const current = entries.find((e) => e.value === value) ?? null;
+  const currentSelectable = selectable.find((e) => e.value === value) ?? null;
 
   return (
     <Combobox
@@ -115,17 +127,23 @@ function SearchableEnumSelect({
           onChange(entry.value);
         }
       }}
-      value={current}
+      value={currentSelectable}
     >
       <ComboboxInput
         className="w-full"
         disabled={disabled === true}
         id={id}
-        placeholder={current ? undefined : `Unknown (${value})`}
+        placeholder={
+          current && !currentSelectable
+            ? `${current.label} (${current.value})`
+            : current
+              ? undefined
+              : `Unknown (${value})`
+        }
       />
       <ComboboxContent>
         <ComboboxList>
-          {entries.map((entry) => (
+          {selectable.map((entry) => (
             <ComboboxItem
               key={entry.value}
               value={entry}

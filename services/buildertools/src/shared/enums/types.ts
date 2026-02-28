@@ -1,4 +1,6 @@
 export interface EnumEntry {
+  /** Why this entry cannot be selected in the UI (filtered from dropdowns) */
+  disabledReason?: string;
   label: string;
   value: number;
 }

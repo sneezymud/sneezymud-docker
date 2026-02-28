@@ -1,7 +1,7 @@
 import type { EnumEntry } from "./types.ts";
 
 export const ITEM_TYPES: EnumEntry[] = [
-  { label: "Undefined", value: 0 },
+  { disabledReason: "Cannot be set by builders", label: "Undefined", value: 0 },
   { label: "Light", value: 1 },
   { label: "Scroll", value: 2 },
   { label: "Wand", value: 3 },
@@ -45,10 +45,18 @@ export const ITEM_TYPES: EnumEntry[] = [
   { label: "Table", value: 41 },
   { label: "Raw Material", value: 42 },
   { label: "Gemstone", value: 43 },
-  { label: "Martial Weapon", value: 44 },
+  {
+    disabledReason: "Monk martial arts - not builder-assignable",
+    label: "Martial Weapon",
+    value: 44,
+  },
   { label: "Jewelry", value: 45 },
   { label: "Vial", value: 46 },
-  { label: "Player Corpse", value: 47 },
+  {
+    disabledReason: "Runtime only - created when players die",
+    label: "Player Corpse",
+    value: 47,
+  },
   { label: "Pool", value: 48 },
   { label: "Keyring", value: 49 },
   { label: "Raw Organic", value: 50 },
