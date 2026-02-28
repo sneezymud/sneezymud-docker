@@ -268,7 +268,7 @@ function FormField({
       ) : null}
       {field.type === "textarea" ? (
         <Textarea
-          className="min-h-[6.75rem] text-base"
+          className="min-h-27 text-base"
           disabled={field.readOnly}
           id={field.key}
           onChange={(e) => {

@@ -388,7 +388,7 @@ export function RoomExits({ exits, onChange, vnum }: RoomExitsProps) {
                     </FieldTooltip>
                   </Label>
                   <Textarea
-                    className="min-h-[6.75rem] resize-y px-2 py-1 disabled:opacity-30"
+                    className="min-h-27 resize-y px-2 py-1 disabled:opacity-30"
                     id={`${prefix}-desc`}
                     onChange={(e) => {
                       update(index, "description", e.target.value);
