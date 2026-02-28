@@ -1,19 +1,36 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { Info } from "lucide-react";
 import { useState } from "react";
 
 import type { FieldDef, FieldGroupDef } from "@/components/entity-form.tsx";
 import type { ColumnDef } from "@/components/sub-table.tsx";
 import type { Obj, ObjAffect, ObjExtra } from "@/shared/schemas/obj.ts";
 
+import { BitfieldEditor } from "@/components/bitfield-editor.tsx";
 import { Breadcrumbs } from "@/components/breadcrumbs.tsx";
 import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
 import { EntityForm } from "@/components/entity-form.tsx";
+import { EnumSelect } from "@/components/enum-select.tsx";
+import { NumberInput } from "@/components/number-input.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { EntityFormSkeleton } from "@/components/skeleton.tsx";
 import { SubTable } from "@/components/sub-table.tsx";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover.tsx";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip.tsx";
 import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
 import { apiFetch } from "@/shared/api-client.ts";
+import { getApplyTypeSpec } from "@/shared/apply-type-specs.ts";
+import { hasBit } from "@/shared/bitfield.ts";
 import {
   APPLY_TYPES,
   EXTRA_FLAGS,
@@ -511,16 +528,184 @@ function getObjFieldGroups(itemType: number): FieldGroupDef[] {
   ];
 }
 
+function HelpTip({ text }: { text: string }) {
+  return (
+    <TooltipProvider delayDuration={300}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            className="text-muted-foreground hover:text-foreground inline-flex cursor-help"
+            type="button"
+          >
+            <Info
+              aria-hidden="true"
+              className="h-3.5 w-3.5"
+            />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent
+          className="max-w-xs text-sm text-wrap"
+          sideOffset={5}
+        >
+          <p>{text}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 const affectColumns: Array<ColumnDef<ObjAffect>> = [
   {
-    entries: APPLY_TYPES,
     key: "type",
     label: "Apply Type",
-    type: "enum",
+    renderCell: (row, _onChange, { id, onRowChange }) => (
+      <EnumSelect
+        entries={APPLY_TYPES}
+        id={id}
+        onChange={(v) => {
+          onRowChange({ mod1: 0, mod2: 0, type: v } as Partial<ObjAffect>);
+        }}
+        value={row.type}
+      />
+    ),
+    type: "custom",
     width: "200px",
   },
-  { key: "mod1", label: "Modifier", type: "number", width: "120px" },
-  { key: "mod2", label: "Modifier 2", type: "number", width: "120px" },
+  {
+    key: "mod1",
+    label: "Modifier",
+    renderCell: (row, onChange, { id }) => {
+      const spec = getApplyTypeSpec(row.type);
+      if (!spec) {
+        return (
+          <NumberInput
+            className="px-2 py-1 font-mono"
+            id={id}
+            onValueChange={onChange}
+            value={row.mod1}
+          />
+        );
+      }
+      const label = (
+        <span className="text-muted-foreground mb-0.5 block text-xs">
+          {spec.mod1.label}
+          {spec.mod1.help ? (
+            <>
+              {" "}
+              <HelpTip text={spec.mod1.help} />
+            </>
+          ) : null}
+        </span>
+      );
+      if (spec.mod1.inputType === "enum" && spec.mod1.enumEntries) {
+        return (
+          <>
+            {label}
+            <EnumSelect
+              entries={spec.mod1.enumEntries}
+              id={id}
+              onChange={onChange}
+              value={row.mod1}
+            />
+          </>
+        );
+      }
+      if (spec.mod1.inputType === "bitfield" && spec.mod1.bitfieldEntries) {
+        const entries = spec.mod1.bitfieldEntries;
+        const count = entries.filter((e) => hasBit(row.mod1, e.bit)).length;
+        return (
+          <>
+            {label}
+            <Popover>
+              <PopoverTrigger
+                aria-label={`${spec.mod1.label}: ${count} selected`}
+                className="hover:bg-accent dark:bg-input/40 focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-2 py-1 text-left text-sm shadow-xs outline-none focus-visible:ring-[3px]"
+              >
+                {count > 0
+                  ? `${count} effect${count === 1 ? "" : "s"}`
+                  : "None"}
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                className="max-h-80 w-96 overflow-y-auto"
+              >
+                <p className="text-foreground mb-2 text-sm font-medium">
+                  {spec.mod1.label}
+                </p>
+                <BitfieldEditor
+                  entries={entries}
+                  onChange={onChange}
+                  value={row.mod1}
+                />
+              </PopoverContent>
+            </Popover>
+          </>
+        );
+      }
+      return (
+        <>
+          {label}
+          <NumberInput
+            className="px-2 py-1 font-mono"
+            id={id}
+            max={spec.mod1.max}
+            min={spec.mod1.min}
+            onValueChange={onChange}
+            value={row.mod1}
+          />
+        </>
+      );
+    },
+    type: "custom",
+    width: "200px",
+  },
+  {
+    key: "mod2",
+    label: "Modifier 2",
+    renderCell: (row, onChange, { id }) => {
+      const spec = getApplyTypeSpec(row.type);
+      if (!spec?.mod2) {
+        if (spec) {
+          return (
+            <span className="text-muted-foreground/50 block pt-1 text-sm">
+              --
+            </span>
+          );
+        }
+        return (
+          <NumberInput
+            className="px-2 py-1 font-mono"
+            id={id}
+            onValueChange={onChange}
+            value={row.mod2}
+          />
+        );
+      }
+      return (
+        <>
+          <span className="text-muted-foreground mb-0.5 block text-xs">
+            {spec.mod2.label}
+            {spec.mod2.help ? (
+              <>
+                {" "}
+                <HelpTip text={spec.mod2.help} />
+              </>
+            ) : null}
+          </span>
+          <NumberInput
+            className="px-2 py-1 font-mono"
+            id={id}
+            max={spec.mod2.max}
+            min={spec.mod2.min}
+            onValueChange={onChange}
+            value={row.mod2}
+          />
+        </>
+      );
+    },
+    type: "custom",
+    width: "120px",
+  },
 ];
 
 const extraColumns: Array<ColumnDef<ObjExtra>> = [

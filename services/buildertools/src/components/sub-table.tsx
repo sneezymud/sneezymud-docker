@@ -19,7 +19,10 @@ import { EnumSelect } from "./enum-select.tsx";
 import { NumberInput } from "./number-input.tsx";
 import { TagInput } from "./tag-input.tsx";
 
-export type ColumnDef<T> = EnumColumnDef<T> | TextColumnDef<T>;
+export type ColumnDef<T> =
+  | CustomColumnDef<T>
+  | EnumColumnDef<T>
+  | TextColumnDef<T>;
 
 interface ColumnDefBase<T> {
   key: keyof T & string;
@@ -34,6 +37,15 @@ interface TextColumnDef<T> extends ColumnDefBase<T> {
 interface EnumColumnDef<T> extends ColumnDefBase<T> {
   entries: EnumEntry[];
   type: "enum";
+}
+
+interface CustomColumnDef<T> extends ColumnDefBase<T> {
+  renderCell: (
+    row: T,
+    onChange: (value: number | string) => void,
+    context: { id: string; onRowChange: (updates: Partial<T>) => void },
+  ) => React.ReactNode;
+  type: "custom";
 }
 
 interface SubTableProps<T extends Record<string, number | string>> {
@@ -104,6 +116,13 @@ export function SubTable<T extends Record<string, number | string>>({
     onChange(updated);
   };
 
+  const updateRow = (index: number, updates: Partial<T>) => {
+    const updated = rows.map((row, i) =>
+      i === index ? { ...row, ...updates } : row,
+    );
+    onChange(updated);
+  };
+
   return (
     <fieldset className="p-4">
       <legend className="text-foreground flex w-full items-center gap-2 text-lg font-semibold">
@@ -160,25 +179,44 @@ export function SubTable<T extends Record<string, number | string>>({
                 return (
                   <div key={col.key}>
                     <Label htmlFor={cellId}>{col.label}</Label>
-                    <CellInput
-                      entries={col.type === "enum" ? col.entries : undefined}
-                      id={cellId}
-                      onNumberChange={(v) => {
-                        updateNumberRow(index, col.key, v);
-                      }}
-                      onTextChange={(v) => {
-                        updateTextRow(index, col.key, v);
-                      }}
-                      type={col.type}
-                      value={row[col.key] ?? ""}
-                    />
+                    {col.type === "custom" ? (
+                      col.renderCell(
+                        row,
+                        (v) => {
+                          if (typeof v === "number") {
+                            updateNumberRow(index, col.key, v);
+                          } else {
+                            updateTextRow(index, col.key, v);
+                          }
+                        },
+                        {
+                          id: cellId,
+                          onRowChange: (updates) => {
+                            updateRow(index, updates);
+                          },
+                        },
+                      )
+                    ) : (
+                      <CellInput
+                        entries={col.type === "enum" ? col.entries : undefined}
+                        id={cellId}
+                        onNumberChange={(v) => {
+                          updateNumberRow(index, col.key, v);
+                        }}
+                        onTextChange={(v) => {
+                          updateTextRow(index, col.key, v);
+                        }}
+                        type={col.type}
+                        value={row[col.key] ?? ""}
+                      />
+                    )}
                   </div>
                 );
               })}
             </div>
             <Button
               aria-label={`Remove row ${index + 1}`}
-              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive dark:hover:bg-destructive/10 mt-[1.375rem] shrink-0"
+              className="text-muted-foreground hover:text-destructive dark:hover:bg-destructive/10 mt-5.5 shrink-0"
               onClick={() => {
                 setPendingRemove(index);
               }}

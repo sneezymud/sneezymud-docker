@@ -5,8 +5,8 @@ import { INT32_MAX, INT32_MIN } from "@/shared/constants.ts";
 import { vnumSchema } from "./common.ts";
 
 export const objAffectSchema = z.object({
-  mod1: z.number().int(),
-  mod2: z.number().int(),
+  mod1: z.number().int().min(INT32_MIN).max(INT32_MAX),
+  mod2: z.number().int().min(INT32_MIN).max(INT32_MAX),
   type: z.number().int(),
   vnum: vnumSchema,
 });
