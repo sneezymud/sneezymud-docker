@@ -13,13 +13,13 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 160, 161, 162)`,
+    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 160, 161, 162, 165)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 160, 161, 162)`,
+    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 160, 161, 162, 165)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM obj WHERE vnum IN (110, 111, 160, 161, 162)`,
+    sql`DELETE FROM obj WHERE vnum IN (110, 111, 160, 161, 162, 165)`,
   );
   await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum IN (5100, 5101)`);
 });
@@ -364,5 +364,38 @@ describe("bulk object deletion", () => {
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     expect(body).toEqual({ deleted: 2, ok: true });
+  });
+});
+
+// -- Schema read/write split --
+
+describe("out-of-range data readable from DB", () => {
+  test("GET returns object with values outside input constraints", async () => {
+    await authRequest(app, "/api/objects", cookie, {
+      body: JSON.stringify({ vnum: 165 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    // Set can_be_seen to 50 directly in DB (outside input range 0-25)
+    await immortalDb.execute(
+      sql`UPDATE obj SET can_be_seen = 50 WHERE vnum = 165`,
+    );
+
+    const res = await authRequest(app, "/api/objects/165", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual(
+      expect.objectContaining({ can_be_seen: 50, vnum: 165 }),
+    );
+  });
+
+  test("PUT rejects values outside input constraints", async () => {
+    const res = await authRequest(app, "/api/objects/165", cookie, {
+      body: JSON.stringify({ ...validObjUpdate, can_be_seen: 50, vnum: 165 }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(res.status).toBe(400);
   });
 });

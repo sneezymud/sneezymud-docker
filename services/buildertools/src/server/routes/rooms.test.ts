@@ -13,13 +13,13 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM roomextra WHERE vnum IN (100, 101, 150, 151, 152)`,
+    sql`DELETE FROM roomextra WHERE vnum IN (100, 101, 150, 151, 152, 155)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM roomexit WHERE vnum IN (100, 101, 150, 151, 152)`,
+    sql`DELETE FROM roomexit WHERE vnum IN (100, 101, 150, 151, 152, 155)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM room WHERE vnum IN (100, 101, 150, 151, 152)`,
+    sql`DELETE FROM room WHERE vnum IN (100, 101, 150, 151, 152, 155)`,
   );
   await sneezyDb.execute(sql`DELETE FROM room WHERE vnum IN (5000, 5001)`);
 });
@@ -415,5 +415,56 @@ describe("bulk room deletion", () => {
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     expect(body).toEqual({ deleted: 2, ok: true });
+  });
+});
+
+// -- Schema read/write split --
+
+describe("out-of-range data readable from DB", () => {
+  test("GET returns room with values outside input constraints", async () => {
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: 155 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    // Set capacity to 200 directly in DB (outside input range 0-100)
+    await immortalDb.execute(
+      sql`UPDATE room SET capacity = 200 WHERE vnum = 155`,
+    );
+
+    const res = await authRequest(app, "/api/rooms/155", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual(expect.objectContaining({ capacity: 200, vnum: 155 }));
+  });
+
+  test("PUT rejects values outside input constraints", async () => {
+    const res = await authRequest(app, "/api/rooms/155", cookie, {
+      body: JSON.stringify({
+        capacity: 200,
+        description: "",
+        exits: [],
+        extras: [],
+        height: 0,
+        name: "",
+        river_dir: 0,
+        river_speed: 0,
+        room_flag: 0,
+        sector: 0,
+        spec: 0,
+        telelook: 0,
+        teletarg: 0,
+        teletime: 0,
+        vnum: 155,
+        x: 0,
+        y: 0,
+        z: 0,
+        zone: 1,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(res.status).toBe(400);
   });
 });

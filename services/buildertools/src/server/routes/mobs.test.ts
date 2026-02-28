@@ -13,16 +13,16 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM mob_extra WHERE vnum IN (120, 121, 170, 171, 172)`,
+    sql`DELETE FROM mob_extra WHERE vnum IN (120, 121, 170, 171, 172, 175)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mob_imm WHERE vnum IN (120, 121, 170, 171, 172)`,
+    sql`DELETE FROM mob_imm WHERE vnum IN (120, 121, 170, 171, 172, 175)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mobresponses WHERE vnum IN (120, 121, 170, 171, 172)`,
+    sql`DELETE FROM mobresponses WHERE vnum IN (120, 121, 170, 171, 172, 175)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mob WHERE vnum IN (120, 121, 170, 171, 172)`,
+    sql`DELETE FROM mob WHERE vnum IN (120, 121, 170, 171, 172, 175)`,
   );
 });
 
@@ -301,5 +301,34 @@ describe("bulk mob deletion", () => {
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     expect(body).toEqual({ deleted: 2, ok: true });
+  });
+});
+
+// -- Schema read/write split --
+
+describe("out-of-range data readable from DB", () => {
+  test("GET returns mob with values outside input constraints", async () => {
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum: 175 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    // Set ac to 200 directly in DB (outside input range 0-127)
+    await immortalDb.execute(sql`UPDATE mob SET ac = 200 WHERE vnum = 175`);
+
+    const res = await authRequest(app, "/api/mobs/175", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual(expect.objectContaining({ ac: 200, vnum: 175 }));
+  });
+
+  test("PUT rejects values outside input constraints", async () => {
+    const res = await authRequest(app, "/api/mobs/175", cookie, {
+      body: JSON.stringify({ ...validMobUpdate, ac: 200, vnum: 175 }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(res.status).toBe(400);
   });
 });
