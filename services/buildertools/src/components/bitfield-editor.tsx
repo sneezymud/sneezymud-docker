@@ -8,6 +8,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip.tsx";
+import { hasBit, toggleBit } from "@/shared/bitfield.ts";
 
 interface BitfieldEditorProps {
   entries: BitfieldEntry[];
@@ -45,7 +46,7 @@ export function BitfieldEditor({
                   checked={isSet}
                   className="size-5"
                   onCheckedChange={() => {
-                    onChange(toggleBitValue(value, entry.bit));
+                    onChange(toggleBit(value, entry.bit));
                   }}
                 />
                 <span>{entry.label}</span>
@@ -76,14 +77,4 @@ export function BitfieldEditor({
         })}
     </div>
   );
-}
-
-function hasBit(value: number, bit: number): boolean {
-  const mask = 2 ** bit;
-  return Math.floor(value / mask) % 2 === 1;
-}
-
-function toggleBitValue(value: number, bit: number): number {
-  const mask = 2 ** bit;
-  return hasBit(value, bit) ? value - mask : value + mask;
 }
