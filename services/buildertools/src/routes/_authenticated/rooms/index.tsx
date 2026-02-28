@@ -1,13 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 
+import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
 import { EntityList } from "@/components/entity-list.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
 import { roomKeys } from "@/shared/query-keys.ts";
+import { bulkDeleteResponseSchema } from "@/shared/schemas/common.ts";
 import { roomListSchema, roomSchema } from "@/shared/schemas/room.ts";
 import { toastError } from "@/shared/toast.ts";
 import { useAuthStore } from "@/state/auth.ts";
@@ -41,6 +45,30 @@ function RoomListPage() {
   } = useQuery({
     queryFn: () => apiFetch("/api/rooms", roomListSchema),
     queryKey: roomKeys.all,
+  });
+
+  const [confirmVnums, setConfirmVnums] = useState<number[]>([]);
+
+  const deleteMutation = useMutation({
+    mutationFn: (vnums: number[]) =>
+      apiFetch("/api/rooms/bulk", bulkDeleteResponseSchema, {
+        body: JSON.stringify({ vnums }),
+        headers: { "Content-Type": "application/json" },
+        method: "DELETE",
+      }),
+    onError: (err) => {
+      toastError(
+        err instanceof ApiResponseError
+          ? err.message
+          : "Failed to delete rooms",
+      );
+    },
+    onSuccess: async (_data, vnums) => {
+      toast.success(
+        `Deleted ${vnums.length} room${vnums.length === 1 ? "" : "s"}`,
+      );
+      await queryClient.invalidateQueries({ queryKey: roomKeys.all });
+    },
   });
 
   const createMutation = useMutation({
@@ -97,12 +125,28 @@ function RoomListPage() {
       <EntityList
         basePath="/rooms"
         createPending={createMutation.isPending}
+        deletePending={deleteMutation.isPending}
         entities={filtered}
         label="Rooms"
         onCreateVnum={(vnum) => {
           createMutation.mutate(vnum);
         }}
+        onDeleteSelected={setConfirmVnums}
         vnumBlocks={blocks}
+      />
+      <ConfirmDialog
+        confirmLabel="Delete"
+        message={`Delete ${confirmVnums.length} room${confirmVnums.length === 1 ? "" : "s"}? This cannot be undone.`}
+        onCancel={() => {
+          setConfirmVnums([]);
+        }}
+        onConfirm={() => {
+          deleteMutation.mutate(confirmVnums);
+          setConfirmVnums([]);
+        }}
+        open={confirmVnums.length > 0}
+        title="Confirm Bulk Delete"
+        variant="danger"
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { and, eq, gte, like, lte, or } from "drizzle-orm";
+import { and, eq, gte, inArray, like, lte, or } from "drizzle-orm";
 
 import type { VnumBlock } from "@/shared/schemas/auth.ts";
 import type { Room, RoomListItem } from "@/shared/schemas/room.ts";
@@ -125,6 +125,15 @@ export async function deleteRoom(vnum: number): Promise<void> {
     await tx.delete(roomexit).where(eq(roomexit.vnum, vnum));
     await tx.delete(room).where(eq(room.vnum, vnum));
   });
+}
+
+export async function deleteRooms(vnums: number[]): Promise<number> {
+  await immortalDb.transaction(async (tx) => {
+    await tx.delete(roomextra).where(inArray(roomextra.vnum, vnums));
+    await tx.delete(roomexit).where(inArray(roomexit.vnum, vnums));
+    await tx.delete(room).where(inArray(room.vnum, vnums));
+  });
+  return vnums.length;
 }
 
 export async function getRoomName(vnum: number): Promise<null | string> {

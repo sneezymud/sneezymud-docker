@@ -13,15 +13,17 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM mob_extra WHERE vnum IN (120, 121, 170)`,
+    sql`DELETE FROM mob_extra WHERE vnum IN (120, 121, 170, 171, 172)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mob_imm WHERE vnum IN (120, 121, 170)`,
+    sql`DELETE FROM mob_imm WHERE vnum IN (120, 121, 170, 171, 172)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mobresponses WHERE vnum IN (120, 121, 170)`,
+    sql`DELETE FROM mobresponses WHERE vnum IN (120, 121, 170, 171, 172)`,
   );
-  await immortalDb.execute(sql`DELETE FROM mob WHERE vnum IN (120, 121, 170)`);
+  await immortalDb.execute(
+    sql`DELETE FROM mob WHERE vnum IN (120, 121, 170, 171, 172)`,
+  );
 });
 
 const validMobUpdate = {
@@ -225,5 +227,79 @@ describe("mob deletion", () => {
     });
 
     expect(res.status).toBe(404);
+  });
+});
+
+// -- Bulk Delete --
+
+describe("bulk mob deletion", () => {
+  test("builder can bulk delete multiple mobs", async () => {
+    // Create two mobs to delete
+    for (const vnum of [171, 172]) {
+      await authRequest(app, "/api/mobs", cookie, {
+        body: JSON.stringify({ vnum }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+    }
+
+    const res = await authRequest(app, "/api/mobs/bulk", cookie, {
+      body: JSON.stringify({ vnums: [171, 172] }),
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual({ deleted: 2, ok: true });
+
+    // Verify they're gone
+    const get171 = await authRequest(app, "/api/mobs/171", cookie);
+    const get172 = await authRequest(app, "/api/mobs/172", cookie);
+    expect(get171.status).toBe(404);
+    expect(get172.status).toBe(404);
+  });
+
+  test("rejects vnums outside assigned blocks", async () => {
+    // Create a mob within blocks to ensure it survives
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum: 171 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const res = await authRequest(app, "/api/mobs/bulk", cookie, {
+      body: JSON.stringify({ vnums: [171, 500] }),
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(403);
+
+    // Verify the in-range mob was NOT deleted
+    const getRes = await authRequest(app, "/api/mobs/171", cookie);
+    expect(getRes.status).toBe(200);
+  });
+
+  test("empty array rejected by validation", async () => {
+    const res = await authRequest(app, "/api/mobs/bulk", cookie, {
+      body: JSON.stringify({ vnums: [] }),
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  test("non-existent vnums succeed silently", async () => {
+    const res = await authRequest(app, "/api/mobs/bulk", cookie, {
+      body: JSON.stringify({ vnums: [198, 199] }),
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual({ deleted: 2, ok: true });
   });
 });

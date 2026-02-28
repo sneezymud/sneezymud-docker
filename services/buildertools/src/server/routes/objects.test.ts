@@ -13,12 +13,14 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 160)`,
+    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 160, 161, 162)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 160)`,
+    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 160, 161, 162)`,
   );
-  await immortalDb.execute(sql`DELETE FROM obj WHERE vnum IN (110, 111, 160)`);
+  await immortalDb.execute(
+    sql`DELETE FROM obj WHERE vnum IN (110, 111, 160, 161, 162)`,
+  );
   await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum IN (5100, 5101)`);
 });
 
@@ -294,5 +296,73 @@ describe("object name lookup", () => {
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     expect(body).toEqual(expect.objectContaining({ name: null, vnum: 49_999 }));
+  });
+});
+
+describe("bulk object deletion", () => {
+  test("builder can bulk delete multiple objects", async () => {
+    for (const vnum of [161, 162]) {
+      await authRequest(app, "/api/objects", cookie, {
+        body: JSON.stringify({ vnum }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+    }
+
+    const res = await authRequest(app, "/api/objects/bulk", cookie, {
+      body: JSON.stringify({ vnums: [161, 162] }),
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual({ deleted: 2, ok: true });
+
+    const get161 = await authRequest(app, "/api/objects/161", cookie);
+    const get162 = await authRequest(app, "/api/objects/162", cookie);
+    expect(get161.status).toBe(404);
+    expect(get162.status).toBe(404);
+  });
+
+  test("rejects vnums outside assigned blocks", async () => {
+    await authRequest(app, "/api/objects", cookie, {
+      body: JSON.stringify({ vnum: 161 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const res = await authRequest(app, "/api/objects/bulk", cookie, {
+      body: JSON.stringify({ vnums: [161, 500] }),
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(403);
+
+    const getRes = await authRequest(app, "/api/objects/161", cookie);
+    expect(getRes.status).toBe(200);
+  });
+
+  test("empty array rejected by validation", async () => {
+    const res = await authRequest(app, "/api/objects/bulk", cookie, {
+      body: JSON.stringify({ vnums: [] }),
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  test("non-existent vnums succeed silently", async () => {
+    const res = await authRequest(app, "/api/objects/bulk", cookie, {
+      body: JSON.stringify({ vnums: [198, 199] }),
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual({ deleted: 2, ok: true });
   });
 });

@@ -6,13 +6,15 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  type RowSelectionState,
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { FolderOpen, SearchX } from "lucide-react";
+import { FolderOpen, SearchX, Trash2 } from "lucide-react";
 import { useDeferredValue, useState } from "react";
 
 import { Button } from "@/components/ui/button.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import {
   Pagination,
@@ -41,9 +43,11 @@ interface EntityListItem {
 interface EntityListProps {
   basePath: string;
   createPending?: boolean;
+  deletePending?: boolean;
   entities: EntityListItem[];
   label: string;
   onCreateVnum?: (vnum: number) => void;
+  onDeleteSelected?: (vnums: number[]) => void;
   secondaryLabel?: string;
   vnumBlocks?: Array<{ end: number; start: number }> | undefined;
 }
@@ -53,9 +57,11 @@ const PAGE_SIZE = 50;
 export function EntityList({
   basePath,
   createPending,
+  deletePending,
   entities,
   label,
   onCreateVnum,
+  onDeleteSelected,
   secondaryLabel,
   vnumBlocks,
 }: EntityListProps) {
@@ -64,13 +70,49 @@ export function EntityList({
   const [sorting, setSorting] = useState<SortingState>([
     { desc: false, id: "vnum" },
   ]);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [wasPending, setWasPending] = useState(false);
+
+  // Clear selection when delete mutation completes (pending true -> false)
+  if (deletePending && !wasPending) {
+    setWasPending(true);
+  } else if (!deletePending && wasPending) {
+    setWasPending(false);
+    setRowSelection({});
+  }
+
+  const selectable = Boolean(onDeleteSelected);
 
   const deferredSearch = useDeferredValue(search);
 
-  const columns: Array<ColumnDef<EntityListItem>> = [
+  const columns: Array<ColumnDef<EntityListItem>> = [];
+
+  if (selectable) {
+    columns.push({
+      enableSorting: false,
+      header: ({ table: t }) => (
+        <Checkbox
+          aria-label="Select all on this page"
+          checked={
+            t.getIsAllPageRowsSelected()
+              ? true
+              : t.getIsSomePageRowsSelected()
+                ? "indeterminate"
+                : false
+          }
+          onCheckedChange={(checked) => {
+            t.toggleAllPageRowsSelected(checked === true);
+          }}
+        />
+      ),
+      id: "select",
+    });
+  }
+
+  columns.push(
     { accessorKey: "vnum", header: "Vnum" },
     { accessorKey: "name", header: "Name", sortingFn: "text" },
-  ];
+  );
 
   if (secondaryLabel) {
     columns.push({
@@ -84,10 +126,12 @@ export function EntityList({
   const table = useReactTable({
     columns,
     data: entities,
+    enableRowSelection: selectable,
     enableSortingRemoval: false,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    getRowId: (row) => String(row.vnum),
     getSortedRowModel: getSortedRowModel(),
     globalFilterFn: (row, _columnId, filterValue: string) => {
       const searchLower = filterValue.toLowerCase();
@@ -100,9 +144,11 @@ export function EntityList({
     initialState: {
       pagination: { pageSize: PAGE_SIZE },
     },
+    onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
     state: {
       globalFilter: deferredSearch,
+      rowSelection,
       sorting,
     },
   });
@@ -111,6 +157,7 @@ export function EntityList({
   const filteredCount = table.getFilteredRowModel().rows.length;
   const totalPages = table.getPageCount();
   const pageIndex = table.getState().pagination.pageIndex;
+  const selectedVnums = Object.keys(rowSelection).map(Number);
 
   return (
     <div>
@@ -134,28 +181,43 @@ export function EntityList({
         ) : null}
       </div>
 
-      <div className="relative mb-4 max-w-lg">
-        <Input
-          aria-label="Search by vnum or name"
-          className="pr-8"
-          onChange={(e) => {
-            setSearch(e.target.value);
-          }}
-          placeholder="Search by vnum or name..."
-          type="text"
-          value={search}
-        />
-        {search ? (
-          <Button
-            aria-label="Clear search"
-            className="absolute top-1/2 right-1 -translate-y-1/2"
-            onClick={() => {
-              setSearch("");
+      <div className="mb-4 flex items-center gap-3">
+        <div className="relative max-w-lg flex-1">
+          <Input
+            aria-label="Search by vnum or name"
+            className="pr-8"
+            onChange={(e) => {
+              setSearch(e.target.value);
             }}
-            size="icon-xs"
-            variant="ghost"
+            placeholder="Search by vnum or name..."
+            type="text"
+            value={search}
+          />
+          {search ? (
+            <Button
+              aria-label="Clear search"
+              className="absolute top-1/2 right-1 -translate-y-1/2"
+              onClick={() => {
+                setSearch("");
+              }}
+              size="icon-xs"
+              variant="ghost"
+            >
+              {"\u2715"}
+            </Button>
+          ) : null}
+        </div>
+        {onDeleteSelected && selectedVnums.length > 0 ? (
+          <Button
+            disabled={deletePending}
+            onClick={() => {
+              onDeleteSelected(selectedVnums);
+            }}
+            size="sm"
+            variant="destructive"
           >
-            {"\u2715"}
+            <Trash2 className="mr-1.5 h-4 w-4" />
+            Delete {selectedVnums.length}
           </Button>
         ) : null}
       </div>
@@ -167,11 +229,13 @@ export function EntityList({
               {headerGroup.headers.map((header) => (
                 <TableHead
                   className={
-                    header.column.id === "vnum"
-                      ? "w-24"
-                      : header.column.id === "secondary"
-                        ? "hidden sm:table-cell"
-                        : undefined
+                    header.column.id === "select"
+                      ? "w-10"
+                      : header.column.id === "vnum"
+                        ? "w-24"
+                        : header.column.id === "secondary"
+                          ? "hidden sm:table-cell"
+                          : undefined
                   }
                   key={header.id}
                 >
@@ -208,6 +272,22 @@ export function EntityList({
                 className="has-[a:focus-visible]:ring-accent group hover:bg-muted/50 has-[a:focus-visible]:bg-muted/30 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-inset"
                 key={entity.vnum}
               >
+                {selectable ? (
+                  <TableCell
+                    className="px-2 py-2.5"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
+                    <Checkbox
+                      aria-label={`Select ${entity.name || entity.vnum}`}
+                      checked={row.getIsSelected()}
+                      onCheckedChange={(checked) => {
+                        row.toggleSelected(checked === true);
+                      }}
+                    />
+                  </TableCell>
+                ) : null}
                 <TableCell className="p-0">
                   <Link
                     className="text-muted-foreground block px-2 py-2.5 font-mono outline-none"
@@ -243,7 +323,7 @@ export function EntityList({
             <TableRow>
               <TableCell
                 className="py-8 text-center"
-                colSpan={secondaryLabel ? 3 : 2}
+                colSpan={columns.length}
               >
                 <EmptyMessage
                   canCreate={Boolean(onCreateVnum && vnumBlocks)}

@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, or } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, or } from "drizzle-orm";
 
 import type { VnumBlock } from "@/shared/schemas/auth.ts";
 import type { Mob, MobListItem } from "@/shared/schemas/mob.ts";
@@ -135,6 +135,16 @@ export async function deleteMob(vnum: number): Promise<void> {
     await tx.delete(mobresponses).where(eq(mobresponses.vnum, vnum));
     await tx.delete(mob).where(eq(mob.vnum, vnum));
   });
+}
+
+export async function deleteMobs(vnums: number[]): Promise<number> {
+  await immortalDb.transaction(async (tx) => {
+    await tx.delete(mobExtra).where(inArray(mobExtra.vnum, vnums));
+    await tx.delete(mobImm).where(inArray(mobImm.vnum, vnums));
+    await tx.delete(mobresponses).where(inArray(mobresponses.vnum, vnums));
+    await tx.delete(mob).where(inArray(mob.vnum, vnums));
+  });
+  return vnums.length;
 }
 
 export async function mobExists(vnum: number): Promise<boolean> {

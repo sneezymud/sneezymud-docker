@@ -1,13 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 
+import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
 import { EntityList } from "@/components/entity-list.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
 import { mobKeys } from "@/shared/query-keys.ts";
+import { bulkDeleteResponseSchema } from "@/shared/schemas/common.ts";
 import { mobListSchema, mobSchema } from "@/shared/schemas/mob.ts";
 import { toastError } from "@/shared/toast.ts";
 import { useAuthStore } from "@/state/auth.ts";
@@ -41,6 +45,28 @@ function MobListPage() {
   } = useQuery({
     queryFn: () => apiFetch("/api/mobs", mobListSchema),
     queryKey: mobKeys.all,
+  });
+
+  const [confirmVnums, setConfirmVnums] = useState<number[]>([]);
+
+  const deleteMutation = useMutation({
+    mutationFn: (vnums: number[]) =>
+      apiFetch("/api/mobs/bulk", bulkDeleteResponseSchema, {
+        body: JSON.stringify({ vnums }),
+        headers: { "Content-Type": "application/json" },
+        method: "DELETE",
+      }),
+    onError: (err) => {
+      toastError(
+        err instanceof ApiResponseError ? err.message : "Failed to delete mobs",
+      );
+    },
+    onSuccess: async (_data, vnums) => {
+      toast.success(
+        `Deleted ${vnums.length} mob${vnums.length === 1 ? "" : "s"}`,
+      );
+      await queryClient.invalidateQueries({ queryKey: mobKeys.all });
+    },
   });
 
   const createMutation = useMutation({
@@ -103,13 +129,29 @@ function MobListPage() {
       <EntityList
         basePath="/mobs"
         createPending={createMutation.isPending}
+        deletePending={deleteMutation.isPending}
         entities={filtered}
         label="Mobs"
         onCreateVnum={(vnum) => {
           createMutation.mutate(vnum);
         }}
+        onDeleteSelected={setConfirmVnums}
         secondaryLabel="Keywords"
         vnumBlocks={blocks}
+      />
+      <ConfirmDialog
+        confirmLabel="Delete"
+        message={`Delete ${confirmVnums.length} mob${confirmVnums.length === 1 ? "" : "s"}? This cannot be undone.`}
+        onCancel={() => {
+          setConfirmVnums([]);
+        }}
+        onConfirm={() => {
+          deleteMutation.mutate(confirmVnums);
+          setConfirmVnums([]);
+        }}
+        open={confirmVnums.length > 0}
+        title="Confirm Bulk Delete"
+        variant="danger"
       />
     </div>
   );

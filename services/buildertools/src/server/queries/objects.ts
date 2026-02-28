@@ -1,4 +1,4 @@
-import { and, eq, gte, like, lte, or } from "drizzle-orm";
+import { and, eq, gte, inArray, like, lte, or } from "drizzle-orm";
 
 import type { VnumBlock } from "@/shared/schemas/auth.ts";
 import type { Obj, ObjListItem } from "@/shared/schemas/obj.ts";
@@ -107,6 +107,15 @@ export async function deleteObject(vnum: number): Promise<void> {
     await tx.delete(objextra).where(eq(objextra.vnum, vnum));
     await tx.delete(obj).where(eq(obj.vnum, vnum));
   });
+}
+
+export async function deleteObjects(vnums: number[]): Promise<number> {
+  await immortalDb.transaction(async (tx) => {
+    await tx.delete(objaffect).where(inArray(objaffect.vnum, vnums));
+    await tx.delete(objextra).where(inArray(objextra.vnum, vnums));
+    await tx.delete(obj).where(inArray(obj.vnum, vnums));
+  });
+  return vnums.length;
 }
 
 export async function searchObjects(

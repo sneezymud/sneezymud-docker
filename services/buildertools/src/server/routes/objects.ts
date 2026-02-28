@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 
 import { objCreateSchema, objSchema } from "@/shared/schemas/obj.ts";
 
@@ -11,6 +12,7 @@ import {
 import {
   createObject,
   deleteObject,
+  deleteObjects,
   getObject,
   getObjectShortDesc,
   listObjects,
@@ -91,6 +93,26 @@ objectRoutes.put(
     return c.json(updated);
   },
 );
+
+const bulkDeleteSchema = z.object({
+  vnums: z.array(z.number().int()).min(1).max(200),
+});
+
+objectRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
+  const user = c.get("user");
+  const { vnums } = c.req.valid("json");
+
+  const unauthorized = vnums.filter((v) => !isVnumInBlocks(v, user.blocks));
+  if (unauthorized.length > 0) {
+    return c.json(
+      { error: `Vnums outside assigned blocks: ${unauthorized.join(", ")}` },
+      403,
+    );
+  }
+
+  const deleted = await deleteObjects(vnums);
+  return c.json({ deleted, ok: true });
+});
 
 objectRoutes.delete("/:vnum", requireVnumAccess, async (c) => {
   const vnum = Number(c.req.param("vnum"));

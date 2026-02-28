@@ -13,12 +13,14 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM roomextra WHERE vnum IN (100, 101, 150)`,
+    sql`DELETE FROM roomextra WHERE vnum IN (100, 101, 150, 151, 152)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM roomexit WHERE vnum IN (100, 101, 150)`,
+    sql`DELETE FROM roomexit WHERE vnum IN (100, 101, 150, 151, 152)`,
   );
-  await immortalDb.execute(sql`DELETE FROM room WHERE vnum IN (100, 101, 150)`);
+  await immortalDb.execute(
+    sql`DELETE FROM room WHERE vnum IN (100, 101, 150, 151, 152)`,
+  );
   await sneezyDb.execute(sql`DELETE FROM room WHERE vnum IN (5000, 5001)`);
 });
 
@@ -345,5 +347,73 @@ describe("room name lookup", () => {
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     expect(body).toEqual(expect.objectContaining({ name: null, vnum: 49_999 }));
+  });
+});
+
+describe("bulk room deletion", () => {
+  test("builder can bulk delete multiple rooms", async () => {
+    for (const vnum of [151, 152]) {
+      await authRequest(app, "/api/rooms", cookie, {
+        body: JSON.stringify({ vnum }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+    }
+
+    const res = await authRequest(app, "/api/rooms/bulk", cookie, {
+      body: JSON.stringify({ vnums: [151, 152] }),
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual({ deleted: 2, ok: true });
+
+    const get151 = await authRequest(app, "/api/rooms/151", cookie);
+    const get152 = await authRequest(app, "/api/rooms/152", cookie);
+    expect(get151.status).toBe(404);
+    expect(get152.status).toBe(404);
+  });
+
+  test("rejects vnums outside assigned blocks", async () => {
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: 151 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const res = await authRequest(app, "/api/rooms/bulk", cookie, {
+      body: JSON.stringify({ vnums: [151, 500] }),
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(403);
+
+    const getRes = await authRequest(app, "/api/rooms/151", cookie);
+    expect(getRes.status).toBe(200);
+  });
+
+  test("empty array rejected by validation", async () => {
+    const res = await authRequest(app, "/api/rooms/bulk", cookie, {
+      body: JSON.stringify({ vnums: [] }),
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  test("non-existent vnums succeed silently", async () => {
+    const res = await authRequest(app, "/api/rooms/bulk", cookie, {
+      body: JSON.stringify({ vnums: [198, 199] }),
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual({ deleted: 2, ok: true });
   });
 });

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 
 import { roomCreateSchema, roomSchema } from "@/shared/schemas/room.ts";
 
@@ -11,6 +12,7 @@ import {
 import {
   createRoom,
   deleteRoom,
+  deleteRooms,
   getRoom,
   getRoomName,
   listRooms,
@@ -98,6 +100,26 @@ roomRoutes.put(
     return c.json(updated);
   },
 );
+
+const bulkDeleteSchema = z.object({
+  vnums: z.array(z.number().int()).min(1).max(200),
+});
+
+roomRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
+  const user = c.get("user");
+  const { vnums } = c.req.valid("json");
+
+  const unauthorized = vnums.filter((v) => !isVnumInBlocks(v, user.blocks));
+  if (unauthorized.length > 0) {
+    return c.json(
+      { error: `Vnums outside assigned blocks: ${unauthorized.join(", ")}` },
+      403,
+    );
+  }
+
+  const deleted = await deleteRooms(vnums);
+  return c.json({ deleted, ok: true });
+});
 
 roomRoutes.delete("/:vnum", requireVnumAccess, async (c) => {
   const vnum = Number(c.req.param("vnum"));
