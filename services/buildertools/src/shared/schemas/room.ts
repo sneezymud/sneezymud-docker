@@ -35,17 +35,17 @@ export const roomExtraSchema = z.object({
 export type RoomExtra = z.infer<typeof roomExtraSchema>;
 
 export const roomSchema = z.object({
-  capacity: z.number().int().min(0).max(100),
+  capacity: z.number().int(),
   description: z.string(),
   exits: z.array(roomExitSchema),
   extras: z.array(roomExtraSchema),
-  height: z.number().int().min(-1).max(1000),
+  height: z.number().int(),
   name: z.string(),
   river_dir: z.number().int(),
   river_speed: z.number().int(),
-  room_flag: z.number().int().min(INT32_MIN).max(INT32_MAX),
+  room_flag: z.number().int(),
   sector: z.number().int(),
-  spec: z.number().int().min(0).max(34),
+  spec: z.number().int(),
   telelook: z.number().int(),
   teletarg: z.number().int(),
   teletime: z.number().int(),
@@ -58,6 +58,16 @@ export const roomSchema = z.object({
 
 export type Room = z.infer<typeof roomSchema>;
 
+// Redit-matching range constraints for write validation
+export const roomInputSchema = roomSchema.extend({
+  capacity: z.number().int().min(0).max(100),
+  height: z.number().int().min(-1).max(1000),
+  room_flag: z.number().int().min(INT32_MIN).max(INT32_MAX),
+  spec: z.number().int().min(0).max(34),
+});
+
+export type RoomInput = z.infer<typeof roomInputSchema>;
+
 export const roomListItemSchema = z.object({
   name: z.string(),
   vnum: vnumSchema,
@@ -67,7 +77,7 @@ export type RoomListItem = z.infer<typeof roomListItemSchema>;
 
 export const roomListSchema = z.array(roomListItemSchema);
 
-export const roomUpdateSchema = roomSchema.omit({ vnum: true });
+export const roomUpdateSchema = roomInputSchema.omit({ vnum: true });
 
 export type RoomUpdate = z.infer<typeof roomUpdateSchema>;
 

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 
-import { objCreateSchema, objSchema } from "@/shared/schemas/obj.ts";
+import { objCreateSchema, objInputSchema } from "@/shared/schemas/obj.ts";
 
 import {
   type AuthEnv,
@@ -78,7 +78,7 @@ objectRoutes.get("/:vnum", requireVnumAccess, async (c) => {
 objectRoutes.put(
   "/:vnum",
   requireVnumAccess,
-  jsonValidator(objSchema),
+  jsonValidator(objInputSchema),
   async (c) => {
     const user = c.get("user");
     const vnum = Number(c.req.param("vnum"));

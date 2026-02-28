@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 
-import { roomCreateSchema, roomSchema } from "@/shared/schemas/room.ts";
+import { roomCreateSchema, roomInputSchema } from "@/shared/schemas/room.ts";
 
 import {
   type AuthEnv,
@@ -78,7 +78,7 @@ roomRoutes.get("/:vnum", requireVnumAccess, async (c) => {
 roomRoutes.put(
   "/:vnum",
   requireVnumAccess,
-  jsonValidator(roomSchema),
+  jsonValidator(roomInputSchema),
   async (c) => {
     const user = c.get("user");
     const vnum = Number(c.req.param("vnum"));
