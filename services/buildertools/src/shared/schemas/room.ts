@@ -1,10 +1,12 @@
 import { z } from "zod";
 
+import { INT32_MAX, INT32_MIN } from "@/shared/constants.ts";
+
 import { vnumSchema } from "./common.ts";
 
 export const roomExitSchema = z.object({
   block: z.number().int(),
-  condition_flag: z.number().int().min(-2_147_483_648).max(2_147_483_647),
+  condition_flag: z.number().int().min(INT32_MIN).max(INT32_MAX),
   description: z.string(),
   destination: z.number().int().min(0).max(49_999),
   direction: z.number().int().gte(0).lte(9),
@@ -41,7 +43,7 @@ export const roomSchema = z.object({
   name: z.string(),
   river_dir: z.number().int(),
   river_speed: z.number().int(),
-  room_flag: z.number().int().min(-2_147_483_648).max(2_147_483_647),
+  room_flag: z.number().int().min(INT32_MIN).max(INT32_MAX),
   sector: z.number().int(),
   spec: z.number().int().min(0).max(34),
   telelook: z.number().int(),

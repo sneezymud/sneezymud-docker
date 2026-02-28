@@ -44,13 +44,21 @@ export function NumberInput({
 
     const parsed = Number(raw);
     if (raw !== "" && Number.isFinite(parsed)) {
-      onValueChange(integer ? Math.round(parsed) : parsed);
+      let clamped = integer ? Math.round(parsed) : parsed;
+      if (min !== undefined && clamped < min) clamped = min;
+      if (max !== undefined && clamped > max) clamped = max;
+      onValueChange(clamped);
     }
   };
 
   const handleBlur = () => {
     const parsed = Number(display);
     if (display === "" || !Number.isFinite(parsed)) {
+      setDisplay(String(value));
+      return;
+    }
+    // Snap display to committed value (clamped during change)
+    if (parsed !== value) {
       setDisplay(String(value));
     }
   };

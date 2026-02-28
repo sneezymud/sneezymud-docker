@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { UINT32_MAX } from "@/shared/constants.ts";
+
 import { vnumSchema } from "./common.ts";
 
 export const mobStringKeywords = [
@@ -31,9 +33,9 @@ export type MobImm = z.infer<typeof mobImmSchema>;
 
 export const mobSchema = z.object({
   ac: z.number().min(0).max(127),
-  actions: z.number().int().min(0).max(4_294_967_295),
+  actions: z.number().int().min(0).max(UINT32_MAX),
   adjacent_sound: z.string(),
-  affects: z.number().int().min(0).max(4_294_967_295),
+  affects: z.number().int().min(0).max(UINT32_MAX),
   agi: z.number().int(),
   attacks: z.number().min(0),
   bra: z.number().int(),
