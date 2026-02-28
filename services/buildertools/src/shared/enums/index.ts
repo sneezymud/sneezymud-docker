@@ -1,3 +1,4 @@
+export { APPLY_TYPES } from "./apply-types.ts";
 export { CLASS_TYPES } from "./class-types.ts";
 export { DIRECTION_TYPES } from "./direction-types.ts";
 export { DOOR_TYPES } from "./door-types.ts";
