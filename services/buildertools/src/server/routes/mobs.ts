@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import { mobCreateSchema, mobSchema } from "@/shared/schemas/mob.ts";
+import { mobCreateSchema, mobInputSchema } from "@/shared/schemas/mob.ts";
 
 import {
   type AuthEnv,
@@ -59,7 +59,7 @@ mobRoutes.get("/:vnum", requireVnumAccess, async (c) => {
 mobRoutes.put(
   "/:vnum",
   requireVnumAccess,
-  jsonValidator(mobSchema),
+  jsonValidator(mobInputSchema),
   async (c) => {
     const user = c.get("user");
     const vnum = Number(c.req.param("vnum"));
