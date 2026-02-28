@@ -101,6 +101,7 @@ export function useEntityEditor<T>({
         return;
       }
       toast.success("Deleted");
+      if (detailKey) queryClient.removeQueries({ queryKey: detailKey });
       void queryClient.invalidateQueries({ queryKey: allKey });
       if (listPath) {
         await navigate({ to: listPath });
