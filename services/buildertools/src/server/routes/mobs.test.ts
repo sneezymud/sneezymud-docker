@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { app } from "../app.ts";
 import { immortalDb } from "../db.ts";
+import { mob } from "../schema/immortal.ts";
 import { authRequest, getAuthCookie } from "../test-helpers.ts";
 
 let cookie: string;
@@ -13,16 +14,16 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM mob_extra WHERE vnum IN (120, 121, 170, 171, 172, 175)`,
+    sql`DELETE FROM mob_extra WHERE vnum IN (120, 121, 170, 171, 172, 175, 176, 177, 178)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mob_imm WHERE vnum IN (120, 121, 170, 171, 172, 175)`,
+    sql`DELETE FROM mob_imm WHERE vnum IN (120, 121, 170, 171, 172, 175, 176, 177, 178)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mobresponses WHERE vnum IN (120, 121, 170, 171, 172, 175)`,
+    sql`DELETE FROM mobresponses WHERE vnum IN (120, 121, 170, 171, 172, 175, 176, 177, 178)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mob WHERE vnum IN (120, 121, 170, 171, 172, 175)`,
+    sql`DELETE FROM mob WHERE vnum IN (120, 121, 170, 171, 172, 175, 176, 177, 178)`,
   );
 });
 
@@ -199,6 +200,30 @@ describe("mob updates", () => {
 
     expect(res.status).toBe(400);
   });
+
+  test("update replaces child rows instead of appending", async () => {
+    // Mob 120 already has 1 extra (keyword "bamfin") and 1 immunity from roundtrip test
+    const putRes = await authRequest(app, "/api/mobs/120", cookie, {
+      body: JSON.stringify({
+        ...validMobUpdate,
+        extras: [
+          { description: "Replaced extra.", keyword: "deathcry", vnum: 120 },
+        ],
+        immunities: [],
+        vnum: 120,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(putRes.status).toBe(200);
+
+    const res = await authRequest(app, "/api/mobs/120", cookie);
+    const body: unknown = await res.json();
+    expect(body).toHaveProperty("extras", [
+      expect.objectContaining({ keyword: "deathcry" }),
+    ]);
+    expect(body).toHaveProperty("immunities", []);
+  });
 });
 
 // -- Delete --
@@ -300,7 +325,112 @@ describe("bulk mob deletion", () => {
 
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
-    expect(body).toEqual({ deleted: 2, ok: true });
+    expect(body).toEqual({ deleted: 0, ok: true });
+  });
+});
+
+// -- Derived fields --
+
+describe("mob derived fields", () => {
+  test("pos is synced from def_position on update", async () => {
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum: 176 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    // Update with def_position = 5 (sitting)
+    await authRequest(app, "/api/mobs/176", cookie, {
+      body: JSON.stringify({ ...validMobUpdate, def_position: 5, vnum: 176 }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    // Verify pos was synced in the DB
+    const [row] = await immortalDb
+      .select({ pos: mob.pos })
+      .from(mob)
+      .where(eq(mob.vnum, 176));
+    expect(row).toEqual({ pos: 5 });
+  });
+
+  test("letter is 'A' when local_sound set but adjacent_sound empty", async () => {
+    await authRequest(app, "/api/mobs/176", cookie, {
+      body: JSON.stringify({
+        ...validMobUpdate,
+        adjacent_sound: "",
+        local_sound: "The guard grunts.",
+        vnum: 176,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    const [row] = await immortalDb
+      .select({ letter: mob.letter })
+      .from(mob)
+      .where(eq(mob.vnum, 176));
+    expect(row).toEqual({ letter: "A" });
+  });
+
+  test("letter is 'L' when both sounds are set", async () => {
+    await authRequest(app, "/api/mobs/176", cookie, {
+      body: JSON.stringify({
+        ...validMobUpdate,
+        adjacent_sound: "You hear grunting nearby.",
+        local_sound: "The guard grunts.",
+        vnum: 176,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    const [row] = await immortalDb
+      .select({ letter: mob.letter })
+      .from(mob)
+      .where(eq(mob.vnum, 176));
+    expect(row).toEqual({ letter: "L" });
+  });
+
+  test("letter is 'L' when both sounds are empty", async () => {
+    await authRequest(app, "/api/mobs/176", cookie, {
+      body: JSON.stringify({
+        ...validMobUpdate,
+        adjacent_sound: "",
+        local_sound: "",
+        vnum: 176,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    const [row] = await immortalDb
+      .select({ letter: mob.letter })
+      .from(mob)
+      .where(eq(mob.vnum, 176));
+    expect(row).toEqual({ letter: "L" });
+  });
+});
+
+// -- Concurrent create race --
+
+describe("duplicate mob creation fallback", () => {
+  test("second create for same vnum returns 409", async () => {
+    // First create succeeds
+    const res1 = await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum: 177 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    expect(res1.status).toBe(201);
+
+    // Second create for same vnum returns 409
+    const res2 = await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum: 177 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    expect(res2.status).toBe(409);
   });
 });
 
@@ -330,5 +460,42 @@ describe("out-of-range data readable from DB", () => {
       method: "PUT",
     });
     expect(res.status).toBe(400);
+  });
+});
+
+// -- Delete cascades --
+
+describe("delete cascades to child tables", () => {
+  test("re-created mob has no orphaned extras or immunities", async () => {
+    // Create mob and populate child rows
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum: 178 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(app, "/api/mobs/178", cookie, {
+      body: JSON.stringify({
+        ...validMobUpdate,
+        extras: [{ description: "old extra", keyword: "bamfin", vnum: 178 }],
+        immunities: [{ amt: 50, type: 2, vnum: 178 }],
+        vnum: 178,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    // Delete and re-create
+    await authRequest(app, "/api/mobs/178", cookie, { method: "DELETE" });
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum: 178 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const res = await authRequest(app, "/api/mobs/178", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toHaveProperty("extras", []);
+    expect(body).toHaveProperty("immunities", []);
   });
 });

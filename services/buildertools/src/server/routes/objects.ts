@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { z } from "zod";
 
+import { bulkDeleteSchema } from "@/shared/schemas/common.ts";
 import { objCreateSchema, objInputSchema } from "@/shared/schemas/obj.ts";
 
 import {
@@ -9,6 +9,7 @@ import {
   requireAuth,
   requireVnumAccess,
 } from "../auth/middleware.ts";
+import { isDuplicateKeyError } from "../db.ts";
 import {
   createObject,
   deleteObject,
@@ -28,46 +29,61 @@ objectRoutes.use(requireAuth);
 
 objectRoutes.get("/", async (c) => {
   const user = c.get("user");
-  const objects = await listObjects(user.blocks);
+  const scope = { owner: user.playerName };
+  const objects = await listObjects(user.blocks, scope);
   return c.json(objects);
 });
 
 objectRoutes.post("/", jsonValidator(objCreateSchema), async (c) => {
   const user = c.get("user");
+  const scope = { owner: user.playerName };
   const data = c.req.valid("json");
 
   if (!isVnumInBlocks(data.vnum, user.blocks)) {
     return c.json({ error: "Vnum outside assigned blocks" }, 403);
   }
 
-  if (await objectExists(data.vnum)) {
+  if (await objectExists(data.vnum, scope)) {
     return c.json({ error: "Object already exists" }, 409);
   }
 
-  await createObject(data.vnum, user.playerName);
-  const obj = await getObject(data.vnum);
+  try {
+    await createObject(data.vnum, scope);
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      return c.json({ error: "Object already exists" }, 409);
+    }
+    throw error;
+  }
+  const obj = await getObject(data.vnum, scope);
   return c.json(obj, 201);
 });
 
 objectRoutes.get("/name/:vnum", async (c) => {
+  const user = c.get("user");
+  const scope = { owner: user.playerName };
   const vnum = Number(c.req.param("vnum"));
-  const name = await getObjectShortDesc(vnum);
+  const name = await getObjectShortDesc(vnum, scope);
   return c.json({ name, vnum });
 });
 
 objectRoutes.get("/search", async (c) => {
+  const user = c.get("user");
+  const scope = { owner: user.playerName };
   const query = c.req.query("q") ?? "";
   if (query.length < 2) {
     return c.json([]);
   }
-  const results = await searchObjects(query);
+  const results = await searchObjects(query, scope);
   return c.json(results);
 });
 
 objectRoutes.get("/:vnum", requireVnumAccess, async (c) => {
+  const user = c.get("user");
+  const scope = { owner: user.playerName };
   const vnum = Number(c.req.param("vnum"));
 
-  const obj = await getObject(vnum);
+  const obj = await getObject(vnum, scope);
   if (!obj) {
     return c.json({ error: "Object not found" }, 404);
   }
@@ -81,25 +97,23 @@ objectRoutes.put(
   jsonValidator(objInputSchema),
   async (c) => {
     const user = c.get("user");
+    const scope = { owner: user.playerName };
     const vnum = Number(c.req.param("vnum"));
 
-    if (!(await objectExists(vnum))) {
+    if (!(await objectExists(vnum, scope))) {
       return c.json({ error: "Object not found" }, 404);
     }
 
     const data = c.req.valid("json");
-    await updateObject(vnum, data, user.playerName);
-    const updated = await getObject(vnum);
+    await updateObject(vnum, data, scope);
+    const updated = await getObject(vnum, scope);
     return c.json(updated);
   },
 );
 
-const bulkDeleteSchema = z.object({
-  vnums: z.array(z.number().int()).min(1).max(200),
-});
-
 objectRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
   const user = c.get("user");
+  const scope = { owner: user.playerName };
   const { vnums } = c.req.valid("json");
 
   const unauthorized = vnums.filter((v) => !isVnumInBlocks(v, user.blocks));
@@ -110,17 +124,19 @@ objectRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
     );
   }
 
-  const deleted = await deleteObjects(vnums);
+  const deleted = await deleteObjects(vnums, scope);
   return c.json({ deleted, ok: true });
 });
 
 objectRoutes.delete("/:vnum", requireVnumAccess, async (c) => {
+  const user = c.get("user");
+  const scope = { owner: user.playerName };
   const vnum = Number(c.req.param("vnum"));
 
-  if (!(await objectExists(vnum))) {
+  if (!(await objectExists(vnum, scope))) {
     return c.json({ error: "Object not found" }, 404);
   }
 
-  await deleteObject(vnum);
+  await deleteObject(vnum, scope);
   return c.json({ ok: true });
 });

@@ -7,8 +7,12 @@ import { immortalDb, sneezyDb } from "../db.ts";
 import { obj, objaffect, objextra } from "../schema/immortal.ts";
 import { obj as sneezyObj } from "../schema/sneezy.ts";
 import { escapeLike } from "./like-escape.ts";
+import { ownerEq, type OwnerScope, scopeOwner } from "./owner-scope.ts";
 
-export async function listObjects(blocks: VnumBlock[]): Promise<ObjListItem[]> {
+export async function listObjects(
+  blocks: VnumBlock[],
+  scope: OwnerScope,
+): Promise<ObjListItem[]> {
   if (blocks.length === 0) {
     return [];
   }
@@ -17,23 +21,40 @@ export async function listObjects(blocks: VnumBlock[]): Promise<ObjListItem[]> {
     .select({ name: obj.name, short_desc: obj.short_desc, vnum: obj.vnum })
     .from(obj)
     .where(
-      or(
-        ...blocks.map((b) => and(gte(obj.vnum, b.start), lte(obj.vnum, b.end))),
+      and(
+        ownerEq(obj.owner, scope),
+        or(
+          ...blocks.map((b) =>
+            and(gte(obj.vnum, b.start), lte(obj.vnum, b.end)),
+          ),
+        ),
       ),
     )
     .orderBy(obj.vnum);
 }
 
-export async function getObject(vnum: number): Promise<null | Obj> {
-  const [row] = await immortalDb.select().from(obj).where(eq(obj.vnum, vnum));
+export async function getObject(
+  vnum: number,
+  scope: OwnerScope,
+): Promise<null | Obj> {
+  const [row] = await immortalDb
+    .select()
+    .from(obj)
+    .where(and(eq(obj.vnum, vnum), ownerEq(obj.owner, scope)));
 
   if (!row) {
     return null;
   }
 
   const [affects, extras] = await Promise.all([
-    immortalDb.select().from(objaffect).where(eq(objaffect.vnum, vnum)),
-    immortalDb.select().from(objextra).where(eq(objextra.vnum, vnum)),
+    immortalDb
+      .select()
+      .from(objaffect)
+      .where(and(eq(objaffect.vnum, vnum), ownerEq(objaffect.owner, scope))),
+    immortalDb
+      .select()
+      .from(objextra)
+      .where(and(eq(objextra.vnum, vnum), ownerEq(objextra.owner, scope))),
   ]);
 
   const { owner: _owner, ...objFields } = row;
@@ -44,7 +65,10 @@ export async function getObject(vnum: number): Promise<null | Obj> {
   };
 }
 
-export async function createObject(vnum: number, owner: string): Promise<void> {
+export async function createObject(
+  vnum: number,
+  scope: OwnerScope,
+): Promise<void> {
   await immortalDb.insert(obj).values({
     action_desc: "",
     action_flag: 0,
@@ -56,7 +80,7 @@ export async function createObject(vnum: number, owner: string): Promise<void> {
     max_exist: 0,
     max_struct: 0,
     name: "",
-    owner,
+    owner: scopeOwner(scope),
     price: 0,
     short_desc: "",
     spec_proc: 0,
@@ -75,25 +99,30 @@ export async function createObject(vnum: number, owner: string): Promise<void> {
 export async function updateObject(
   vnum: number,
   data: Obj,
-  owner: string,
+  scope: OwnerScope,
 ): Promise<void> {
+  const owner = scopeOwner(scope);
   const { affects, extras, vnum: _vnum, ...objFields } = data;
 
   await immortalDb.transaction(async (tx) => {
     await tx
       .update(obj)
       .set({ ...objFields, owner })
-      .where(eq(obj.vnum, vnum));
+      .where(and(eq(obj.vnum, vnum), ownerEq(obj.owner, scope)));
 
     // Replace affects atomically
-    await tx.delete(objaffect).where(eq(objaffect.vnum, vnum));
+    await tx
+      .delete(objaffect)
+      .where(and(eq(objaffect.vnum, vnum), ownerEq(objaffect.owner, scope)));
     for (const affect of affects) {
       const { vnum: _av, ...fields } = affect;
       await tx.insert(objaffect).values({ ...fields, owner, vnum });
     }
 
     // Replace extras atomically
-    await tx.delete(objextra).where(eq(objextra.vnum, vnum));
+    await tx
+      .delete(objextra)
+      .where(and(eq(objextra.vnum, vnum), ownerEq(objextra.owner, scope)));
     for (const extra of extras) {
       const { vnum: _ev, ...fields } = extra;
       await tx.insert(objextra).values({ ...fields, owner, vnum });
@@ -101,38 +130,70 @@ export async function updateObject(
   });
 }
 
-export async function deleteObject(vnum: number): Promise<void> {
+export async function deleteObject(
+  vnum: number,
+  scope: OwnerScope,
+): Promise<void> {
   await immortalDb.transaction(async (tx) => {
-    await tx.delete(objaffect).where(eq(objaffect.vnum, vnum));
-    await tx.delete(objextra).where(eq(objextra.vnum, vnum));
-    await tx.delete(obj).where(eq(obj.vnum, vnum));
+    await tx
+      .delete(objaffect)
+      .where(and(eq(objaffect.vnum, vnum), ownerEq(objaffect.owner, scope)));
+    await tx
+      .delete(objextra)
+      .where(and(eq(objextra.vnum, vnum), ownerEq(objextra.owner, scope)));
+    await tx
+      .delete(obj)
+      .where(and(eq(obj.vnum, vnum), ownerEq(obj.owner, scope)));
   });
 }
 
-export async function deleteObjects(vnums: number[]): Promise<number> {
+export async function deleteObjects(
+  vnums: number[],
+  scope: OwnerScope,
+): Promise<number> {
+  let deleted = 0;
   await immortalDb.transaction(async (tx) => {
-    await tx.delete(objaffect).where(inArray(objaffect.vnum, vnums));
-    await tx.delete(objextra).where(inArray(objextra.vnum, vnums));
-    await tx.delete(obj).where(inArray(obj.vnum, vnums));
+    await tx
+      .delete(objaffect)
+      .where(
+        and(inArray(objaffect.vnum, vnums), ownerEq(objaffect.owner, scope)),
+      );
+    await tx
+      .delete(objextra)
+      .where(
+        and(inArray(objextra.vnum, vnums), ownerEq(objextra.owner, scope)),
+      );
+    const result = await tx
+      .delete(obj)
+      .where(and(inArray(obj.vnum, vnums), ownerEq(obj.owner, scope)));
+    deleted = result[0].affectedRows;
   });
-  return vnums.length;
+  return deleted;
 }
 
 export async function searchObjects(
   query: string,
+  scope: OwnerScope,
 ): Promise<Array<{ short_desc: string; vnum: number }>> {
   const likeParam = `%${escapeLike(query)}%`;
   const isNumeric = /^\d+$/.test(query);
 
   const nameFilter = like(obj.short_desc, likeParam);
   const sneezyNameFilter = like(sneezyObj.short_desc, likeParam);
+  const vnumFilter = isNumeric ? eq(obj.vnum, Number(query)) : undefined;
+  const sneezyVnumFilter = isNumeric
+    ? eq(sneezyObj.vnum, Number(query))
+    : undefined;
 
   const [immortalRows, sneezyRows] = await Promise.all([
     immortalDb
       .select({ short_desc: obj.short_desc, vnum: obj.vnum })
       .from(obj)
       .where(
-        isNumeric ? or(eq(obj.vnum, Number(query)), nameFilter) : nameFilter,
+        and(
+          ownerEq(obj.owner, scope),
+          vnumFilter ? or(vnumFilter, nameFilter) : nameFilter,
+        ),
       )
       .orderBy(obj.vnum)
       .limit(10),
@@ -140,8 +201,8 @@ export async function searchObjects(
       .select({ short_desc: sneezyObj.short_desc, vnum: sneezyObj.vnum })
       .from(sneezyObj)
       .where(
-        isNumeric
-          ? or(eq(sneezyObj.vnum, Number(query)), sneezyNameFilter)
+        sneezyVnumFilter
+          ? or(sneezyVnumFilter, sneezyNameFilter)
           : sneezyNameFilter,
       )
       .orderBy(sneezyObj.vnum)
@@ -162,13 +223,16 @@ export async function searchObjects(
   return merged.slice(0, 20);
 }
 
-export async function getObjectShortDesc(vnum: number): Promise<null | string> {
+export async function getObjectShortDesc(
+  vnum: number,
+  scope: OwnerScope,
+): Promise<null | string> {
   // Try immortal first (builder workspace), then sneezy (production)
   // Key vnums can reference objects outside the builder's assigned blocks
   const [immortalRow] = await immortalDb
     .select({ short_desc: obj.short_desc })
     .from(obj)
-    .where(eq(obj.vnum, vnum))
+    .where(and(eq(obj.vnum, vnum), ownerEq(obj.owner, scope)))
     .limit(1);
 
   if (immortalRow) {
@@ -188,11 +252,14 @@ export async function getObjectShortDesc(vnum: number): Promise<null | string> {
   return null;
 }
 
-export async function objectExists(vnum: number): Promise<boolean> {
+export async function objectExists(
+  vnum: number,
+  scope: OwnerScope,
+): Promise<boolean> {
   const [row] = await immortalDb
     .select({ vnum: obj.vnum })
     .from(obj)
-    .where(eq(obj.vnum, vnum))
+    .where(and(eq(obj.vnum, vnum), ownerEq(obj.owner, scope)))
     .limit(1);
 
   return row !== undefined;

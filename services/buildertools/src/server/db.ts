@@ -64,3 +64,13 @@ export const sneezyDb = drizzle(sneezyPool);
 export async function closePools(): Promise<void> {
   await Promise.all([immortalPool.end(), sneezyPool.end()]);
 }
+
+/** MySQL error 1062: duplicate entry for a unique/primary key. */
+export function isDuplicateKeyError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "errno" in err &&
+    (err as { errno: unknown }).errno === 1062
+  );
+}

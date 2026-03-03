@@ -29,6 +29,9 @@ export const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
 
 export const requireVnumAccess = createMiddleware<AuthEnv>(async (c, next) => {
   const vnum = Number(c.req.param("vnum"));
+  if (!Number.isInteger(vnum) || vnum < 0) {
+    return c.json({ error: "Invalid vnum" }, 400);
+  }
   const user = c.get("user");
   if (!isVnumInBlocks(vnum, user.blocks)) {
     return c.json({ error: "Vnum outside assigned blocks" }, 403);

@@ -20,13 +20,15 @@ export const mobResponseRoutes = new Hono<AuthEnv>();
 mobResponseRoutes.use(requireAuth);
 
 mobResponseRoutes.get("/:vnum", requireVnumAccess, async (c) => {
+  const user = c.get("user");
+  const scope = { owner: user.playerName };
   const vnum = Number(c.req.param("vnum"));
 
-  if (!(await mobExists(vnum))) {
+  if (!(await mobExists(vnum, scope))) {
     return c.json({ error: "Mob not found" }, 404);
   }
 
-  const response = await getMobResponse(vnum);
+  const response = await getMobResponse(vnum, scope);
   return c.json(response ?? { response: "", vnum });
 });
 
@@ -36,18 +38,19 @@ mobResponseRoutes.put(
   jsonValidator(mobResponseSchema),
   async (c) => {
     const user = c.get("user");
+    const scope = { owner: user.playerName };
     const vnum = Number(c.req.param("vnum"));
 
-    if (!(await mobExists(vnum))) {
+    if (!(await mobExists(vnum, scope))) {
       return c.json({ error: "Mob not found" }, 404);
     }
 
     const data = c.req.valid("json");
     await (data.response.trim() === ""
-      ? deleteMobResponse(vnum)
-      : upsertMobResponse(vnum, data.response, user.playerName));
+      ? deleteMobResponse(vnum, scope)
+      : upsertMobResponse(vnum, data.response, scope));
 
-    const updated = await getMobResponse(vnum);
+    const updated = await getMobResponse(vnum, scope);
     return c.json(updated ?? { response: "", vnum });
   },
 );

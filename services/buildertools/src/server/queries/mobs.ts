@@ -7,8 +7,12 @@ import { mobExtraSchema } from "@/shared/schemas/mob.ts";
 
 import { immortalDb } from "../db.ts";
 import { mob, mobExtra, mobImm, mobresponses } from "../schema/immortal.ts";
+import { ownerEq, type OwnerScope, scopeOwner } from "./owner-scope.ts";
 
-export async function listMobs(blocks: VnumBlock[]): Promise<MobListItem[]> {
+export async function listMobs(
+  blocks: VnumBlock[],
+  scope: OwnerScope,
+): Promise<MobListItem[]> {
   if (blocks.length === 0) {
     return [];
   }
@@ -17,38 +21,61 @@ export async function listMobs(blocks: VnumBlock[]): Promise<MobListItem[]> {
     .select({ name: mob.name, short_desc: mob.short_desc, vnum: mob.vnum })
     .from(mob)
     .where(
-      or(
-        ...blocks.map((b) => and(gte(mob.vnum, b.start), lte(mob.vnum, b.end))),
+      and(
+        ownerEq(mob.owner, scope),
+        or(
+          ...blocks.map((b) =>
+            and(gte(mob.vnum, b.start), lte(mob.vnum, b.end)),
+          ),
+        ),
       ),
     )
     .orderBy(mob.vnum);
 }
 
-export async function getMob(vnum: number): Promise<Mob | null> {
-  const [row] = await immortalDb.select().from(mob).where(eq(mob.vnum, vnum));
+export async function getMob(
+  vnum: number,
+  scope: OwnerScope,
+): Promise<Mob | null> {
+  const [row] = await immortalDb
+    .select()
+    .from(mob)
+    .where(and(eq(mob.vnum, vnum), ownerEq(mob.owner, scope)));
 
   if (!row) {
     return null;
   }
 
   const [extras, immunities] = await Promise.all([
-    immortalDb.select().from(mobExtra).where(eq(mobExtra.vnum, vnum)),
-    immortalDb.select().from(mobImm).where(eq(mobImm.vnum, vnum)),
+    immortalDb
+      .select()
+      .from(mobExtra)
+      .where(and(eq(mobExtra.vnum, vnum), ownerEq(mobExtra.owner, scope))),
+    immortalDb
+      .select()
+      .from(mobImm)
+      .where(and(eq(mobImm.vnum, vnum), ownerEq(mobImm.owner, scope))),
   ]);
 
   const { letter: _letter, owner: _owner, pos: _pos, ...mobFields } = row;
   return {
     ...mobFields,
     adjacent_sound: mobFields.adjacent_sound ?? "",
-    extras: extras.map(({ owner: _eo, ...fields }) =>
-      mobExtraSchema.parse(fields),
+    extras: extras.map(({ description, owner: _eo, ...fields }) =>
+      mobExtraSchema.parse({ ...fields, description: description ?? "" }),
     ),
-    immunities: immunities.map(({ owner: _io, ...fields }) => fields),
+    immunities: immunities.map(({ amt, owner: _io, ...fields }) => ({
+      ...fields,
+      amt: amt ?? 0,
+    })),
     local_sound: mobFields.local_sound ?? "",
   };
 }
 
-export async function createMob(vnum: number, owner: string): Promise<void> {
+export async function createMob(
+  vnum: number,
+  scope: OwnerScope,
+): Promise<void> {
   await immortalDb.insert(mob).values({
     ac: 0,
     actions: 0,
@@ -80,7 +107,7 @@ export async function createMob(vnum: number, owner: string): Promise<void> {
     long_desc: "",
     max_exist: 0,
     name: "",
-    owner,
+    owner: scopeOwner(scope),
     per: 0,
     pos: 9,
     race: 0,
@@ -101,8 +128,9 @@ export async function createMob(vnum: number, owner: string): Promise<void> {
 export async function updateMob(
   vnum: number,
   data: Mob,
-  owner: string,
+  scope: OwnerScope,
 ): Promise<void> {
+  const owner = scopeOwner(scope);
   const { extras, immunities, vnum: _vnum, ...mobFields } = data;
   const letter = mobFields.local_sound && !mobFields.adjacent_sound ? "A" : "L";
 
@@ -110,17 +138,21 @@ export async function updateMob(
     await tx
       .update(mob)
       .set({ ...mobFields, letter, owner, pos: mobFields.def_position })
-      .where(eq(mob.vnum, vnum));
+      .where(and(eq(mob.vnum, vnum), ownerEq(mob.owner, scope)));
 
     // Replace extras atomically
-    await tx.delete(mobExtra).where(eq(mobExtra.vnum, vnum));
+    await tx
+      .delete(mobExtra)
+      .where(and(eq(mobExtra.vnum, vnum), ownerEq(mobExtra.owner, scope)));
     for (const extra of extras) {
       const { vnum: _ev, ...fields } = extra;
       await tx.insert(mobExtra).values({ ...fields, owner, vnum });
     }
 
     // Replace immunities atomically
-    await tx.delete(mobImm).where(eq(mobImm.vnum, vnum));
+    await tx
+      .delete(mobImm)
+      .where(and(eq(mobImm.vnum, vnum), ownerEq(mobImm.owner, scope)));
     for (const imm of immunities) {
       const { vnum: _iv, ...fields } = imm;
       await tx.insert(mobImm).values({ ...fields, owner, vnum });
@@ -128,30 +160,66 @@ export async function updateMob(
   });
 }
 
-export async function deleteMob(vnum: number): Promise<void> {
+export async function deleteMob(
+  vnum: number,
+  scope: OwnerScope,
+): Promise<void> {
   await immortalDb.transaction(async (tx) => {
-    await tx.delete(mobExtra).where(eq(mobExtra.vnum, vnum));
-    await tx.delete(mobImm).where(eq(mobImm.vnum, vnum));
-    await tx.delete(mobresponses).where(eq(mobresponses.vnum, vnum));
-    await tx.delete(mob).where(eq(mob.vnum, vnum));
+    await tx
+      .delete(mobExtra)
+      .where(and(eq(mobExtra.vnum, vnum), ownerEq(mobExtra.owner, scope)));
+    await tx
+      .delete(mobImm)
+      .where(and(eq(mobImm.vnum, vnum), ownerEq(mobImm.owner, scope)));
+    await tx
+      .delete(mobresponses)
+      .where(
+        and(eq(mobresponses.vnum, vnum), ownerEq(mobresponses.owner, scope)),
+      );
+    await tx
+      .delete(mob)
+      .where(and(eq(mob.vnum, vnum), ownerEq(mob.owner, scope)));
   });
 }
 
-export async function deleteMobs(vnums: number[]): Promise<number> {
+export async function deleteMobs(
+  vnums: number[],
+  scope: OwnerScope,
+): Promise<number> {
+  let deleted = 0;
   await immortalDb.transaction(async (tx) => {
-    await tx.delete(mobExtra).where(inArray(mobExtra.vnum, vnums));
-    await tx.delete(mobImm).where(inArray(mobImm.vnum, vnums));
-    await tx.delete(mobresponses).where(inArray(mobresponses.vnum, vnums));
-    await tx.delete(mob).where(inArray(mob.vnum, vnums));
+    await tx
+      .delete(mobExtra)
+      .where(
+        and(inArray(mobExtra.vnum, vnums), ownerEq(mobExtra.owner, scope)),
+      );
+    await tx
+      .delete(mobImm)
+      .where(and(inArray(mobImm.vnum, vnums), ownerEq(mobImm.owner, scope)));
+    await tx
+      .delete(mobresponses)
+      .where(
+        and(
+          inArray(mobresponses.vnum, vnums),
+          ownerEq(mobresponses.owner, scope),
+        ),
+      );
+    const result = await tx
+      .delete(mob)
+      .where(and(inArray(mob.vnum, vnums), ownerEq(mob.owner, scope)));
+    deleted = result[0].affectedRows;
   });
-  return vnums.length;
+  return deleted;
 }
 
-export async function mobExists(vnum: number): Promise<boolean> {
+export async function mobExists(
+  vnum: number,
+  scope: OwnerScope,
+): Promise<boolean> {
   const [row] = await immortalDb
     .select({ vnum: mob.vnum })
     .from(mob)
-    .where(eq(mob.vnum, vnum))
+    .where(and(eq(mob.vnum, vnum), ownerEq(mob.owner, scope)))
     .limit(1);
 
   return row !== undefined;

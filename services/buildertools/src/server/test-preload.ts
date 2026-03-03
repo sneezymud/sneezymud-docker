@@ -33,6 +33,8 @@ assertTestDatabases();
 const TEST_PASSWORD_HASH = "tek4edTZE8";
 // crypt("testpass", "noblocks") truncated to 10 chars
 const NO_BLOCKS_PASSWORD_HASH = "noA/WtpIgY";
+// crypt("testpass", "otherbuilder") truncated to 10 chars
+const OTHER_PASSWORD_HASH = "otICdK6ofe";
 
 // Truncate all content tables in both databases
 await immortalDb.execute(sql`DELETE FROM roomextra`);
@@ -87,6 +89,23 @@ await sneezyDb.execute(sql`
 await sneezyDb.execute(sql`
   INSERT INTO wizdata (player_id, setsev, blockastart, blockaend, blockbstart, blockbend)
   VALUES (99998, 0, 0, 0, 0, 0)
+`);
+
+// Seed second builder with overlapping vnum blocks for owner isolation tests
+await sneezyDb.execute(sql`
+  INSERT INTO account (account_id, name, passwd)
+  VALUES (99997, 'otherbuilder', ${OTHER_PASSWORD_HASH})
+`);
+await sneezyDb.execute(sql`
+  INSERT INTO player (id, account_id, name)
+  VALUES (99997, 99997, 'OtherBuilder')
+`);
+await sneezyDb.execute(sql`
+  INSERT INTO wizdata (player_id, setsev, blockastart, blockaend, blockbstart, blockbend)
+  VALUES (99997, 0, 100, 199, 0, 0)
+`);
+await sneezyDb.execute(sql`
+  INSERT INTO wizpower (player_id, wizpower) VALUES (99997, 1)
 `);
 
 // Clean up connection pools when all test files finish

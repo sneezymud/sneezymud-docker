@@ -67,6 +67,26 @@ describe("mob responses", () => {
     expect(body).toEqual(expect.objectContaining({ response: "", vnum: 130 }));
   });
 
+  test("whitespace-only response is treated as empty and deletes the row", async () => {
+    // First set a real response
+    await authRequest(app, "/api/mob-responses/130", cookie, {
+      body: JSON.stringify({ response: "say {hello;}", vnum: 130 }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    // Send whitespace-only - should delete the response row
+    const res = await authRequest(app, "/api/mob-responses/130", cookie, {
+      body: JSON.stringify({ response: "   \t\n  ", vnum: 130 }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual(expect.objectContaining({ response: "", vnum: 130 }));
+  });
+
   test("response for nonexistent mob returns 404", async () => {
     const res = await authRequest(app, "/api/mob-responses/199", cookie);
 

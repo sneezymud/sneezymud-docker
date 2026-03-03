@@ -16,6 +16,10 @@ export const apiErrorSchema = z.object({
 
 export type ApiError = z.infer<typeof apiErrorSchema>;
 
+export const bulkDeleteSchema = z.object({
+  vnums: z.array(vnumSchema).min(1).max(200),
+});
+
 export const bulkDeleteResponseSchema = z.object({
   deleted: z.number(),
   ok: z.boolean(),

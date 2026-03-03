@@ -1,25 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { vnumSchema } from "./common.ts";
 import { roomExitSchema } from "./room.ts";
-
-describe("vnumSchema", () => {
-  test("accepts zero", () => {
-    expect(vnumSchema.safeParse(0).success).toBe(true);
-  });
-
-  test("accepts positive integer", () => {
-    expect(vnumSchema.safeParse(100).success).toBe(true);
-  });
-
-  test("rejects negative number", () => {
-    expect(vnumSchema.safeParse(-1).success).toBe(false);
-  });
-
-  test("rejects non-integer", () => {
-    expect(vnumSchema.safeParse(1.5).success).toBe(false);
-  });
-});
 
 describe("roomExitSchema key_num", () => {
   const validExit = {

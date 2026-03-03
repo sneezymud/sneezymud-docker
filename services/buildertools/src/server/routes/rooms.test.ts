@@ -13,13 +13,13 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM roomextra WHERE vnum IN (100, 101, 150, 151, 152, 155)`,
+    sql`DELETE FROM roomextra WHERE vnum IN (100, 101, 102, 103, 150, 151, 152, 155)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM roomexit WHERE vnum IN (100, 101, 150, 151, 152, 155)`,
+    sql`DELETE FROM roomexit WHERE vnum IN (100, 101, 102, 103, 150, 151, 152, 155)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM room WHERE vnum IN (100, 101, 150, 151, 152, 155)`,
+    sql`DELETE FROM room WHERE vnum IN (100, 101, 102, 103, 150, 151, 152, 155)`,
   );
   await sneezyDb.execute(sql`DELETE FROM room WHERE vnum IN (5000, 5001)`);
 });
@@ -55,6 +55,7 @@ describe("room creation", () => {
     expect(res.status).toBe(201);
     const body: unknown = await res.json();
     expect(body).toHaveProperty("vnum", 100);
+    expect(body).toHaveProperty("zone", 1);
   });
 
   test("creating a room at an existing vnum returns 409", async () => {
@@ -203,6 +204,41 @@ describe("room updates", () => {
 
     expect(res.status).toBe(400);
   });
+
+  test("update replaces child rows instead of appending", async () => {
+    // Room 100 already has 1 exit and 1 extra from roundtrip test
+    const putRes = await authRequest(app, "/api/rooms/100", cookie, {
+      body: JSON.stringify({
+        capacity: 0,
+        description: "",
+        exits: [],
+        extras: [],
+        height: -1,
+        name: "Stripped Room",
+        river_dir: 0,
+        river_speed: 0,
+        room_flag: 0,
+        sector: 0,
+        spec: 0,
+        telelook: 0,
+        teletarg: 0,
+        teletime: 0,
+        vnum: 100,
+        x: 0,
+        y: 0,
+        z: 0,
+        zone: 1,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(putRes.status).toBe(200);
+
+    const res = await authRequest(app, "/api/rooms/100", cookie);
+    const body: unknown = await res.json();
+    expect(body).toHaveProperty("exits", []);
+    expect(body).toHaveProperty("extras", []);
+  });
 });
 
 // -- Delete --
@@ -303,6 +339,65 @@ describe("room search", () => {
 
   // Search crosses block boundaries intentionally - exit/key pickers need
   // to find rooms in other builders' blocks and the production database.
+  test("SQL metacharacters in query are treated literally", async () => {
+    // Create a room with % in the name
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: 102 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(app, "/api/rooms/102", cookie, {
+      body: JSON.stringify({
+        capacity: 0,
+        description: "",
+        exits: [],
+        extras: [],
+        height: -1,
+        name: "100% Haunted Room",
+        river_dir: 0,
+        river_speed: 0,
+        room_flag: 0,
+        sector: 0,
+        spec: 0,
+        telelook: 0,
+        teletarg: 0,
+        teletime: 0,
+        vnum: 102,
+        x: 0,
+        y: 0,
+        z: 0,
+        zone: 1,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    // Searching for literal "%" should only match rooms with % in the name,
+    // not wildcard-match everything
+    const res = await authRequest(
+      app,
+      "/api/rooms/search?q=100%25+Haunted",
+      cookie,
+    );
+
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual(
+      expect.arrayContaining([expect.objectContaining({ vnum: 102 })]),
+    );
+
+    // Searching for "_" should not wildcard-match single characters
+    const underscoreRes = await authRequest(
+      app,
+      "/api/rooms/search?q=10_+Haunted",
+      cookie,
+    );
+    const underscoreBody: unknown = await underscoreRes.json();
+    expect(underscoreBody).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ vnum: 102 })]),
+    );
+  });
+
   test("search finds rooms in sneezy database too", async () => {
     const res = await authRequest(
       app,
@@ -314,6 +409,16 @@ describe("room search", () => {
     const body: unknown = await res.json();
     expect(body).toEqual(
       expect.arrayContaining([expect.objectContaining({ vnum: 5000 })]),
+    );
+  });
+
+  test("search by numeric vnum", async () => {
+    const res = await authRequest(app, "/api/rooms/search?q=101", cookie);
+
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual(
+      expect.arrayContaining([expect.objectContaining({ vnum: 101 })]),
     );
   });
 });
@@ -414,7 +519,7 @@ describe("bulk room deletion", () => {
 
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
-    expect(body).toEqual({ deleted: 2, ok: true });
+    expect(body).toEqual({ deleted: 0, ok: true });
   });
 });
 
@@ -466,5 +571,71 @@ describe("out-of-range data readable from DB", () => {
       method: "PUT",
     });
     expect(res.status).toBe(400);
+  });
+});
+
+// -- Delete cascades --
+
+describe("delete cascades to child tables", () => {
+  test("re-created room has no orphaned exits or extras", async () => {
+    // Create room and populate child rows
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: 103 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(app, "/api/rooms/103", cookie, {
+      body: JSON.stringify({
+        capacity: 0,
+        description: "",
+        exits: [
+          {
+            block: 0,
+            condition_flag: 0,
+            description: "old exit",
+            destination: 100,
+            direction: 0,
+            key_num: -1,
+            lock_difficulty: 0,
+            name: "",
+            type: 0,
+            vnum: 103,
+            weight: 0,
+          },
+        ],
+        extras: [{ description: "old extra", name: "old", vnum: 103 }],
+        height: -1,
+        name: "Cascade Test Room",
+        river_dir: 0,
+        river_speed: 0,
+        room_flag: 0,
+        sector: 0,
+        spec: 0,
+        telelook: 0,
+        teletarg: 0,
+        teletime: 0,
+        vnum: 103,
+        x: 0,
+        y: 0,
+        z: 0,
+        zone: 1,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    // Delete and re-create
+    await authRequest(app, "/api/rooms/103", cookie, { method: "DELETE" });
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: 103 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const res = await authRequest(app, "/api/rooms/103", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toHaveProperty("exits", []);
+    expect(body).toHaveProperty("extras", []);
   });
 });

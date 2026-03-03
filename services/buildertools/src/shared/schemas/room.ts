@@ -5,7 +5,7 @@ import { INT32_MAX, INT32_MIN } from "@/shared/constants.ts";
 import { vnumSchema } from "./common.ts";
 
 export const roomExitSchema = z.object({
-  block: z.number().int(),
+  block: z.number().int().nullable(),
   condition_flag: z.number().int().min(INT32_MIN).max(INT32_MAX),
   description: z.string(),
   destination: z.number().int().min(0).max(49_999),

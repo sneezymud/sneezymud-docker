@@ -13,13 +13,13 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 160, 161, 162, 165)`,
+    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 112, 113, 160, 161, 162, 165)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 160, 161, 162, 165)`,
+    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 112, 113, 160, 161, 162, 165)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM obj WHERE vnum IN (110, 111, 160, 161, 162, 165)`,
+    sql`DELETE FROM obj WHERE vnum IN (110, 111, 112, 113, 160, 161, 162, 165)`,
   );
   await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum IN (5100, 5101)`);
 });
@@ -179,6 +179,26 @@ describe("object updates", () => {
 
     expect(res.status).toBe(400);
   });
+
+  test("update replaces child rows instead of appending", async () => {
+    // Object 110 already has 1 affect and 1 extra from roundtrip test
+    const putRes = await authRequest(app, "/api/objects/110", cookie, {
+      body: JSON.stringify({
+        ...validObjUpdate,
+        affects: [],
+        extras: [],
+        vnum: 110,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(putRes.status).toBe(200);
+
+    const res = await authRequest(app, "/api/objects/110", cookie);
+    const body: unknown = await res.json();
+    expect(body).toHaveProperty("affects", []);
+    expect(body).toHaveProperty("extras", []);
+  });
 });
 
 // -- Delete --
@@ -248,6 +268,48 @@ describe("object search", () => {
     const body: unknown = await res.json();
     expect(body).toEqual(
       expect.arrayContaining([expect.objectContaining({ vnum: 111 })]),
+    );
+  });
+
+  test("SQL metacharacters in query are treated literally", async () => {
+    // Create an object with % in the short_desc
+    await authRequest(app, "/api/objects", cookie, {
+      body: JSON.stringify({ vnum: 112 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(app, "/api/objects/112", cookie, {
+      body: JSON.stringify({
+        ...validObjUpdate,
+        short_desc: "a 100% pure gold ring",
+        vnum: 112,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    // Searching for literal "%" should match the specific object
+    const res = await authRequest(
+      app,
+      "/api/objects/search?q=100%25+pure",
+      cookie,
+    );
+
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual(
+      expect.arrayContaining([expect.objectContaining({ vnum: 112 })]),
+    );
+
+    // Searching for "_" should not wildcard-match single characters
+    const underscoreRes = await authRequest(
+      app,
+      "/api/objects/search?q=10_+pure",
+      cookie,
+    );
+    const underscoreBody: unknown = await underscoreRes.json();
+    expect(underscoreBody).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ vnum: 112 })]),
     );
   });
 
@@ -363,7 +425,7 @@ describe("bulk object deletion", () => {
 
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
-    expect(body).toEqual({ deleted: 2, ok: true });
+    expect(body).toEqual({ deleted: 0, ok: true });
   });
 });
 
@@ -397,5 +459,42 @@ describe("out-of-range data readable from DB", () => {
       method: "PUT",
     });
     expect(res.status).toBe(400);
+  });
+});
+
+// -- Delete cascades --
+
+describe("delete cascades to child tables", () => {
+  test("re-created object has no orphaned affects or extras", async () => {
+    // Create object and populate child rows
+    await authRequest(app, "/api/objects", cookie, {
+      body: JSON.stringify({ vnum: 113 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(app, "/api/objects/113", cookie, {
+      body: JSON.stringify({
+        ...validObjUpdate,
+        affects: [{ mod1: 5, mod2: 0, type: 1, vnum: 113 }],
+        extras: [{ description: "old extra", name: "old", vnum: 113 }],
+        vnum: 113,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    // Delete and re-create
+    await authRequest(app, "/api/objects/113", cookie, { method: "DELETE" });
+    await authRequest(app, "/api/objects", cookie, {
+      body: JSON.stringify({ vnum: 113 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const res = await authRequest(app, "/api/objects/113", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toHaveProperty("affects", []);
+    expect(body).toHaveProperty("extras", []);
   });
 });

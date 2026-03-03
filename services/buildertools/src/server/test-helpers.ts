@@ -9,6 +9,13 @@ export const testUser: SessionUser = {
   username: "testbuilder",
 };
 
+// Second builder: same vnum blocks 100-199, different owner
+export const otherUser: SessionUser = {
+  blocks: [{ end: 199, start: 100 }],
+  playerName: "OtherBuilder",
+  username: "otherbuilder",
+};
+
 // No-blocks user: valid credentials but no vnum assignments
 export const noBlocksUser = {
   password: "testpass",
@@ -26,6 +33,28 @@ export async function getAuthCookie(app: Hono): Promise<string> {
     body: JSON.stringify({
       password: TEST_PASSWORD,
       username: testUser.username,
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      "X-Requested-With": "XMLHttpRequest",
+    },
+    method: "POST",
+  });
+  const cookie = res.headers.get("Set-Cookie");
+  if (!cookie) {
+    throw new Error(`Login failed (${res.status}): ${await res.text()}`);
+  }
+  return cookie;
+}
+
+/**
+ * Log in as the other builder and return the session cookie string.
+ */
+export async function getOtherAuthCookie(app: Hono): Promise<string> {
+  const res = await app.request("/api/auth/login", {
+    body: JSON.stringify({
+      password: TEST_PASSWORD,
+      username: otherUser.username,
     }),
     headers: {
       "Content-Type": "application/json",
