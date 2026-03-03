@@ -1,5 +1,5 @@
 node_modules
-dist
+.artifacts
 .env
 *.md
 .claude
