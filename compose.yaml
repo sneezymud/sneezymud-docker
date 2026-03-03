@@ -27,6 +27,7 @@ services:
 
   buildertools:
     container_name: sneezy-buildertools
+    env_file: services/buildertools/.env
     ports:
       - "5001:5000"
     depends_on:

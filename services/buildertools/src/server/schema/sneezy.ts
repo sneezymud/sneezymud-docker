@@ -2,14 +2,14 @@ import { int, mysqlTable, text } from "drizzle-orm/mysql-core";
 
 export const account = mysqlTable("account", {
   account_id: int().primaryKey(),
-  name: text().notNull(),
-  passwd: text().notNull(),
+  name: text(),
+  passwd: text(),
 });
 
 export const player = mysqlTable("player", {
-  account_id: int().notNull(),
+  account_id: int(),
   id: int().primaryKey(),
-  name: text().notNull(),
+  name: text(),
 });
 
 export const room = mysqlTable("room", {
@@ -18,11 +18,16 @@ export const room = mysqlTable("room", {
 });
 
 export const wizdata = mysqlTable("wizdata", {
-  blockaend: int().notNull(),
-  blockastart: int().notNull(),
-  blockbend: int().notNull(),
-  blockbstart: int().notNull(),
+  blockaend: int(),
+  blockastart: int(),
+  blockbend: int(),
+  blockbstart: int(),
   player_id: int().notNull(),
+});
+
+export const wizpower = mysqlTable("wizpower", {
+  player_id: int(),
+  wizpower: int(),
 });
 
 export const obj = mysqlTable("obj", {

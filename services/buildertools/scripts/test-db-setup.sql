@@ -30,6 +30,7 @@ CREATE TABLE immortal_test.mob_imm LIKE immortal.mob_imm;
 CREATE TABLE immortal_test.mobresponses LIKE immortal.mobresponses;
 
 -- sneezy tables (game database - read-only from app)
+DROP TABLE IF EXISTS sneezy_test.wizpower;
 DROP TABLE IF EXISTS sneezy_test.wizdata;
 DROP TABLE IF EXISTS sneezy_test.player;
 DROP TABLE IF EXISTS sneezy_test.account;
@@ -40,6 +41,7 @@ DROP TABLE IF EXISTS sneezy_test.obj;
 CREATE TABLE sneezy_test.account LIKE sneezy.account;
 CREATE TABLE sneezy_test.player LIKE sneezy.player;
 CREATE TABLE sneezy_test.wizdata LIKE sneezy.wizdata;
+CREATE TABLE sneezy_test.wizpower LIKE sneezy.wizpower;
 CREATE TABLE sneezy_test.zone LIKE sneezy.zone;
 CREATE TABLE sneezy_test.room LIKE sneezy.room;
 CREATE TABLE sneezy_test.obj LIKE sneezy.obj;

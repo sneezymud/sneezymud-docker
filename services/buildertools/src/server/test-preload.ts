@@ -46,6 +46,7 @@ await immortalDb.execute(sql`DELETE FROM objaffect`);
 await immortalDb.execute(sql`DELETE FROM objextra`);
 await immortalDb.execute(sql`DELETE FROM obj`);
 
+await sneezyDb.execute(sql`DELETE FROM wizpower`);
 await sneezyDb.execute(sql`DELETE FROM wizdata`);
 await sneezyDb.execute(sql`DELETE FROM player`);
 await sneezyDb.execute(sql`DELETE FROM account`);
@@ -65,6 +66,9 @@ await sneezyDb.execute(sql`
 await sneezyDb.execute(sql`
   INSERT INTO wizdata (player_id, setsev, blockastart, blockaend, blockbstart, blockbend)
   VALUES (99999, 0, 100, 199, 0, 0)
+`);
+await sneezyDb.execute(sql`
+  INSERT INTO wizpower (player_id, wizpower) VALUES (99999, 1)
 `);
 await sneezyDb.execute(sql`
   INSERT INTO zone (zone_nr, zone_name, top, bottom, lifespan, reset_mode, zone_enabled, age, util_flag)

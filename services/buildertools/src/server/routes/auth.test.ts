@@ -84,7 +84,7 @@ describe("GET /api/auth/me", () => {
     const cookie = extractCookie(loginRes);
 
     const res = await app.request("/api/auth/me", {
-      headers: { Cookie: cookie },
+      headers: { Cookie: cookie, "X-Requested-With": "XMLHttpRequest" },
     });
 
     expect(res.status).toBe(200);
@@ -98,9 +98,25 @@ describe("GET /api/auth/me", () => {
   });
 
   test("returns 401 without session", async () => {
-    const res = await app.request("/api/auth/me");
+    const res = await app.request("/api/auth/me", {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    });
 
     expect(res.status).toBe(401);
+  });
+
+  test("returns 403 without X-Requested-With header", async () => {
+    const loginRes = await loginRequest({
+      password: "testpass",
+      username: "testbuilder",
+    });
+    const cookie = extractCookie(loginRes);
+
+    const res = await app.request("/api/auth/me", {
+      headers: { Cookie: cookie },
+    });
+
+    expect(res.status).toBe(403);
   });
 });
 
@@ -122,7 +138,7 @@ describe("POST /api/auth/logout", () => {
     const clearCookie = extractCookie(logoutRes);
 
     const meRes = await app.request("/api/auth/me", {
-      headers: { Cookie: clearCookie },
+      headers: { Cookie: clearCookie, "X-Requested-With": "XMLHttpRequest" },
     });
     expect(meRes.status).toBe(401);
   });

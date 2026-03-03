@@ -9,9 +9,9 @@ import type { SessionUser } from "@/shared/schemas/auth.ts";
 import { sessionUserSchema } from "@/shared/schemas/auth.ts";
 
 const SESSION_COOKIE = "bt_session";
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24; // 24 hours
-// Random secret per process — sessions don't survive restarts, which is fine
-// for a 24h TTL. Set BT_SESSION_SECRET for persistence across restarts.
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days
+// Without BT_SESSION_SECRET, a random secret is generated per process - all
+// sessions are invalidated on restart. Set it in .env for persistence.
 const SECRET =
   process.env["BT_SESSION_SECRET"] ?? randomBytes(32).toString("hex");
 
@@ -55,6 +55,11 @@ export function touchSession(c: Context): void {
   if (!payload) {
     return;
   }
+  // Only refresh when past the halfway point of the session lifetime
+  const halfLife = (SESSION_MAX_AGE_SECONDS * 1000) / 2;
+  if (payload.expiresAt - Date.now() > halfLife) {
+    return;
+  }
   const refreshed = sign({
     expiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
     user: payload.user,
@@ -62,12 +67,15 @@ export function touchSession(c: Context): void {
   setSessionCookie(c, refreshed);
 }
 
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
 function setSessionCookie(c: Context, token: string): void {
   setCookie(c, SESSION_COOKIE, token, {
     httpOnly: true,
     maxAge: SESSION_MAX_AGE_SECONDS,
     path: "/",
     sameSite: "Lax",
+    secure: IS_PRODUCTION,
   });
 }
 
