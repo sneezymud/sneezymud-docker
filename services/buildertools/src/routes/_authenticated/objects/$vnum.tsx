@@ -81,30 +81,37 @@ function specFieldToFieldDef(field: ObjValueField): FieldDef {
 
 function getObjFieldGroups(itemType: number): FieldGroupDef[] {
   const spec = getObjTypeSpec(itemType);
-  const typeSpecificGroup: FieldGroupDef | undefined = spec
-    ? spec.fields.length > 0
-      ? {
-          fields: spec.fields.map(specFieldToFieldDef),
-          title: "Type-Specific Values",
-          tooltip: (
-            <p>
-              These values are interpreted based on the item type selected
-              above. Labels and help text update automatically when you change
-              the item type.
-            </p>
-          ),
-        }
-      : undefined
-    : {
-        fields: [
-          { key: "val0", label: "Value 0", type: "number" as const },
-          { key: "val1", label: "Value 1", type: "number" as const },
-          { key: "val2", label: "Value 2", type: "number" as const },
-          { key: "val3", label: "Value 3", type: "number" as const },
-        ],
-        title: "Type-Specific Values",
-        tooltip: <p>Unknown item type. These are the raw database values.</p>,
-      };
+
+  const itemTypeField: FieldDef = {
+    enumEntries: ITEM_TYPES,
+    key: "type",
+    label: "Item Type",
+    tooltip: (
+      <p>
+        Changing the item type changes the meaning of the type-specific values
+        in this section.
+      </p>
+    ),
+    type: "enum",
+  };
+
+  const typeSpecificFields: FieldDef[] = spec
+    ? spec.fields.map(specFieldToFieldDef)
+    : [
+        { key: "val0", label: "Value 0", type: "number" as const },
+        { key: "val1", label: "Value 1", type: "number" as const },
+        { key: "val2", label: "Value 2", type: "number" as const },
+        { key: "val3", label: "Value 3", type: "number" as const },
+      ];
+
+  const typeSpecificTooltip = spec ? (
+    <p>
+      These values are interpreted based on the item type. Labels and help text
+      update automatically when you change the item type.
+    </p>
+  ) : (
+    <p>Unknown item type. These are the raw database values.</p>
+  );
   return [
     {
       fields: [
@@ -116,8 +123,10 @@ function getObjFieldGroups(itemType: number): FieldGroupDef[] {
           tooltip: (
             <p>
               Space-separated words players use to target this object (e.g.,
-              "sword long steel"). Matching is substring-based. Use 3 - 4
-              descriptive keywords covering appearance and material.
+              "sword long steel"). The first keyword is the primary identifier -
+              the game's <code>fname()</code> extracts it for abbreviated
+              matching in action messages. Matching is substring-based. Use 3 -
+              4 descriptive keywords covering appearance and material.
             </p>
           ),
           type: "text",
@@ -158,7 +167,9 @@ function getObjFieldGroups(itemType: number): FieldGroupDef[] {
             <p>
               What players see when the object is lying on the ground in a room.
               Should be a complete sentence in third person (e.g., "A rusty iron
-              key lies here.").
+              key lies here."). Supports <code>$g</code> placeholder - replaced
+              with the room's ground surface based on sector type (e.g., "stone
+              floor", "water", "forest floor").
             </p>
           ),
           type: "textarea",
@@ -168,73 +179,21 @@ function getObjFieldGroups(itemType: number): FieldGroupDef[] {
           label: "Action Description",
           tooltip: (
             <p>
-              Displayed when the item is activated or used (e.g., lamp igniting,
-              instrument playing). Leave blank for most items - only needed for
-              items with special activation messages.
+              For notes, this is the written content shown when the note is
+              examined. For personalized items, triggers monogram display. Most
+              items leave this blank.
             </p>
           ),
           type: "textarea",
         },
       ],
       title: "Identity",
-      tooltip: (
-        <p>
-          Core strings that identify this object to players. Keywords determine
-          how players target the object; descriptions appear in different
-          contexts.
-        </p>
-      ),
     },
     {
-      fields: [
-        {
-          enumEntries: ITEM_TYPES,
-          key: "type",
-          label: "Item Type",
-          tooltip: (
-            <p>
-              Changing the item type changes the meaning of the four
-              type-specific values below.
-            </p>
-          ),
-          type: "enum",
-        },
-        {
-          enumEntries: MATERIAL_TYPES,
-          key: "material",
-          label: "Material",
-          tooltip: (
-            <p>
-              Affects item durability, damage interactions, weight modifiers,
-              and repair costs. Choose a material that matches the item's
-              physical composition.
-            </p>
-          ),
-          type: "enum",
-        },
-        {
-          bitfieldEntries: EXTRA_FLAGS,
-          key: "action_flag",
-          label: "Extra Flags",
-          type: "bitfield",
-        },
-        {
-          bitfieldEntries: WEAR_FLAGS,
-          key: "wear_flag",
-          label: "Wear Flags",
-          type: "bitfield",
-        },
-      ],
-      title: "Classification",
-      tooltip: (
-        <p>
-          Item type determines the object's behavior and which type-specific
-          values apply. Flags control visibility, restrictions, and special
-          properties.
-        </p>
-      ),
+      fields: [itemTypeField, ...typeSpecificFields],
+      title: "Type-Specific Values",
+      tooltip: typeSpecificTooltip,
     },
-    ...(typeSpecificGroup ? [typeSpecificGroup] : []),
     {
       fields: [
         {
@@ -263,6 +222,19 @@ function getObjFieldGroups(itemType: number): FieldGroupDef[] {
           min: 0,
           step: 1,
           type: "number",
+        },
+        {
+          enumEntries: MATERIAL_TYPES,
+          key: "material",
+          label: "Material",
+          tooltip: (
+            <p>
+              Affects item durability, damage interactions, weight modifiers,
+              and repair costs. Choose a material that matches the item's
+              physical composition.
+            </p>
+          ),
+          type: "enum",
         },
       ],
       title: "Physical",
@@ -523,6 +495,41 @@ function getObjFieldGroups(itemType: number): FieldGroupDef[] {
       title: "Limits & Behavior",
       tooltip: (
         <p>Durability, lifespan, visibility, and special behavior controls.</p>
+      ),
+    },
+    {
+      fields: [
+        {
+          bitfieldEntries: EXTRA_FLAGS,
+          key: "action_flag",
+          label: "",
+          type: "bitfield",
+        },
+      ],
+      title: "Extra Flags",
+      tooltip: (
+        <p>
+          Special properties like glow, hum, invisible, anti-class restrictions,
+          and no-drop/no-rent behavior.
+        </p>
+      ),
+    },
+    {
+      fields: [
+        {
+          bitfieldEntries: WEAR_FLAGS,
+          key: "wear_flag",
+          label: "",
+          type: "bitfield",
+        },
+      ],
+      title: "Wear Flags",
+      tooltip: (
+        <p>
+          Equipment slots where this item can be worn or held. TAKE is required
+          for players to pick up the item. Most items need both TAKE and one
+          wear position.
+        </p>
       ),
     },
   ];
@@ -848,6 +855,48 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
         return;
       }
     }
+    // When item type changes, clamp out-of-range type-specific values to
+    // field minimums (e.g. switching to scroll when val0=0 would give
+    // magicLevel=0 and learnedness=0, both below their min of 1)
+    if (key === "type") {
+      const numValue = typeof value === "number" ? value : Number(value);
+      const newSpec = getObjTypeSpec(numValue);
+      setEdits((prev) => {
+        const valEdits: Record<string, number> = {};
+        if (newSpec) {
+          const v = (k: "val0" | "val1" | "val2" | "val3") =>
+            prev?.[k] ?? obj[k];
+          const raw: [number, number, number, number] = [
+            v("val0"),
+            v("val1"),
+            v("val2"),
+            v("val3"),
+          ];
+          const expanded = expandTypeValues(newSpec, raw);
+          for (const field of newSpec.fields) {
+            if (field.input.type !== "number") continue;
+            const { min } = field.input;
+            if (min === undefined) continue;
+            if ((expanded[field.key] ?? 0) < min) {
+              raw[field.source.val] =
+                field.source.highBit !== undefined &&
+                field.source.numBits !== undefined
+                  ? setBits(
+                      raw[field.source.val],
+                      field.source.highBit,
+                      field.source.numBits,
+                      min,
+                    )
+                  : min;
+              valEdits[VAL_KEYS[field.source.val]] = raw[field.source.val];
+            }
+          }
+        }
+        return { ...prev, type: numValue, ...valEdits };
+      });
+      return;
+    }
+
     setEdits((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -884,24 +933,24 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
         saving={saving}
         values={expandedValues}
       >
-        <SubTable
-          columns={affectColumns}
-          emptyRow={{ mod1: 0, mod2: 0, type: 0, vnum }}
-          help="Each apply modifies a character stat when the object is equipped. Max 5 applies per object."
-          label="Applies"
-          onChange={setAffectEdits}
-          rows={affectEdits ?? obj.affects}
-          singularLabel="apply"
-        />
-        <SubTable
-          columns={extraColumns}
-          emptyRow={{ description: "", name: "", vnum }}
-          help="Space-separated keywords players can 'look' at to see the description. Substring matching applies."
-          label="Extra Descriptions"
-          onChange={setExtraEdits}
-          rows={extraEdits ?? obj.extras}
-          singularLabel="extra description"
-        />
+        <div className="grid gap-6 lg:grid-cols-2">
+          <SubTable
+            columns={affectColumns}
+            emptyRow={{ mod1: 0, mod2: 0, type: 0, vnum }}
+            helpParagraph="Each apply modifies a character stat when the object is equipped. The in-game engine loads at most 5 applies - extra applies are stored in the database but ignored at runtime."
+            label="Applies"
+            onChange={setAffectEdits}
+            rows={affectEdits ?? obj.affects}
+          />
+          <SubTable
+            columns={extraColumns}
+            emptyRow={{ description: "", name: "", vnum }}
+            helpParagraph="Space-separated keywords players can 'look' at to see the description. Substring matching applies."
+            label="Extra Descriptions"
+            onChange={setExtraEdits}
+            rows={extraEdits ?? obj.extras}
+          />
+        </div>
       </EntityForm>
 
       <ConfirmDialog

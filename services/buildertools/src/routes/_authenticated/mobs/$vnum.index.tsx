@@ -1282,7 +1282,6 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
             label="Immunities"
             onChange={setImmEdits}
             rows={immEdits ?? mob.immunities}
-            singularLabel="immunity"
           />
         </div>
       </EntityForm>

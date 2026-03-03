@@ -593,7 +593,6 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
             label="Extra Descriptions"
             onChange={setExtraEdits}
             rows={extraEdits ?? room.extras}
-            singularLabel="extra description"
           />
         </div>
       </EntityForm>

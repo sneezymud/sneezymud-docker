@@ -14,7 +14,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip.tsx";
 
-import { ConfirmDialog } from "./confirm-dialog.tsx";
 import { EnumSelect } from "./enum-select.tsx";
 import { NumberInput } from "./number-input.tsx";
 import { TagInput } from "./tag-input.tsx";
@@ -52,23 +51,23 @@ interface SubTableProps<T extends Record<string, number | string>> {
   columns: Array<ColumnDef<T>>;
   emptyRow: T;
   help?: string;
+  helpParagraph?: string;
   label: string;
+  maxRows?: number;
   onChange: (rows: T[]) => void;
   rows: T[];
-  singularLabel: string;
 }
 
 export function SubTable<T extends Record<string, number | string>>({
   columns,
   emptyRow,
   help,
+  helpParagraph,
   label,
+  maxRows,
   onChange,
   rows,
-  singularLabel,
 }: SubTableProps<T>) {
-  const [pendingRemove, setPendingRemove] = useState<null | number>(null);
-
   // Stable row keys — track UUID per row via state
   const [rowKeys, setRowKeys] = useState<string[]>(() =>
     rows.map(() => crypto.randomUUID()),
@@ -151,7 +150,8 @@ export function SubTable<T extends Record<string, number | string>>({
           </TooltipProvider>
         ) : null}
         <Button
-          className="ml-auto border-dashed"
+          className="border-dashed"
+          disabled={maxRows !== undefined && rows.length >= maxRows}
           onClick={addRow}
           size="sm"
           variant="outline"
@@ -159,6 +159,11 @@ export function SubTable<T extends Record<string, number | string>>({
           + Add
         </Button>
       </legend>
+      {helpParagraph ? (
+        <p className="text-muted-foreground mt-1 mb-3 text-sm">
+          {helpParagraph}
+        </p>
+      ) : null}
 
       <div className="space-y-2">
         {rows.map((row, index) => (
@@ -218,7 +223,7 @@ export function SubTable<T extends Record<string, number | string>>({
               aria-label={`Remove row ${index + 1}`}
               className="text-muted-foreground hover:text-destructive dark:hover:bg-destructive/10 mt-5.5 shrink-0"
               onClick={() => {
-                setPendingRemove(index);
+                removeRow(index);
               }}
               size="xs"
               variant="ghost"
@@ -228,21 +233,6 @@ export function SubTable<T extends Record<string, number | string>>({
           </div>
         ))}
       </div>
-      <ConfirmDialog
-        confirmLabel="Remove"
-        message={`Remove this ${singularLabel.toLowerCase()}?`}
-        onCancel={() => {
-          setPendingRemove(null);
-        }}
-        onConfirm={() => {
-          if (pendingRemove !== null) {
-            removeRow(pendingRemove);
-          }
-          setPendingRemove(null);
-        }}
-        open={pendingRemove !== null}
-        variant="danger"
-      />
     </fieldset>
   );
 }

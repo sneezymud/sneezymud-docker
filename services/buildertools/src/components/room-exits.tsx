@@ -209,25 +209,26 @@ export function RoomExits({ exits, onChange, vnum }: RoomExitsProps) {
     if (!dir) {
       return;
     }
-    setRowKeys((prev) => [...prev, crypto.randomUUID()]);
-    const next = [
-      ...exits,
-      {
-        block: 0,
-        condition_flag: 0,
-        description: "",
-        destination: 0,
-        direction: dir.value,
-        key_num: -1,
-        lock_difficulty: 0,
-        name: "",
-        type: 0,
-        vnum,
-        weight: 1,
-      },
+    const newExit = {
+      block: 0,
+      condition_flag: 0,
+      description: "",
+      destination: 0,
+      direction: dir.value,
+      key_num: -1,
+      lock_difficulty: 0,
+      name: "",
+      type: 0,
+      vnum,
+      weight: 1,
+    };
+    const paired = [
+      ...exits.map((e, i) => ({ exit: e, key: rowKeys[i] ?? "" })),
+      { exit: newExit, key: crypto.randomUUID() },
     ];
-    next.sort((a, b) => a.direction - b.direction);
-    onChange(next);
+    paired.sort((a, b) => a.exit.direction - b.exit.direction);
+    onChange(paired.map((p) => p.exit));
+    setRowKeys(paired.map((p) => p.key));
   };
 
   const removeExit = (index: number) => {
