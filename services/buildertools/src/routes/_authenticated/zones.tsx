@@ -287,12 +287,7 @@ function ZonesPage() {
           <PaginationContent>
             <PaginationItem>
               <PaginationPrevious
-                aria-disabled={!table.getCanPreviousPage()}
-                className={
-                  table.getCanPreviousPage()
-                    ? "cursor-pointer"
-                    : "pointer-events-none opacity-50"
-                }
+                disabled={!table.getCanPreviousPage()}
                 onClick={() => {
                   table.previousPage();
                 }}
@@ -305,12 +300,7 @@ function ZonesPage() {
             </PaginationItem>
             <PaginationItem>
               <PaginationNext
-                aria-disabled={!table.getCanNextPage()}
-                className={
-                  table.getCanNextPage()
-                    ? "cursor-pointer"
-                    : "pointer-events-none opacity-50"
-                }
+                disabled={!table.getCanNextPage()}
                 onClick={() => {
                   table.nextPage();
                 }}

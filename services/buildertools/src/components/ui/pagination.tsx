@@ -9,7 +9,7 @@ import { buttonVariants } from "@/components/ui/variants";
 import { cn } from "@/lib/utils";
 
 type PaginationLinkProps = Pick<React.ComponentProps<typeof Button>, "size"> &
-  React.ComponentProps<"a"> & {
+  React.ComponentProps<"button"> & {
     isActive?: boolean;
   };
 
@@ -54,8 +54,7 @@ function PaginationLink({
   ...props
 }: PaginationLinkProps) {
   return (
-    // eslint-disable-next-line jsx-a11y/anchor-has-content
-    <a
+    <button
       aria-current={isActive ? "page" : undefined}
       className={cn(
         buttonVariants({
@@ -66,6 +65,7 @@ function PaginationLink({
       )}
       data-active={isActive}
       data-slot="pagination-link"
+      type="button"
       {...props}
     />
   );

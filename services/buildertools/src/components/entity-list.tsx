@@ -71,15 +71,6 @@ export function EntityList({
     { desc: false, id: "vnum" },
   ]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [wasPending, setWasPending] = useState(false);
-
-  // Clear selection when delete mutation completes (pending true -> false)
-  if (deletePending && !wasPending) {
-    setWasPending(true);
-  } else if (!deletePending && wasPending) {
-    setWasPending(false);
-    setRowSelection({});
-  }
 
   const selectable = Boolean(onDeleteSelected);
 
@@ -344,12 +335,7 @@ export function EntityList({
           <PaginationContent>
             <PaginationItem>
               <PaginationPrevious
-                aria-disabled={!table.getCanPreviousPage()}
-                className={
-                  table.getCanPreviousPage()
-                    ? "cursor-pointer"
-                    : "pointer-events-none opacity-50"
-                }
+                disabled={!table.getCanPreviousPage()}
                 onClick={() => {
                   table.previousPage();
                 }}
@@ -362,12 +348,7 @@ export function EntityList({
             </PaginationItem>
             <PaginationItem>
               <PaginationNext
-                aria-disabled={!table.getCanNextPage()}
-                className={
-                  table.getCanNextPage()
-                    ? "cursor-pointer"
-                    : "pointer-events-none opacity-50"
-                }
+                disabled={!table.getCanNextPage()}
                 onClick={() => {
                   table.nextPage();
                 }}

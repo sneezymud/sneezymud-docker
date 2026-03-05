@@ -190,6 +190,7 @@ export function EntityForm({
               setShowDeleteConfirm(false);
             }}
             onConfirm={() => {
+              if (deletePending) return;
               setShowDeleteConfirm(false);
               onDelete();
             }}

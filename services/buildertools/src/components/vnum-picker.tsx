@@ -133,7 +133,9 @@ export function VnumPicker({
           <p className="text-destructive mt-2 text-xs">
             {existingVnums.has(vnumNumber)
               ? "Already exists"
-              : "Outside your assigned blocks"}
+              : !Number.isInteger(vnumNumber) || vnumNumber < 0
+                ? "Must be a non-negative whole number"
+                : "Outside your assigned blocks"}
           </p>
         ) : null}
       </PopoverContent>

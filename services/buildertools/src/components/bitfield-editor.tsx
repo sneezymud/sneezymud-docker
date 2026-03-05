@@ -41,20 +41,22 @@ export function BitfieldEditor({
               className="flex items-center gap-0.5"
               key={entry.bit}
             >
-              <label className="text-foreground/80 hover:bg-muted flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm">
+              <div className="text-foreground/80 hover:bg-muted flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm">
                 <Checkbox
                   checked={isSet}
                   className="size-5"
+                  id={`${id}-${entry.bit}`}
                   onCheckedChange={() => {
                     onChange(toggleBit(value, entry.bit));
                   }}
                 />
-                <span>{entry.label}</span>
-              </label>
+                <label htmlFor={`${id}-${entry.bit}`}>{entry.label}</label>
+              </div>
               {entry.tooltip ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
+                      aria-label={`Info about ${entry.label}`}
                       className="text-muted-foreground hover:text-foreground inline-flex cursor-help"
                       type="button"
                     >
