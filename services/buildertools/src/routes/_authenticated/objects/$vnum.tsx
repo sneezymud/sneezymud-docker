@@ -909,16 +909,8 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
       const numValue = typeof value === "number" ? value : Number(value);
       const newSpec = getObjTypeSpec(numValue);
       setEdits((prev) => {
-        const valEdits: Record<string, number> = {};
+        const raw: [number, number, number, number] = [0, 0, 0, 0];
         if (newSpec) {
-          const v = (k: "val0" | "val1" | "val2" | "val3") =>
-            prev?.[k] ?? obj[k];
-          const raw: [number, number, number, number] = [
-            v("val0"),
-            v("val1"),
-            v("val2"),
-            v("val3"),
-          ];
           const expanded = expandTypeValues(newSpec, raw);
           for (const field of newSpec.fields) {
             if (field.input.type !== "number") continue;
@@ -935,11 +927,17 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
                       min,
                     )
                   : min;
-              valEdits[VAL_KEYS[field.source.val]] = raw[field.source.val];
             }
           }
         }
-        return { ...prev, type: numValue, ...valEdits };
+        return {
+          ...prev,
+          type: numValue,
+          val0: raw[0],
+          val1: raw[1],
+          val2: raw[2],
+          val3: raw[3],
+        };
       });
       return;
     }

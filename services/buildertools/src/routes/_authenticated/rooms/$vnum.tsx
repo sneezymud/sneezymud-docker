@@ -35,7 +35,10 @@ export const Route = createFileRoute("/_authenticated/rooms/$vnum")({
   component: RoomEditorPage,
 });
 
-function buildZoneField(zoneEntries: EnumEntry[] | undefined): FieldDef {
+function buildZoneField(
+  zoneEntries: EnumEntry[] | undefined,
+  zonesError: boolean,
+): FieldDef {
   const tooltip = (
     <p>
       The zone this room belongs to, determined by vnum range. Zones control
@@ -53,17 +56,20 @@ function buildZoneField(zoneEntries: EnumEntry[] | undefined): FieldDef {
       type: "enum",
     };
   }
-  return {
+  const base: FieldDef = {
     key: "zone",
     label: "Zone",
     readOnly: true,
     tooltip,
     type: "number",
   };
+  if (zonesError) base.help = "Zone names unavailable";
+  return base;
 }
 
 function getRoomFieldGroups(
   zoneEntries: EnumEntry[] | undefined,
+  zonesError: boolean,
   powers: number[],
 ): FieldGroupDef[] {
   return [
@@ -101,7 +107,7 @@ function getRoomFieldGroups(
     },
     {
       fields: [
-        buildZoneField(zoneEntries),
+        buildZoneField(zoneEntries, zonesError),
         {
           detailedTooltip: (
             <>
@@ -429,7 +435,7 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
     queryKey: roomKeys.detail(vnum),
   });
 
-  const { data: zones } = useQuery({
+  const { data: zones, isError: zonesError } = useQuery({
     queryFn: () => apiFetch("/api/zones", zoneListSchema),
     queryKey: zoneKeys.all,
   });
@@ -569,7 +575,7 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
         deleteMessage={`Are you sure you want to delete room ${vnum}? This also removes all exits.`}
         deletePending={deletePending}
         dirty={dirty}
-        groups={getRoomFieldGroups(zoneEntries, user?.powers ?? [])}
+        groups={getRoomFieldGroups(zoneEntries, zonesError, user?.powers ?? [])}
         onChange={handleFieldChange}
         onDelete={handleDelete}
         onReset={() => {

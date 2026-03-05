@@ -94,7 +94,7 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
 
   const { blockerProceed, blockerReset, blockerStatus, handleSave, saving } =
     useEntityEditor({
-      allKey: mobKeys.response(vnum),
+      allKey: mobKeys.all,
       data,
       detailKey: mobKeys.response(vnum),
       dirty,

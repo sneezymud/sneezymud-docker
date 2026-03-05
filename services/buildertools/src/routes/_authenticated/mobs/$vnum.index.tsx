@@ -171,6 +171,7 @@ const mobFieldGroups: FieldGroupDef[] = [
       {
         key: "attacks",
         label: "Attacks",
+        max: 12,
         min: 0,
         step: 0.1,
         tooltip: (
