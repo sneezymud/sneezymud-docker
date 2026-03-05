@@ -18,11 +18,7 @@ interface TagInputProps {
  */
 export function TagInput({ id, onChange, value }: TagInputProps) {
   const tags = value ? value.split(/\s+/).filter(Boolean) : [];
-  const tagEntries = tags.map((tag, i) => ({
-    index: i,
-    key: tags.indexOf(tag) === i ? tag : `${tag}:${i}`,
-    tag,
-  }));
+  const tagEntries = tags.map((tag, i) => ({ index: i, key: i, tag }));
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
