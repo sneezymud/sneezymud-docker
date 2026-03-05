@@ -62,8 +62,18 @@ export type Room = z.infer<typeof roomSchema>;
 export const roomInputSchema = roomSchema.extend({
   capacity: z.number().int().min(0).max(100),
   height: z.number().int().min(-1).max(1000),
+  river_dir: z.number().int().min(0).max(9),
+  river_speed: z.number().int().min(0).max(200),
   room_flag: z.number().int().min(INT32_MIN).max(INT32_MAX),
+  sector: z.number().int().min(0).max(61),
   spec: z.number().int().min(0).max(34),
+  telelook: z.number().int().min(0).max(1),
+  teletarg: z.number().int().min(0).max(49_999),
+  teletime: z.number().int().min(0).max(10_000),
+  x: z.number().int().min(-1000).max(1000),
+  y: z.number().int().min(-1000).max(1000),
+  z: z.number().int().min(-1000).max(1000),
+  zone: z.number().int().min(0).max(500),
 });
 
 export type RoomInput = z.infer<typeof roomInputSchema>;
