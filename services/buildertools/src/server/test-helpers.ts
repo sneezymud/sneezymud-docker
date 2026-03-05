@@ -2,24 +2,87 @@ import type { Hono } from "hono";
 
 import type { SessionUser } from "@/shared/schemas/auth.ts";
 
-// Test builder: vnum blocks 100-199
+import { POWER } from "@/shared/powers.ts";
+
+// All powers a fully-privileged builder would have
+const ALL_BUILDER_POWERS = [
+  POWER.BUILDER,
+  POWER.EDIT,
+  POWER.MEDIT,
+  POWER.MEDIT_IMP_POWER,
+  POWER.OEDIT,
+  POWER.OEDIT_APPLYS,
+  POWER.OEDIT_COST,
+  POWER.OEDIT_IMP_POWER,
+  POWER.OEDIT_NOPROTOS,
+  POWER.OEDIT_WEAPONS,
+  POWER.REDIT,
+  POWER.REDIT_ENABLED,
+  POWER.RSAVE,
+];
+
+// Test builder: vnum blocks 100-199, all powers
 export const testUser: SessionUser = {
   blocks: [{ end: 199, start: 100 }],
   playerName: "TestBuilder",
+  powers: ALL_BUILDER_POWERS,
   username: "testbuilder",
 };
 
-// Second builder: same vnum blocks 100-199, different owner
+// Second builder: same vnum blocks 100-199, partial powers (mob + object only)
 export const otherUser: SessionUser = {
   blocks: [{ end: 199, start: 100 }],
   playerName: "OtherBuilder",
+  powers: [
+    POWER.BUILDER,
+    POWER.EDIT,
+    POWER.MEDIT,
+    POWER.OEDIT,
+    POWER.REDIT,
+    POWER.RSAVE,
+  ],
   username: "otherbuilder",
 };
 
-// No-blocks user: valid credentials but no vnum assignments
+// Expanded-access builder: own blocks 200-299, POWER_LOW + NO_LIMITS for expanded access
+export const expandedUser: SessionUser = {
+  blocks: [{ end: 299, start: 200 }],
+  playerName: "ExpandedBuilder",
+  powers: [
+    POWER.BUILDER,
+    POWER.EDIT,
+    POWER.LOW,
+    POWER.MEDIT,
+    POWER.NO_LIMITS,
+    POWER.OEDIT,
+    POWER.REDIT,
+    POWER.RSAVE,
+  ],
+  username: "expandedbuilder",
+};
+
+// Expanded mob/object access only: POWER_LOW but NOT POWER_NO_LIMITS
+// Can expand for mobs/objects but NOT rooms
+export const lowOnlyUser: SessionUser = {
+  blocks: [{ end: 399, start: 300 }],
+  playerName: "LowOnlyBuilder",
+  powers: [
+    POWER.BUILDER,
+    POWER.EDIT,
+    POWER.LOW,
+    POWER.MEDIT,
+    POWER.OEDIT,
+    POWER.REDIT,
+    POWER.RSAVE,
+  ],
+  username: "lowonlybuilder",
+};
+
+// No-blocks user: POWER_BUILDER only, no vnum blocks, no entity powers
 export const noBlocksUser = {
   password: "testpass",
   playerName: "NoBlocks",
+  powers: [POWER.BUILDER],
   username: "noblocks",
 };
 
@@ -55,6 +118,72 @@ export async function getOtherAuthCookie(app: Hono): Promise<string> {
     body: JSON.stringify({
       password: TEST_PASSWORD,
       username: otherUser.username,
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      "X-Requested-With": "XMLHttpRequest",
+    },
+    method: "POST",
+  });
+  const cookie = res.headers.get("Set-Cookie");
+  if (!cookie) {
+    throw new Error(`Login failed (${res.status}): ${await res.text()}`);
+  }
+  return cookie;
+}
+
+/**
+ * Log in as the expanded-access builder and return the session cookie string.
+ */
+export async function getExpandedAuthCookie(app: Hono): Promise<string> {
+  const res = await app.request("/api/auth/login", {
+    body: JSON.stringify({
+      password: TEST_PASSWORD,
+      username: expandedUser.username,
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      "X-Requested-With": "XMLHttpRequest",
+    },
+    method: "POST",
+  });
+  const cookie = res.headers.get("Set-Cookie");
+  if (!cookie) {
+    throw new Error(`Login failed (${res.status}): ${await res.text()}`);
+  }
+  return cookie;
+}
+
+/**
+ * Log in as the LOW-only builder and return the session cookie string.
+ */
+export async function getLowOnlyAuthCookie(app: Hono): Promise<string> {
+  const res = await app.request("/api/auth/login", {
+    body: JSON.stringify({
+      password: TEST_PASSWORD,
+      username: lowOnlyUser.username,
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      "X-Requested-With": "XMLHttpRequest",
+    },
+    method: "POST",
+  });
+  const cookie = res.headers.get("Set-Cookie");
+  if (!cookie) {
+    throw new Error(`Login failed (${res.status}): ${await res.text()}`);
+  }
+  return cookie;
+}
+
+/**
+ * Log in as the no-blocks user and return the session cookie string.
+ */
+export async function getNoBlocksAuthCookie(app: Hono): Promise<string> {
+  const res = await app.request("/api/auth/login", {
+    body: JSON.stringify({
+      password: TEST_PASSWORD,
+      username: noBlocksUser.username,
     }),
     headers: {
       "Content-Type": "application/json",

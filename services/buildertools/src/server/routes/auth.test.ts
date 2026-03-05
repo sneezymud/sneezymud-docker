@@ -62,16 +62,20 @@ describe("POST /api/auth/login", () => {
     expect(res.status).toBe(400);
   });
 
-  test("user with no vnum blocks returns 403", async () => {
+  test("user with no vnum blocks can log in with POWER_BUILDER", async () => {
     const res = await loginRequest({
       password: noBlocksUser.password,
       username: noBlocksUser.username,
     });
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
     const body: unknown = await res.json();
-    // The error message should mention contacting an admin
-    expect(body).toHaveProperty("error", expect.stringContaining("admin"));
+    expect(body).toEqual(
+      expect.objectContaining({
+        blocks: [],
+        playerName: noBlocksUser.playerName,
+      }),
+    );
   });
 });
 
@@ -129,7 +133,7 @@ describe("POST /api/auth/logout", () => {
     const cookie = extractCookie(loginRes);
 
     const logoutRes = await app.request("/api/auth/logout", {
-      headers: { Cookie: cookie },
+      headers: { Cookie: cookie, "X-Requested-With": "XMLHttpRequest" },
       method: "POST",
     });
     expect(logoutRes.status).toBe(200);
