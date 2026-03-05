@@ -1,15 +1,25 @@
-import { count, desc, eq, sql } from "drizzle-orm";
+import { count, desc, eq, ne, sql } from "drizzle-orm";
 
-import type { SessionUser, VnumBlock } from "@/shared/schemas/auth.ts";
+import type { VnumBlock } from "@/shared/schemas/auth.ts";
+
+import { hasPower, POWER } from "@/shared/powers.ts";
 
 import { verifyPassword } from "../auth/crypt.ts";
 import { sneezyDb } from "../db.ts";
 import { account, player, wizdata, wizpower } from "../schema/sneezy.ts";
 
 export type AuthResult =
-  | { kind: "no_blocks"; playerName: string }
   | { kind: "not_found" }
-  | { kind: "success"; user: SessionUser }
+  | { kind: "not_immortal"; playerName: string }
+  | {
+      kind: "success";
+      user: {
+        blocks: VnumBlock[];
+        playerName: string;
+        powers: number[];
+        username: string;
+      };
+    }
   | { kind: "wrong_password" };
 
 /**
@@ -33,6 +43,7 @@ export async function authenticateBuilder(
       blockbend: wizdata.blockbend,
       blockbstart: wizdata.blockbstart,
       passwd: account.passwd,
+      player_id: player.id,
       player_name: player.name,
       wizpower_count: wizpowerCount,
     })
@@ -60,6 +71,20 @@ export async function authenticateBuilder(
   }
 
   const playerName = row.player_name ?? "";
+  const playerId = row.player_id;
+
+  const powerRows = await sneezyDb
+    .select({ wizpower: wizpower.wizpower })
+    .from(wizpower)
+    .where(eq(wizpower.player_id, playerId));
+  const powers = powerRows
+    .map((r) => r.wizpower)
+    .filter((p): p is number => p !== null);
+
+  if (!hasPower(powers, POWER.BUILDER)) {
+    return { kind: "not_immortal", playerName };
+  }
+
   const blocks: VnumBlock[] = [];
   const blockAStart = row.blockastart ?? 0;
   const blockAEnd = row.blockaend ?? 0;
@@ -73,16 +98,97 @@ export async function authenticateBuilder(
     blocks.push({ end: blockBEnd, start: blockBStart });
   }
 
-  if (blocks.length === 0) {
-    return { kind: "no_blocks", playerName };
-  }
-
   return {
     kind: "success",
     user: {
       blocks,
       playerName,
+      powers,
       username,
     },
   };
+}
+
+/**
+ * Re-fetch a session user's powers and blocks from the database.
+ * Used by touchSession to keep session data fresh without requiring
+ * re-authentication. Returns null if the player no longer exists or
+ * lost builder access.
+ */
+export async function refreshSessionUser(
+  username: string,
+): Promise<null | { blocks: VnumBlock[]; powers: number[] }> {
+  const [row] = await sneezyDb
+    .select({
+      blockaend: wizdata.blockaend,
+      blockastart: wizdata.blockastart,
+      blockbend: wizdata.blockbend,
+      blockbstart: wizdata.blockbstart,
+      player_id: player.id,
+    })
+    .from(player)
+    .innerJoin(account, eq(player.account_id, account.account_id))
+    .innerJoin(wizdata, eq(wizdata.player_id, player.id))
+    .where(eq(account.name, username));
+
+  if (!row) return null;
+
+  const powerRows = await sneezyDb
+    .select({ wizpower: wizpower.wizpower })
+    .from(wizpower)
+    .where(eq(wizpower.player_id, row.player_id));
+  const powers = powerRows
+    .map((r) => r.wizpower)
+    .filter((p): p is number => p !== null);
+
+  if (!hasPower(powers, POWER.BUILDER)) return null;
+
+  const blocks: VnumBlock[] = [];
+  const blockAStart = row.blockastart ?? 0;
+  const blockAEnd = row.blockaend ?? 0;
+  const blockBStart = row.blockbstart ?? 0;
+  const blockBEnd = row.blockbend ?? 0;
+  if (blockAStart > 0 || blockAEnd > 0) {
+    blocks.push({ end: blockAEnd, start: blockAStart });
+  }
+  if (blockBStart > 0 || blockBEnd > 0) {
+    blocks.push({ end: blockBEnd, start: blockBStart });
+  }
+
+  return { blocks, powers };
+}
+
+/**
+ * Fetch vnum blocks assigned to all builders except the given player.
+ * Used for POWER_LOW expansion - expanded users can access any vnum not
+ * assigned to another builder.
+ */
+export async function getOtherBuildersBlocks(
+  excludePlayerName: string,
+): Promise<VnumBlock[]> {
+  const rows = await sneezyDb
+    .select({
+      blockaend: wizdata.blockaend,
+      blockastart: wizdata.blockastart,
+      blockbend: wizdata.blockbend,
+      blockbstart: wizdata.blockbstart,
+    })
+    .from(wizdata)
+    .innerJoin(player, eq(player.id, wizdata.player_id))
+    .where(ne(player.name, excludePlayerName));
+
+  const blocks: VnumBlock[] = [];
+  for (const row of rows) {
+    const aStart = row.blockastart ?? 0;
+    const aEnd = row.blockaend ?? 0;
+    const bStart = row.blockbstart ?? 0;
+    const bEnd = row.blockbend ?? 0;
+    if (aStart > 0 || aEnd > 0) {
+      blocks.push({ end: aEnd, start: aStart });
+    }
+    if (bStart > 0 || bEnd > 0) {
+      blocks.push({ end: bEnd, start: bStart });
+    }
+  }
+  return blocks;
 }

@@ -8,6 +8,8 @@ import type { SessionUser } from "@/shared/schemas/auth.ts";
 
 import { sessionUserSchema } from "@/shared/schemas/auth.ts";
 
+import { refreshSessionUser } from "../queries/auth.ts";
+
 const SESSION_COOKIE = "bt_session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days
 // Without BT_SESSION_SECRET, a random secret is generated per process - all
@@ -46,7 +48,7 @@ export function getSession(c: Context): null | SessionUser {
   return payload.user;
 }
 
-export function touchSession(c: Context): void {
+export async function touchSession(c: Context): Promise<void> {
   const token = getCookie(c, SESSION_COOKIE);
   if (!token) {
     return;
@@ -60,9 +62,21 @@ export function touchSession(c: Context): void {
   if (payload.expiresAt - Date.now() > halfLife) {
     return;
   }
+  // Re-query powers and blocks so permission changes take effect
+  // within one session half-life (~15 days) instead of requiring re-login
+  const fresh = await refreshSessionUser(payload.user.username);
+  if (!fresh) {
+    // User lost builder access - destroy their session
+    destroySession(c);
+    return;
+  }
   const refreshed = sign({
     expiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
-    user: payload.user,
+    user: {
+      ...payload.user,
+      blocks: fresh.blocks,
+      powers: fresh.powers,
+    },
   });
   setSessionCookie(c, refreshed);
 }

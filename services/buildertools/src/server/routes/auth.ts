@@ -9,6 +9,9 @@ import { authenticateBuilder } from "../queries/auth.ts";
 export const authRoutes = new Hono();
 
 authRoutes.post("/login", jsonValidator(loginRequestSchema), async (c) => {
+  if (c.req.header("X-Requested-With") !== "XMLHttpRequest") {
+    return c.json({ error: "Invalid request origin" }, 403);
+  }
   const { password, username } = c.req.valid("json");
 
   const result = await authenticateBuilder(username, password);
@@ -16,10 +19,10 @@ authRoutes.post("/login", jsonValidator(loginRequestSchema), async (c) => {
   if (result.kind === "not_found" || result.kind === "wrong_password") {
     return c.json({ error: "Invalid username or password" }, 401);
   }
-  if (result.kind === "no_blocks") {
+  if (result.kind === "not_immortal") {
     return c.json(
       {
-        error: `No vnum blocks assigned to ${result.playerName} \u2014 contact an admin`,
+        error: `${result.playerName} does not have builder access - contact an admin`,
       },
       403,
     );
@@ -30,6 +33,9 @@ authRoutes.post("/login", jsonValidator(loginRequestSchema), async (c) => {
 });
 
 authRoutes.post("/logout", (c) => {
+  if (c.req.header("X-Requested-With") !== "XMLHttpRequest") {
+    return c.json({ error: "Invalid request origin" }, 403);
+  }
   destroySession(c);
   return c.json({ ok: true });
 });
