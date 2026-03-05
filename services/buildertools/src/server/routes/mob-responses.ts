@@ -1,11 +1,13 @@
 import { Hono } from "hono";
 
+import { POWER } from "@/shared/powers.ts";
 import { mobResponseSchema } from "@/shared/schemas/mob-response.ts";
 
 import {
   type AuthEnv,
   jsonValidator,
   requireAuth,
+  requirePower,
   requireVnumAccess,
 } from "../auth/middleware.ts";
 import {
@@ -18,8 +20,9 @@ import { mobExists } from "../queries/mobs.ts";
 export const mobResponseRoutes = new Hono<AuthEnv>();
 
 mobResponseRoutes.use(requireAuth);
+mobResponseRoutes.use(requirePower(POWER.MEDIT));
 
-mobResponseRoutes.get("/:vnum", requireVnumAccess, async (c) => {
+mobResponseRoutes.get("/:vnum", requireVnumAccess("mob"), async (c) => {
   const user = c.get("user");
   const scope = { owner: user.playerName };
   const vnum = Number(c.req.param("vnum"));
@@ -34,7 +37,7 @@ mobResponseRoutes.get("/:vnum", requireVnumAccess, async (c) => {
 
 mobResponseRoutes.put(
   "/:vnum",
-  requireVnumAccess,
+  requireVnumAccess("mob"),
   jsonValidator(mobResponseSchema),
   async (c) => {
     const user = c.get("user");

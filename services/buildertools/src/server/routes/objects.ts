@@ -1,15 +1,21 @@
 import { Hono } from "hono";
 
+import { hasPower, POWER } from "@/shared/powers.ts";
 import { bulkDeleteSchema } from "@/shared/schemas/common.ts";
 import { objCreateSchema, objInputSchema } from "@/shared/schemas/obj.ts";
+import { isUnassignableObjSpecProc } from "@/shared/spec-proc-access.ts";
 
 import {
   type AuthEnv,
+  canAccessVnum,
+  hasExpandedAccess,
   jsonValidator,
   requireAuth,
+  requirePower,
   requireVnumAccess,
 } from "../auth/middleware.ts";
 import { isDuplicateKeyError } from "../db.ts";
+import { getOtherBuildersBlocks } from "../queries/auth.ts";
 import {
   createObject,
   deleteObject,
@@ -21,16 +27,17 @@ import {
   searchObjects,
   updateObject,
 } from "../queries/objects.ts";
-import { isVnumInBlocks } from "../queries/vnum-access.ts";
 
 export const objectRoutes = new Hono<AuthEnv>();
 
 objectRoutes.use(requireAuth);
+objectRoutes.use(requirePower(POWER.OEDIT));
 
 objectRoutes.get("/", async (c) => {
   const user = c.get("user");
   const scope = { owner: user.playerName };
-  const objects = await listObjects(user.blocks, scope);
+  const blocks = hasExpandedAccess(user.powers, "object") ? null : user.blocks;
+  const objects = await listObjects(blocks, scope);
   return c.json(objects);
 });
 
@@ -39,7 +46,7 @@ objectRoutes.post("/", jsonValidator(objCreateSchema), async (c) => {
   const scope = { owner: user.playerName };
   const data = c.req.valid("json");
 
-  if (!isVnumInBlocks(data.vnum, user.blocks)) {
+  if (!(await canAccessVnum(data.vnum, user, "object"))) {
     return c.json({ error: "Vnum outside assigned blocks" }, 403);
   }
 
@@ -78,7 +85,7 @@ objectRoutes.get("/search", async (c) => {
   return c.json(results);
 });
 
-objectRoutes.get("/:vnum", requireVnumAccess, async (c) => {
+objectRoutes.get("/:vnum", requireVnumAccess("object"), async (c) => {
   const user = c.get("user");
   const scope = { owner: user.playerName };
   const vnum = Number(c.req.param("vnum"));
@@ -93,18 +100,51 @@ objectRoutes.get("/:vnum", requireVnumAccess, async (c) => {
 
 objectRoutes.put(
   "/:vnum",
-  requireVnumAccess,
+  requireVnumAccess("object"),
   jsonValidator(objInputSchema),
   async (c) => {
     const user = c.get("user");
     const scope = { owner: user.playerName };
     const vnum = Number(c.req.param("vnum"));
 
-    if (!(await objectExists(vnum, scope))) {
+    const current = await getObject(vnum, scope);
+    if (!current) {
       return c.json({ error: "Object not found" }, 404);
     }
 
     const data = c.req.valid("json");
+
+    // Enforce field-level power restrictions by preserving DB values
+    const ITEM_WEAPON = 5;
+    const PROTOTYPE_BIT = 1 << 4;
+    if (!hasPower(user.powers, POWER.OEDIT_COST)) {
+      data.price = current.price;
+    }
+    if (!hasPower(user.powers, POWER.OEDIT_APPLYS)) {
+      data.affects = current.affects;
+    }
+    if (
+      !hasPower(user.powers, POWER.OEDIT_WEAPONS) &&
+      data.type === ITEM_WEAPON
+    ) {
+      data.val0 = current.val0;
+      data.val1 = current.val1;
+      data.val2 = current.val2;
+      data.val3 = current.val3;
+    }
+    if (!hasPower(user.powers, POWER.OEDIT_NOPROTOS)) {
+      // Preserve the PROTOTYPE bit from the current value
+      data.action_flag =
+        (data.action_flag & ~PROTOTYPE_BIT) |
+        (current.action_flag & PROTOTYPE_BIT);
+    }
+    if (
+      !hasPower(user.powers, POWER.OEDIT_IMP_POWER) &&
+      isUnassignableObjSpecProc(data.spec_proc)
+    ) {
+      data.spec_proc = current.spec_proc;
+    }
+
     await updateObject(vnum, data, scope);
     const updated = await getObject(vnum, scope);
     return c.json(updated);
@@ -116,7 +156,16 @@ objectRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
   const scope = { owner: user.playerName };
   const { vnums } = c.req.valid("json");
 
-  const unauthorized = vnums.filter((v) => !isVnumInBlocks(v, user.blocks));
+  const otherBlocks = hasExpandedAccess(user.powers, "object")
+    ? await getOtherBuildersBlocks(user.playerName)
+    : undefined;
+  const accessChecks = await Promise.all(
+    vnums.map(async (v) => ({
+      ok: await canAccessVnum(v, user, "object", otherBlocks),
+      v,
+    })),
+  );
+  const unauthorized = accessChecks.filter((r) => !r.ok).map((r) => r.v);
   if (unauthorized.length > 0) {
     return c.json(
       { error: `Vnums outside assigned blocks: ${unauthorized.join(", ")}` },
@@ -128,7 +177,7 @@ objectRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
   return c.json({ deleted, ok: true });
 });
 
-objectRoutes.delete("/:vnum", requireVnumAccess, async (c) => {
+objectRoutes.delete("/:vnum", requireVnumAccess("object"), async (c) => {
   const user = c.get("user");
   const scope = { owner: user.playerName };
   const vnum = Number(c.req.param("vnum"));

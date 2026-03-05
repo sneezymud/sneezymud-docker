@@ -10,26 +10,26 @@ import { escapeLike } from "./like-escape.ts";
 import { ownerEq, type OwnerScope, scopeOwner } from "./owner-scope.ts";
 
 export async function listObjects(
-  blocks: VnumBlock[],
+  blocks: null | VnumBlock[],
   scope: OwnerScope,
 ): Promise<ObjListItem[]> {
-  if (blocks.length === 0) {
+  if (blocks !== null && blocks.length === 0) {
     return [];
   }
+
+  const blockFilter =
+    blocks === null
+      ? undefined
+      : or(
+          ...blocks.map((b) =>
+            and(gte(obj.vnum, b.start), lte(obj.vnum, b.end)),
+          ),
+        );
 
   return immortalDb
     .select({ name: obj.name, short_desc: obj.short_desc, vnum: obj.vnum })
     .from(obj)
-    .where(
-      and(
-        ownerEq(obj.owner, scope),
-        or(
-          ...blocks.map((b) =>
-            and(gte(obj.vnum, b.start), lte(obj.vnum, b.end)),
-          ),
-        ),
-      ),
-    )
+    .where(and(ownerEq(obj.owner, scope), blockFilter))
     .orderBy(obj.vnum);
 }
 

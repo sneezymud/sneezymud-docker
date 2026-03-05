@@ -10,26 +10,26 @@ import { mob, mobExtra, mobImm, mobresponses } from "../schema/immortal.ts";
 import { ownerEq, type OwnerScope, scopeOwner } from "./owner-scope.ts";
 
 export async function listMobs(
-  blocks: VnumBlock[],
+  blocks: null | VnumBlock[],
   scope: OwnerScope,
 ): Promise<MobListItem[]> {
-  if (blocks.length === 0) {
+  if (blocks !== null && blocks.length === 0) {
     return [];
   }
+
+  const blockFilter =
+    blocks === null
+      ? undefined
+      : or(
+          ...blocks.map((b) =>
+            and(gte(mob.vnum, b.start), lte(mob.vnum, b.end)),
+          ),
+        );
 
   return immortalDb
     .select({ name: mob.name, short_desc: mob.short_desc, vnum: mob.vnum })
     .from(mob)
-    .where(
-      and(
-        ownerEq(mob.owner, scope),
-        or(
-          ...blocks.map((b) =>
-            and(gte(mob.vnum, b.start), lte(mob.vnum, b.end)),
-          ),
-        ),
-      ),
-    )
+    .where(and(ownerEq(mob.owner, scope), blockFilter))
     .orderBy(mob.vnum);
 }
 

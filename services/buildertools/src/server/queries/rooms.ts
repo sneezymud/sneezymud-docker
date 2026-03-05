@@ -10,17 +10,22 @@ import { escapeLike } from "./like-escape.ts";
 import { ownerEq, type OwnerScope, scopeOwner } from "./owner-scope.ts";
 
 export async function listRooms(
-  blocks: VnumBlock[],
+  blocks: null | VnumBlock[],
   scope: OwnerScope,
 ): Promise<RoomListItem[]> {
-  if (blocks.length === 0) {
+  if (blocks !== null && blocks.length === 0) {
     return [];
   }
 
   return immortalDb
     .select({ name: room.name, vnum: room.vnum })
     .from(room)
-    .where(and(ownerEq(room.owner, scope), vnumBlockFilter(blocks)))
+    .where(
+      and(
+        ownerEq(room.owner, scope),
+        blocks === null ? undefined : vnumBlockFilter(blocks),
+      ),
+    )
     .orderBy(room.vnum);
 }
 
