@@ -21,9 +21,15 @@ import {
   ROOM_SPEC_PROCS,
   SECTOR_TYPES,
 } from "@/shared/enums/index.ts";
+import { hasPower, POWER } from "@/shared/powers.ts";
 import { roomKeys, zoneKeys } from "@/shared/query-keys.ts";
 import { roomSchema } from "@/shared/schemas/room.ts";
 import { zoneListSchema } from "@/shared/schemas/zone.ts";
+import {
+  gateSpecProcs,
+  isUnassignableRoomSpecProc,
+} from "@/shared/spec-proc-access.ts";
+import { useAuthStore } from "@/state/auth.ts";
 
 export const Route = createFileRoute("/_authenticated/rooms/$vnum")({
   component: RoomEditorPage,
@@ -58,6 +64,7 @@ function buildZoneField(zoneEntries: EnumEntry[] | undefined): FieldDef {
 
 function getRoomFieldGroups(
   zoneEntries: EnumEntry[] | undefined,
+  powers: number[],
 ): FieldGroupDef[] {
   return [
     {
@@ -241,7 +248,9 @@ function getRoomFieldGroups(
           type: "number",
         },
         {
-          enumEntries: ROOM_SPEC_PROCS,
+          enumEntries: hasPower(powers, POWER.REDIT_ENABLED)
+            ? ROOM_SPEC_PROCS
+            : gateSpecProcs(ROOM_SPEC_PROCS, isUnassignableRoomSpecProc),
           key: "spec",
           label: "Room Spec",
           tooltip: (
@@ -408,6 +417,7 @@ function roomToFormValues(
 
 function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
   const vnum = Number(vnumParam);
+  const user = useAuthStore((s) => s.user);
 
   const {
     data: room,
@@ -559,7 +569,7 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
         deleteMessage={`Are you sure you want to delete room ${vnum}? This also removes all exits.`}
         deletePending={deletePending}
         dirty={dirty}
-        groups={getRoomFieldGroups(zoneEntries)}
+        groups={getRoomFieldGroups(zoneEntries, user?.powers ?? [])}
         onChange={handleFieldChange}
         onDelete={handleDelete}
         onReset={() => {

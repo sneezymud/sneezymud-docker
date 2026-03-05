@@ -55,6 +55,7 @@ interface SubTableProps<T extends Record<string, number | string>> {
   label: string;
   maxRows?: number;
   onChange: (rows: T[]) => void;
+  readOnly?: boolean | undefined;
   rows: T[];
 }
 
@@ -66,6 +67,7 @@ export function SubTable<T extends Record<string, number | string>>({
   label,
   maxRows,
   onChange,
+  readOnly,
   rows,
 }: SubTableProps<T>) {
   // Stable row keys — track UUID per row via state
@@ -123,7 +125,10 @@ export function SubTable<T extends Record<string, number | string>>({
   };
 
   return (
-    <fieldset className="p-4">
+    <fieldset
+      className="p-4"
+      disabled={readOnly}
+    >
       <legend className="text-foreground flex w-full items-center gap-2 text-lg font-semibold">
         <span>{label}</span>
         {help ? (
@@ -149,15 +154,17 @@ export function SubTable<T extends Record<string, number | string>>({
             </Tooltip>
           </TooltipProvider>
         ) : null}
-        <Button
-          className="border-dashed"
-          disabled={maxRows !== undefined && rows.length >= maxRows}
-          onClick={addRow}
-          size="sm"
-          variant="outline"
-        >
-          + Add
-        </Button>
+        {readOnly ? null : (
+          <Button
+            className="border-dashed"
+            disabled={maxRows !== undefined && rows.length >= maxRows}
+            onClick={addRow}
+            size="sm"
+            variant="outline"
+          >
+            + Add
+          </Button>
+        )}
       </legend>
       {helpParagraph ? (
         <p className="text-muted-foreground mt-1 mb-3 text-sm">
@@ -219,17 +226,19 @@ export function SubTable<T extends Record<string, number | string>>({
                 );
               })}
             </div>
-            <Button
-              aria-label={`Remove row ${index + 1}`}
-              className="text-muted-foreground hover:text-destructive dark:hover:bg-destructive/10 mt-5.5 shrink-0"
-              onClick={() => {
-                removeRow(index);
-              }}
-              size="xs"
-              variant="ghost"
-            >
-              Remove
-            </Button>
+            {readOnly ? null : (
+              <Button
+                aria-label={`Remove row ${index + 1}`}
+                className="text-muted-foreground hover:text-destructive dark:hover:bg-destructive/10 mt-5.5 shrink-0"
+                onClick={() => {
+                  removeRow(index);
+                }}
+                size="xs"
+                variant="ghost"
+              >
+                Remove
+              </Button>
+            )}
           </div>
         ))}
       </div>

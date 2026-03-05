@@ -49,10 +49,14 @@ export function VnumPicker({
   );
 
   const vnumNumber = Number(vnumInput);
+  const inBlocks =
+    vnumBlocks.length === 0 ||
+    vnumBlocks.some((b) => vnumNumber >= b.start && vnumNumber <= b.end);
   const isValid =
     vnumInput !== "" &&
     Number.isInteger(vnumNumber) &&
-    vnumBlocks.some((b) => vnumNumber >= b.start && vnumNumber <= b.end) &&
+    vnumNumber >= 0 &&
+    inBlocks &&
     !existingVnums.has(vnumNumber);
 
   const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
@@ -109,9 +113,12 @@ export function VnumPicker({
               type="number"
               value={vnumInput}
             />
-            <p className="text-muted-foreground mt-1 text-xs">
-              Ranges: {vnumBlocks.map((b) => `${b.start}-${b.end}`).join(", ")}
-            </p>
+            {vnumBlocks.length > 0 && (
+              <p className="text-muted-foreground mt-1 text-xs">
+                Ranges:{" "}
+                {vnumBlocks.map((b) => `${b.start}-${b.end}`).join(", ")}
+              </p>
+            )}
           </div>
           <Button
             disabled={!isValid || createPending}

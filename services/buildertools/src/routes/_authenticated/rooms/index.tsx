@@ -10,6 +10,7 @@ import { QueryStatus } from "@/components/query-status.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
+import { hasPower, POWER } from "@/shared/powers.ts";
 import { roomKeys } from "@/shared/query-keys.ts";
 import { bulkDeleteResponseSchema } from "@/shared/schemas/common.ts";
 import { roomListSchema, roomSchema } from "@/shared/schemas/room.ts";
@@ -32,7 +33,11 @@ export const Route = createFileRoute("/_authenticated/rooms/")({
 });
 
 function RoomListPage() {
-  const blocks = useAuthStore((s) => s.user?.blocks);
+  const user = useAuthStore((s) => s.user);
+  const powers = user?.powers ?? [];
+  const expandedAccess =
+    hasPower(powers, POWER.LOW) && hasPower(powers, POWER.NO_LIMITS);
+  const blocks = expandedAccess ? [] : (user?.blocks ?? []);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { from, to } = Route.useSearch();

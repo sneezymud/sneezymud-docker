@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/lib/utils.ts";
+import { hasPower, POWER } from "@/shared/powers.ts";
 import { useAuthStore } from "@/state/auth.ts";
 import { useDirtyStore } from "@/state/dirty.ts";
 
@@ -83,27 +84,33 @@ export function Nav({ className, onNavClick }: NavProps) {
       </div>
 
       <div className="flex flex-1 flex-col gap-1.5">
-        <NavLink
-          icon={<DoorOpen className="h-4 w-4 shrink-0" />}
-          onClick={onNavClick}
-          to="/rooms"
-        >
-          Rooms
-        </NavLink>
-        <NavLink
-          icon={<User className="h-4 w-4 shrink-0" />}
-          onClick={onNavClick}
-          to="/mobs"
-        >
-          Mobs
-        </NavLink>
-        <NavLink
-          icon={<Box className="h-4 w-4 shrink-0" />}
-          onClick={onNavClick}
-          to="/objects"
-        >
-          Objects
-        </NavLink>
+        {hasPower(user.powers, POWER.REDIT) ? (
+          <NavLink
+            icon={<DoorOpen className="h-4 w-4 shrink-0" />}
+            onClick={onNavClick}
+            to="/rooms"
+          >
+            Rooms
+          </NavLink>
+        ) : null}
+        {hasPower(user.powers, POWER.MEDIT) ? (
+          <NavLink
+            icon={<User className="h-4 w-4 shrink-0" />}
+            onClick={onNavClick}
+            to="/mobs"
+          >
+            Mobs
+          </NavLink>
+        ) : null}
+        {hasPower(user.powers, POWER.OEDIT) ? (
+          <NavLink
+            icon={<Box className="h-4 w-4 shrink-0" />}
+            onClick={onNavClick}
+            to="/objects"
+          >
+            Objects
+          </NavLink>
+        ) : null}
         <NavLink
           icon={<Map className="h-4 w-4 shrink-0" />}
           onClick={onNavClick}

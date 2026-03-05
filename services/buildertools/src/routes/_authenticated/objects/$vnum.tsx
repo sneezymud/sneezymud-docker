@@ -45,8 +45,14 @@ import {
   type ObjValueField,
   setBits,
 } from "@/shared/obj-type-specs.ts";
+import { hasPower, POWER } from "@/shared/powers.ts";
 import { objectKeys } from "@/shared/query-keys.ts";
 import { objSchema } from "@/shared/schemas/obj.ts";
+import {
+  gateSpecProcs,
+  isUnassignableObjSpecProc,
+} from "@/shared/spec-proc-access.ts";
+import { useAuthStore } from "@/state/auth.ts";
 
 export const Route = createFileRoute("/_authenticated/objects/$vnum")({
   component: ObjectEditorPage,
@@ -79,7 +85,10 @@ function specFieldToFieldDef(field: ObjValueField): FieldDef {
   }
 }
 
-function getObjFieldGroups(itemType: number): FieldGroupDef[] {
+function getObjFieldGroups(
+  itemType: number,
+  powers: number[],
+): FieldGroupDef[] {
   const spec = getObjTypeSpec(itemType);
 
   const itemTypeField: FieldDef = {
@@ -95,13 +104,43 @@ function getObjFieldGroups(itemType: number): FieldGroupDef[] {
     type: "enum",
   };
 
+  const ITEM_WEAPON = 5;
+  const weaponReadOnly =
+    itemType === ITEM_WEAPON && !hasPower(powers, POWER.OEDIT_WEAPONS);
+
   const typeSpecificFields: FieldDef[] = spec
-    ? spec.fields.map(specFieldToFieldDef)
+    ? spec.fields.map((f) => {
+        const def = specFieldToFieldDef(f);
+        if (weaponReadOnly) {
+          def.readOnly = true;
+        }
+        return def;
+      })
     : [
-        { key: "val0", label: "Value 0", type: "number" as const },
-        { key: "val1", label: "Value 1", type: "number" as const },
-        { key: "val2", label: "Value 2", type: "number" as const },
-        { key: "val3", label: "Value 3", type: "number" as const },
+        {
+          key: "val0",
+          label: "Value 0",
+          readOnly: weaponReadOnly,
+          type: "number" as const,
+        },
+        {
+          key: "val1",
+          label: "Value 1",
+          readOnly: weaponReadOnly,
+          type: "number" as const,
+        },
+        {
+          key: "val2",
+          label: "Value 2",
+          readOnly: weaponReadOnly,
+          type: "number" as const,
+        },
+        {
+          key: "val3",
+          label: "Value 3",
+          readOnly: weaponReadOnly,
+          type: "number" as const,
+        },
       ];
 
   const typeSpecificTooltip = spec ? (
@@ -220,6 +259,7 @@ function getObjFieldGroups(itemType: number): FieldGroupDef[] {
           label: "Price",
           max: 1_000_000,
           min: 0,
+          readOnly: !hasPower(powers, POWER.OEDIT_COST),
           step: 1,
           type: "number",
         },
@@ -486,7 +526,9 @@ function getObjFieldGroups(itemType: number): FieldGroupDef[] {
           type: "number",
         },
         {
-          enumEntries: OBJ_SPEC_PROCS,
+          enumEntries: hasPower(powers, POWER.OEDIT_IMP_POWER)
+            ? OBJ_SPEC_PROCS
+            : gateSpecProcs(OBJ_SPEC_PROCS, isUnassignableObjSpecProc),
           key: "spec_proc",
           label: "Special Proc",
           type: "enum",
@@ -500,7 +542,11 @@ function getObjFieldGroups(itemType: number): FieldGroupDef[] {
     {
       fields: [
         {
-          bitfieldEntries: EXTRA_FLAGS,
+          bitfieldEntries: hasPower(powers, POWER.OEDIT_NOPROTOS)
+            ? EXTRA_FLAGS.map((e) =>
+                e.bit === 4 ? { bit: e.bit, label: e.label } : e,
+              )
+            : EXTRA_FLAGS,
           key: "action_flag",
           label: "",
           type: "bitfield",
@@ -734,6 +780,7 @@ function objToFormValues(
 
 function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
   const vnum = Number(vnumParam);
+  const user = useAuthStore((s) => s.user);
 
   const {
     data: obj,
@@ -920,7 +967,7 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
         deleteMessage={`Are you sure you want to delete object ${vnum}? This also removes all affects and extra descriptions.`}
         deletePending={deletePending}
         dirty={dirty}
-        groups={getObjFieldGroups(currentItemType)}
+        groups={getObjFieldGroups(currentItemType, user?.powers ?? [])}
         onChange={handleFieldChange}
         onDelete={handleDelete}
         onReset={() => {
@@ -940,6 +987,7 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
             helpParagraph="Each apply modifies a character stat when the object is equipped. The in-game engine loads at most 5 applies - extra applies are stored in the database but ignored at runtime."
             label="Applies"
             onChange={setAffectEdits}
+            readOnly={!hasPower(user?.powers ?? [], POWER.OEDIT_APPLYS)}
             rows={affectEdits ?? obj.affects}
           />
           <SubTable

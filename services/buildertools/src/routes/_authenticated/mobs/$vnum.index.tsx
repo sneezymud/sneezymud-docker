@@ -47,12 +47,18 @@ import {
   RACE_TYPES,
   SEX_TYPES,
 } from "@/shared/enums/index.ts";
+import { hasPower, POWER } from "@/shared/powers.ts";
 import { mobKeys } from "@/shared/query-keys.ts";
 import {
   mobExtraSchema,
   mobSchema,
   mobStringKeywords,
 } from "@/shared/schemas/mob.ts";
+import {
+  gateSpecProcs,
+  isUnassignableMobSpecProc,
+} from "@/shared/spec-proc-access.ts";
+import { useAuthStore } from "@/state/auth.ts";
 
 export const Route = createFileRoute("/_authenticated/mobs/$vnum/")({
   component: MobEditorPage,
@@ -1148,6 +1154,8 @@ function MobStringsEditor({
 
 function MobEditorInner({ vnumParam }: { vnumParam: string }) {
   const vnum = Number(vnumParam);
+  const user = useAuthStore((s) => s.user);
+  const powers = user?.powers ?? [];
 
   const {
     data: mob,
@@ -1256,7 +1264,24 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
         deleteMessage={`Are you sure you want to delete mob ${vnum}? This also removes extras, immunities, and responses.`}
         deletePending={deletePending}
         dirty={dirty}
-        groups={mobFieldGroups}
+        groups={
+          hasPower(powers, POWER.MEDIT_IMP_POWER)
+            ? mobFieldGroups
+            : mobFieldGroups.map((g) => ({
+                ...g,
+                fields: g.fields.map((f) =>
+                  f.key === "spec_proc" && f.type === "enum"
+                    ? {
+                        ...f,
+                        enumEntries: gateSpecProcs(
+                          f.enumEntries,
+                          isUnassignableMobSpecProc,
+                        ),
+                      }
+                    : f,
+                ),
+              }))
+        }
         onChange={handleFieldChange}
         onDelete={handleDelete}
         onReset={() => {
