@@ -8,6 +8,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip.tsx";
+import { cn } from "@/lib/utils.ts";
 import { hasBit, toggleBit } from "@/shared/bitfield.ts";
 
 interface BitfieldEditorProps {
@@ -41,7 +42,14 @@ export function BitfieldEditor({
               className="flex items-center gap-0.5"
               key={entry.bit}
             >
-              <div className="text-foreground/80 hover:bg-muted flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm">
+              <div
+                className={cn(
+                  "flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm",
+                  isSet
+                    ? "bg-primary/10 text-foreground"
+                    : "text-foreground/80 hover:bg-muted",
+                )}
+              >
                 <Checkbox
                   checked={isSet}
                   className="size-5"

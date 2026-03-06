@@ -83,7 +83,6 @@ function AuthenticatedLayout() {
 
       {/* Mobile sidebar */}
       <Sheet
-        modal={false}
         onOpenChange={(isOpen) => {
           if (!isOpen) closeSidebar();
         }}

@@ -7,6 +7,7 @@
 
 html {
   color-scheme: dark;
+  overflow: hidden;
 }
 
 @theme inline {
@@ -55,7 +56,7 @@ html {
   --card-foreground: oklch(0.95 0.005 0);
   --popover: oklch(0.23 0.008 250);
   --popover-foreground: oklch(0.95 0.005 0);
-  --primary: oklch(0.72 0.19 50);
+  --primary: oklch(0.7 0.16 50);
   --primary-foreground: oklch(0.13 0.005 250);
   --secondary: oklch(0.27 0.009 250);
   --secondary-foreground: oklch(0.92 0.005 0);
@@ -64,17 +65,17 @@ html {
   --accent: oklch(0.55 0.1 240);
   --accent-foreground: oklch(0.95 0.005 0);
   --destructive: oklch(0.65 0.2 25);
-  --border: oklch(1 0.005 250 / 17%);
+  --border: oklch(1 0.005 250 / 20%);
   --input: oklch(1 0.005 250 / 15%);
-  --ring: oklch(0.6 0.15 50);
+  --ring: oklch(0.58 0.13 50);
   --sidebar: oklch(0.17 0.006 250);
   --sidebar-foreground: oklch(0.95 0.005 0);
-  --sidebar-primary: oklch(0.72 0.19 50);
+  --sidebar-primary: oklch(0.7 0.16 50);
   --sidebar-primary-foreground: oklch(0.13 0.005 250);
   --sidebar-accent: oklch(0.27 0.009 250);
   --sidebar-accent-foreground: oklch(0.95 0.005 0);
   --sidebar-border: oklch(1 0.005 250 / 17%);
-  --sidebar-ring: oklch(0.6 0.15 50);
+  --sidebar-ring: oklch(0.58 0.13 50);
 }
 
 @layer base {

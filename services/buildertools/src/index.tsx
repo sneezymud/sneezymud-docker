@@ -17,7 +17,9 @@ import { useAuthStore } from "./state/auth.ts";
 function handleAuthError(error: Error): void {
   if (error instanceof ApiResponseError && error.status === 401) {
     useAuthStore.getState().clearUser();
-    toast.warning("Your session has expired. Please log in again.");
+    toast.warning("Your session has expired. Please log in again.", {
+      id: "session-expired",
+    });
     void router.navigate({ to: "/login" });
   }
 }

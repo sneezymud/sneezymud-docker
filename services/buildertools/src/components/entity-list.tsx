@@ -281,7 +281,7 @@ export function EntityList({
                 ) : null}
                 <TableCell className="p-0">
                   <Link
-                    className="text-muted-foreground block px-2 py-2.5 font-mono outline-none"
+                    className="text-accent hover:text-accent/80 block px-2 py-2.5 font-mono outline-none"
                     to={to}
                   >
                     {entity.vnum}

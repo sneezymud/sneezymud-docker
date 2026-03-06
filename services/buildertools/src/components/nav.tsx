@@ -54,10 +54,7 @@ export function Nav({ className, onNavClick }: NavProps) {
 
   return (
     <nav
-      className={cn(
-        "border-border/50 bg-card flex w-56 flex-col p-4",
-        className,
-      )}
+      className={cn("border-border bg-card flex w-56 flex-col p-4", className)}
     >
       <div className="mb-6 flex items-start justify-between">
         <div>
