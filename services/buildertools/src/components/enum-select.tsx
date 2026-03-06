@@ -85,6 +85,7 @@ function NativeEnumSelect({
       >
         <SelectValue />
       </SelectTrigger>
+
       <SelectContent position="popper">
         {displayLabel ? (
           <SelectItem value={String(value)}>
@@ -93,6 +94,7 @@ function NativeEnumSelect({
         ) : known ? null : (
           <SelectItem value={String(value)}>Unknown ({value})</SelectItem>
         )}
+
         {selectable.map((entry) => (
           <SelectItem
             key={entry.value}
@@ -141,6 +143,7 @@ function SearchableEnumSelect({
               : `Unknown (${value})`
         }
       />
+
       <ComboboxContent>
         <ComboboxList>
           {selectable.map((entry) => (
@@ -153,6 +156,7 @@ function SearchableEnumSelect({
             </ComboboxItem>
           ))}
         </ComboboxList>
+
         <ComboboxEmpty>No matches</ComboboxEmpty>
       </ComboboxContent>
     </Combobox>

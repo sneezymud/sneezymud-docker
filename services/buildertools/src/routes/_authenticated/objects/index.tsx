@@ -134,6 +134,7 @@ function ObjectListPage() {
           </AlertDescription>
         </Alert>
       ) : null}
+
       <EntityList
         basePath="/objects"
         createPending={createMutation.isPending}
@@ -147,6 +148,7 @@ function ObjectListPage() {
         secondaryLabel="Keywords"
         vnumBlocks={blocks}
       />
+
       <ConfirmDialog
         confirmLabel="Delete"
         message={`Delete ${confirmVnums.length} object${confirmVnums.length === 1 ? "" : "s"}? This cannot be undone.`}

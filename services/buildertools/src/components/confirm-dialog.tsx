@@ -40,10 +40,13 @@ export function ConfirmDialog({
           <AlertDialogTitle className={title ? "" : "sr-only"}>
             {title ?? "Confirmation"}
           </AlertDialogTitle>
+
           <AlertDialogDescription>{message}</AlertDialogDescription>
         </AlertDialogHeader>
+
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
+
           <AlertDialogAction
             onClick={onConfirm}
             variant={variant === "danger" ? "destructive" : "default"}

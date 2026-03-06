@@ -45,6 +45,7 @@ function CommandDialog({
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
+
       <DialogContent
         className={cn("overflow-hidden p-0", className)}
         showCloseButton={showCloseButton}
@@ -67,6 +68,7 @@ function CommandInput({
       data-slot="command-input-wrapper"
     >
       <SearchIcon className="size-4 shrink-0 opacity-50" />
+
       <CommandPrimitive.Input
         className={cn(
           "placeholder:text-muted-foreground flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50",

@@ -71,6 +71,7 @@ const columns: Array<ColumnDef<Zone>> = [
               Rooms
             </Link>
           </Button>
+
           <Button
             asChild
             className="h-auto p-0"
@@ -83,6 +84,7 @@ const columns: Array<ColumnDef<Zone>> = [
               Mobs
             </Link>
           </Button>
+
           <Button
             asChild
             className="h-auto p-0"
@@ -178,6 +180,7 @@ function ZonesPage() {
           columnClassName={(id) => (id === "zone_nr" ? "w-24" : undefined)}
           headerGroups={table.getHeaderGroups()}
         />
+
         <TableBody>
           {rows.map((row) => (
             <TableRow key={row.original.zone_nr}>
@@ -199,6 +202,7 @@ function ZonesPage() {
               ))}
             </TableRow>
           ))}
+
           {rows.length === 0 ? (
             <TableRow>
               <TableCell

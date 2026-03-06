@@ -54,11 +54,13 @@ export function FieldTooltip({
             />
           </button>
         </TooltipTrigger>
+
         <TooltipContent
           className={cn("max-w-sm text-sm text-wrap", richTextDescendants)}
           sideOffset={5}
         >
           {children}
+
           {detailedTooltip ? (
             <button
               className="text-muted-foreground hover:text-foreground mt-2 block text-xs italic underline"
@@ -72,6 +74,7 @@ export function FieldTooltip({
           ) : null}
         </TooltipContent>
       </Tooltip>
+
       {detailedTooltip ? (
         <Sheet
           onOpenChange={setSheetOpen}
@@ -82,6 +85,7 @@ export function FieldTooltip({
               <SheetTitle>{label ?? "Details"}</SheetTitle>
               <SheetDescription>Detailed field reference</SheetDescription>
             </SheetHeader>
+
             <ScrollArea className="flex-1 overflow-hidden">
               <div className={cn("px-4 pb-4 text-sm", richTextDescendants)}>
                 {detailedTooltip}

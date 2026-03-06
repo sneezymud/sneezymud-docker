@@ -32,11 +32,13 @@ export function TablePagination({
             onClick={onPreviousPage}
           />
         </PaginationItem>
+
         <PaginationItem>
           <span className="text-muted-foreground text-sm">
             Page {pageIndex + 1} of {totalPages}
           </span>
         </PaginationItem>
+
         <PaginationItem>
           <PaginationNext
             disabled={!canNextPage}

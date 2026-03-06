@@ -20,6 +20,11 @@ import unicorn from "eslint-plugin-unicorn";
 import { defineConfig } from "eslint/config";
 import { type Config, configs as tseslint } from "typescript-eslint";
 
+import { jsxNewlineMultiline } from "./eslint-rules/jsx-newline-multiline";
+import { maxComponentLines } from "./eslint-rules/max-component-lines";
+import { maxComponentSetup } from "./eslint-rules/max-component-setup";
+import { maxInlineData } from "./eslint-rules/max-inline-data";
+
 const e2eGlobs = ["**/{__tests__,tests}/e2e/**", "**/*.e2e?(.test).{ts,tsx}"];
 
 const config: Config = defineConfig([
@@ -150,6 +155,26 @@ const config: Config = defineConfig([
           allowNumber: true,
         },
       ],
+    },
+  },
+
+  {
+    files: ["**/*.{jsx,tsx}"],
+    plugins: {
+      local: {
+        rules: {
+          "jsx-newline-multiline": jsxNewlineMultiline,
+          "max-component-lines": maxComponentLines,
+          "max-component-setup": maxComponentSetup,
+          "max-inline-data": maxInlineData,
+        },
+      },
+    },
+    rules: {
+      "local/jsx-newline-multiline": "warn",
+      "local/max-component-lines": ["warn", { max: 150 }],
+      "local/max-component-setup": ["warn", { max: 40 }],
+      "local/max-inline-data": ["warn", { max: 50 }],
     },
   },
 

@@ -145,6 +145,7 @@ export function RoomExits({ exits, onChange, vnum }: RoomExitsProps) {
                 Exits define how players move between rooms. Each direction can
                 have one exit with an optional door.
               </p>
+
               <p>
                 Exits work immediately from the database without zone file
                 entries. However, any door (Type other than None) will be closed
@@ -154,6 +155,7 @@ export function RoomExits({ exits, onChange, vnum }: RoomExitsProps) {
             </>
           }
         />
+
         <div className="space-y-3">
           {exits.map((exit, index) => (
             <ExitRow

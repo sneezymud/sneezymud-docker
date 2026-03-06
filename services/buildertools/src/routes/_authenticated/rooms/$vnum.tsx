@@ -220,6 +220,7 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
             onChange={setExitEdits}
             vnum={vnum}
           />
+
           <SubTable
             columns={extraDescColumns}
             emptyRow={{ description: "", name: "", vnum }}

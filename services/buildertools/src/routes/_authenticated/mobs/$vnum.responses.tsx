@@ -147,6 +147,7 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
           <span className="text-muted-foreground mb-1 text-xs">
             Response Script
           </span>
+
           <CodeEditor
             onChange={setDraft}
             onSave={dirty && !saving ? handleSave : undefined}
@@ -159,6 +160,7 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
             <h3 className="text-foreground mb-3 text-sm font-medium">
               Syntax Reference
             </h3>
+
             <Accordion
               collapsible
               type="single"
@@ -171,6 +173,7 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
                   <AccordionTrigger className="text-muted-foreground hover:text-foreground py-1.5 text-xs font-medium">
                     {section.title}
                   </AccordionTrigger>
+
                   <AccordionContent>
                     <pre className="text-muted-foreground text-xs leading-relaxed whitespace-pre-wrap">
                       {section.content}

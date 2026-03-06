@@ -88,6 +88,7 @@ export function EntityList({
             ({entities.length})
           </span>
         </h2>
+
         {onCreateVnum && vnumBlocks ? (
           <VnumPicker
             createPending={createPending}
@@ -128,6 +129,7 @@ export function EntityList({
           }
           headerGroups={table.getHeaderGroups()}
         />
+
         <TableBody>
           {rows.map((row) => (
             <EntityRow
@@ -138,6 +140,7 @@ export function EntityList({
               selectable={selectable}
             />
           ))}
+
           {rows.length === 0 ? (
             <TableRow>
               <TableCell
@@ -250,6 +253,7 @@ function EntityListToolbar({
           type="text"
           value={search}
         />
+
         {search ? (
           <Button
             aria-label="Clear search"
@@ -264,6 +268,7 @@ function EntityListToolbar({
           </Button>
         ) : null}
       </div>
+
       {onDelete && selectedCount > 0 ? (
         <Button
           disabled={deletePending}
@@ -313,6 +318,7 @@ function EntityRow({
           />
         </TableCell>
       ) : null}
+
       <TableCell className="p-0">
         <Link
           className="text-accent hover:text-accent/80 block px-2 py-2.5 font-mono outline-none"
@@ -321,6 +327,7 @@ function EntityRow({
           {entity.vnum}
         </Link>
       </TableCell>
+
       <TableCell className="p-0">
         <Link
           className="text-foreground group-hover:text-foreground block px-2 py-2.5 outline-none"
@@ -330,6 +337,7 @@ function EntityRow({
           {entity.name || "(unnamed)"}
         </Link>
       </TableCell>
+
       {secondaryLabel ? (
         <TableCell className="hidden p-0 sm:table-cell">
           <Link
@@ -369,6 +377,7 @@ function EmptyMessage({
     return (
       <div className="text-muted-foreground flex flex-col items-center gap-2 py-4">
         <FolderOpen className="h-8 w-8 opacity-40" />
+
         <span>
           No {label.toLowerCase()} yet.{" "}
           <Button

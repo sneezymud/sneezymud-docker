@@ -227,6 +227,7 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
             rows={extraEdits ?? mob.extras}
             vnum={vnum}
           />
+
           <SubTable
             columns={immColumns}
             emptyRow={{ amt: 0, type: 0, vnum }}

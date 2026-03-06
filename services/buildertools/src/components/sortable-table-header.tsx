@@ -30,6 +30,7 @@ export function SortableTableHeader<TData>({
                     header.column.columnDef.header,
                     header.getContext(),
                   )}
+
                   {sortIndicator(header.column.getIsSorted())}
                 </Button>
               ) : (

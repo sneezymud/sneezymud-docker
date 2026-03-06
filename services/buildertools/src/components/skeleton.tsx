@@ -20,6 +20,7 @@ export function EntityFormSkeleton() {
           <legend className="px-2">
             <Skeleton className="h-4 w-20" />
           </legend>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((field) => (
               <div key={field}>

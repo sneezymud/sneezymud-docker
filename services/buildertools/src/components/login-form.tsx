@@ -55,6 +55,7 @@ export function LoginForm() {
     >
       <div>
         <Label htmlFor="username">Username</Label>
+
         <Input
           autoComplete="username"
           id="username"
@@ -70,6 +71,7 @@ export function LoginForm() {
 
       <div>
         <Label htmlFor="password">Password</Label>
+
         <Input
           autoComplete="current-password"
           id="password"

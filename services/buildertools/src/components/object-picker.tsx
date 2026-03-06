@@ -124,9 +124,11 @@ export function ObjectPicker({
             ref={inputRef}
             value={inputText}
           />
+
           <Search className="text-muted-foreground pointer-events-none absolute top-1/2 right-2 h-3 w-3 -translate-y-1/2" />
         </div>
       </PopoverAnchor>
+
       <PopoverContent
         align="start"
         className="max-h-48 w-64 overflow-y-auto p-1"
@@ -157,6 +159,7 @@ export function ObjectPicker({
               <span className="text-muted-foreground font-mono">
                 {item.vnum}
               </span>
+
               {item.short_desc}
             </button>
           ))

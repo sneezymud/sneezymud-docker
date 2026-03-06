@@ -74,24 +74,30 @@ export function MobStringsEditor({
             <p className="font-medium">
               Custom messages displayed during mob events.
             </p>
+
             <ul className="mt-1.5 ml-3 list-disc">
               <li>
                 <strong>Enter World</strong> - shown when the mob first appears
               </li>
+
               <li>
                 <strong>Leave World</strong> - shown when the mob is removed
               </li>
+
               <li>
                 <strong>Death Cry</strong> - "Your blood freezes..." message on
                 death
               </li>
+
               <li>
                 <strong>Respawn</strong> - shown when the mob repopulates
               </li>
+
               <li>
                 <strong>Room Enter</strong> - replaces "X has arrived" when
                 entering a room
               </li>
+
               <li>
                 <strong>Room Leave</strong> - replaces "X leaves north" when
                 leaving a room
@@ -100,6 +106,7 @@ export function MobStringsEditor({
           </>
         }
       />
+
       <div className="space-y-3">
         {rows.map((row, index) => (
           <div
@@ -109,6 +116,7 @@ export function MobStringsEditor({
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <Label htmlFor={`mstr-${index}-keyword`}>Type</Label>
+
                 <Select
                   onValueChange={(v) => {
                     const keyword = mobExtraSchema.shape.keyword.parse(v);
@@ -124,6 +132,7 @@ export function MobStringsEditor({
                   >
                     <SelectValue />
                   </SelectTrigger>
+
                   <SelectContent position="popper">
                     {mobStringKeywords
                       .filter((k) => k === row.keyword || !usedKeywords.has(k))
@@ -138,6 +147,7 @@ export function MobStringsEditor({
                   </SelectContent>
                 </Select>
               </div>
+
               <Button
                 aria-label={`Remove ${MOB_STRING_LABELS[row.keyword]} string`}
                 className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive mt-5 ml-2 shrink-0"
@@ -150,7 +160,9 @@ export function MobStringsEditor({
                 Remove
               </Button>
             </div>
+
             <Label htmlFor={`mstr-${index}-description`}>Message</Label>
+
             <Textarea
               className="min-h-16 text-base"
               id={`mstr-${index}-description`}

@@ -80,6 +80,7 @@ export function VnumPicker({
       <PopoverTrigger asChild>
         <Button size="sm">{triggerLabel}</Button>
       </PopoverTrigger>
+
       <PopoverContent
         align="end"
         className="w-80"
@@ -90,6 +91,7 @@ export function VnumPicker({
       >
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-medium">Create at vnum</h3>
+
           <PopoverClose className="text-muted-foreground hover:text-foreground text-xs">
             Cancel
           </PopoverClose>
@@ -113,6 +115,7 @@ export function VnumPicker({
               type="number"
               value={vnumInput}
             />
+
             {vnumBlocks.length > 0 && (
               <p className="text-muted-foreground mt-1 text-xs">
                 Ranges:{" "}
@@ -120,6 +123,7 @@ export function VnumPicker({
               </p>
             )}
           </div>
+
           <Button
             disabled={!isValid || createPending}
             type="submit"

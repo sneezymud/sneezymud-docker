@@ -42,6 +42,7 @@ export function QueryStatus({
         <Alert variant="destructive">
           <AlertDescription>{message}</AlertDescription>
         </Alert>
+
         {backTo ? (
           <Button
             asChild

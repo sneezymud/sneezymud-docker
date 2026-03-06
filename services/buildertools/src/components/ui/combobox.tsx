@@ -33,6 +33,7 @@ function ComboboxTrigger({
       {...props}
     >
       {children}
+
       <ChevronDownIcon
         className="text-muted-foreground pointer-events-none size-4"
         data-slot="combobox-trigger-icon"
@@ -76,6 +77,7 @@ function ComboboxInput({
         render={<InputGroupInput disabled={disabled} />}
         {...props}
       />
+
       <InputGroupAddon align="inline-end">
         {showTrigger && (
           <InputGroupButton
@@ -89,8 +91,10 @@ function ComboboxInput({
             <ComboboxTrigger />
           </InputGroupButton>
         )}
+
         {showClear && <ComboboxClear disabled={disabled} />}
       </InputGroupAddon>
+
       {children}
     </InputGroup>
   );
@@ -161,6 +165,7 @@ function ComboboxItem({
       {...props}
     >
       {children}
+
       <ComboboxPrimitive.ItemIndicator
         data-slot="combobox-item-indicator"
         render={
@@ -242,7 +247,7 @@ function ComboboxChips({
   return (
     <ComboboxPrimitive.Chips
       className={cn(
-        "dark:bg-input/30 border-input focus-within:border-ring focus-within:ring-ring/50 has-aria-invalid:ring-destructive/20 dark:has-aria-invalid:ring-destructive/40 has-aria-invalid:border-destructive dark:has-aria-invalid:border-destructive/50 flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border bg-transparent bg-clip-padding px-2.5 py-1.5 text-sm shadow-xs transition-[color,box-shadow] focus-within:ring-[3px] has-aria-invalid:ring-[3px] has-data-[slot=combobox-chip]:px-1.5",
+        "dark:bg-input/30 border-input focus-within:border-ring focus-within:ring-ring/50 has-aria-invalid:ring-destructive/20 has-aria-invalid:border-destructive dark:has-aria-invalid:border-destructive/50 flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border bg-clip-padding px-2.5 py-1.5 text-sm shadow-xs transition-[color,box-shadow] focus-within:ring-[3px] has-aria-invalid:ring-[3px] has-data-[slot=combobox-chip]:px-1.5",
         className,
       )}
       data-slot="combobox-chips"
@@ -269,6 +274,7 @@ function ComboboxChip({
       {...props}
     >
       {children}
+
       {showRemove && (
         <ComboboxPrimitive.ChipRemove
           className="-ml-1 opacity-50 hover:opacity-100"

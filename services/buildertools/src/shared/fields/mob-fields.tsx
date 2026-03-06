@@ -42,14 +42,17 @@ export const mobFieldGroups: FieldGroupDef[] = [
               <strong>lowercase</strong> with an article - the game capitalizes
               automatically at the start of sentences.
             </p>
+
             <ul>
               <li>
                 <strong>a town guard</strong> → "A town guard hits you."
               </li>
+
               <li>
                 <strong>an old drunk man</strong> → "An old drunk man staggers
                 in."
               </li>
+
               <li>
                 <strong>the Tormenter</strong> → for unique named mobs
               </li>
@@ -83,11 +86,13 @@ export const mobFieldGroups: FieldGroupDef[] = [
               to keep in mind what the mob can load, and avoid contradicting
               those details in the long description.
             </p>
+
             <p className="mt-1.5">
               <span className="text-destructive font-medium">Bad:</span> {'"'}
               This heavyset guard wears dented chainmail and a bored expression.
               A short sword hangs at his hip.{'"'}
             </p>
+
             <p className="mt-1">
               <span className="font-medium text-emerald-500">Good:</span> {'"'}
               This heavyset guard breathes heavily as he marches on, performing
@@ -154,14 +159,18 @@ export const mobFieldGroups: FieldGroupDef[] = [
               Number of attacks per combat round. Attacks are distributed across
               the round, capped at 12.
             </p>
+
             <p>Typical ranges:</p>
+
             <ul>
               <li>
                 <strong>1 - 3</strong> - common mobs
               </li>
+
               <li>
                 <strong>5 - 8</strong> - bosses
               </li>
+
               <li>
                 <strong>12</strong> - raid encounters
               </li>
@@ -181,14 +190,18 @@ export const mobFieldGroups: FieldGroupDef[] = [
               Bonus added to all melee attack rolls. Higher values make the mob
               hit more reliably.
             </p>
+
             <p>Typical ranges:</p>
+
             <ul>
               <li>
                 <strong>0 - 50</strong> - weak mobs (relies on level)
               </li>
+
               <li>
                 <strong>50 - 150</strong> - mid-tier
               </li>
+
               <li>
                 <strong>150+</strong> - challenging encounters
               </li>
@@ -209,20 +222,26 @@ export const mobFieldGroups: FieldGroupDef[] = [
               <strong>AC Level</strong> is the value stored in the database. The
               game converts it to effective AC:
             </p>
+
             <p>
               <strong>{"Effective AC = 600 - (20 × AC Level)"}</strong>
             </p>
+
             <p>Reference values:</p>
+
             <ul>
               <li>
                 <strong>0</strong> → AC 600 (no armor)
               </li>
+
               <li>
                 <strong>10</strong> → AC 400
               </li>
+
               <li>
                 <strong>20</strong> → AC 200
               </li>
+
               <li>
                 <strong>30</strong> → AC 0 (heavily armored)
               </li>
@@ -243,14 +262,18 @@ export const mobFieldGroups: FieldGroupDef[] = [
               Additive bonus to the mob's hit points. Combined with damage
               level:
             </p>
+
             <p>
               <strong>{"max HP = damage_level × 100 + hpbonus"}</strong>
             </p>
+
             <p>Typical ranges:</p>
+
             <ul>
               <li>
                 <strong>50 - 200</strong> - weak mobs
               </li>
+
               <li>
                 <strong>500 - 2,000</strong> - bosses
               </li>
@@ -271,14 +294,18 @@ export const mobFieldGroups: FieldGroupDef[] = [
               Multiplier that scales both damage output and base HP. This is the
               primary difficulty knob alongside level.
             </p>
+
             <p>Typical ranges:</p>
+
             <ul>
               <li>
                 <strong>0.5 - 1.0</strong> - weak
               </li>
+
               <li>
                 <strong>1.0 - 3.0</strong> - medium
               </li>
+
               <li>
                 <strong>3.0 - 8.0</strong> - strong
               </li>
@@ -298,13 +325,16 @@ export const mobFieldGroups: FieldGroupDef[] = [
               Controls damage variance (0 - 100). Low values produce consistent,
               predictable damage. High values create more swingy combat.
             </p>
+
             <ul>
               <li>
                 <strong>0 - 30</strong> - very consistent
               </li>
+
               <li>
                 <strong>50 - 70</strong> - moderate variance
               </li>
+
               <li>
                 <strong>80 - 100</strong> - wild swings
               </li>
@@ -346,27 +376,34 @@ export const mobFieldGroups: FieldGroupDef[] = [
         <p>
           <strong>Signed offsets</strong> from the mob's racial base stats.
         </p>
+
         <ul>
           <li>
             <strong>0</strong> = racial average
           </li>
+
           <li>
             <strong>+25</strong> = maximum bonus
           </li>
+
           <li>
             <strong>-25</strong> = maximum penalty
           </li>
         </ul>
+
         <p className="mt-1.5">
           <strong>Stat group sums</strong> should generally be 0 or less:
         </p>
+
         <ul>
           <li>
             <strong>Physical:</strong> STR + BRA + CON
           </li>
+
           <li>
             <strong>Mental:</strong> INT + WIS + FOC
           </li>
+
           <li>
             <strong>Utility:</strong> DEX + AGI + SPE + PER + CHA + KAR
           </li>
@@ -541,21 +578,27 @@ export const mobFieldGroups: FieldGroupDef[] = [
               Body weight in pounds (1 - 100,000). Set directly by the builder -
               race has no effect on mob weight.
             </p>
+
             <p>Reference weights:</p>
+
             <ul>
               <li>
                 <strong>1 - 10</strong> - tiny creatures (rats, birds)
               </li>
+
               <li>
                 <strong>100 - 200</strong> - human-sized
               </li>
+
               <li>
                 <strong>500 - 1,000</strong> - horses, bears
               </li>
+
               <li>
                 <strong>10,000+</strong> - dragons, giants
               </li>
             </ul>
+
             <p>
               Affects bash/bodyslam effectiveness, encumbrance, and mount
               capacity. A value of 0 (the default) is nonsensical - always set
@@ -576,21 +619,27 @@ export const mobFieldGroups: FieldGroupDef[] = [
               Standing height in inches (1 - 10,000). Set directly by the
               builder - race has no effect on mob height.
             </p>
+
             <p>Reference heights:</p>
+
             <ul>
               <li>
                 <strong>6 - 12</strong> - small animals
               </li>
+
               <li>
                 <strong>36 - 48</strong> - hobbits, gnomes
               </li>
+
               <li>
                 <strong>66 - 78</strong> - human-sized
               </li>
+
               <li>
                 <strong>96 - 120</strong> - ogres, giants
               </li>
             </ul>
+
             <p>
               Affects combat reach, hit location targeting, and mount
               compatibility. A value of 0 (the default) is nonsensical - always
@@ -629,26 +678,33 @@ export const mobFieldGroups: FieldGroupDef[] = [
               A constant (0 - 10), not a raw gold amount. The game computes
               actual gold at load time:
             </p>
+
             <p>
               <strong>
                 {"gold = level × max(20, level) × constant × 0.75"}
               </strong>
             </p>
+
             <p>Example values for a level 50 mob:</p>
+
             <ul>
               <li>
                 <strong>1</strong> → 1,875 gold
               </li>
+
               <li>
                 <strong>3</strong> → 5,625 gold
               </li>
+
               <li>
                 <strong>5</strong> → 9,375 gold
               </li>
+
               <li>
                 <strong>10</strong> → 18,750 gold
               </li>
             </ul>
+
             <p>
               Shopkeepers get 5× this amount. Set to <strong>0</strong> for mobs
               that carry no gold.
@@ -683,13 +739,16 @@ export const mobFieldGroups: FieldGroupDef[] = [
               Invisibility threshold (0 - 100). Players need at least this much
               perception to see the mob.
             </p>
+
             <ul>
               <li>
                 <strong>0</strong> - always visible (most mobs)
               </li>
+
               <li>
                 <strong>30 - 50</strong> - invisible to most players
               </li>
+
               <li>
                 <strong>70 - 100</strong> - hidden from nearly everyone
               </li>
@@ -710,22 +769,28 @@ export const mobFieldGroups: FieldGroupDef[] = [
               light. The game adds this to room lighting (0 = pitch black, 25 =
               noon sunlight) plus racial bonuses.
             </p>
+
             <p>Recommended values:</p>
+
             <ul>
               <li>
                 <strong>0</strong> → normal vision (most mobs)
               </li>
+
               <li>
                 <strong>5 - 15</strong> → keen sight (elves, nocturnal hunters)
               </li>
+
               <li>
                 <strong>20 - 25</strong> → excellent dark vision (drow, shadow
                 creatures)
               </li>
+
               <li>
                 <strong>-5 to -10</strong> → poor vision (blind cave dwellers)
               </li>
             </ul>
+
             <p>
               Only set this for mobs that should see better or worse in darkness
               than their race normally allows.
@@ -770,21 +835,25 @@ export const mobFieldGroups: FieldGroupDef[] = [
               currently disabled globally, but faction type still has active
               effects:
             </p>
+
             <ul>
               <li>
                 <strong>Protector/Protectee AI</strong> - Protector mobs
                 automatically assist same-faction Protectees in combat.
               </li>
+
               <li>
                 <strong>Combat assists</strong> - Mobs use faction when deciding
                 whether to join ongoing fights in the room.
               </li>
+
               <li>
                 <strong>Friendship</strong> - Two mobs are considered
                 &ldquo;friends&rdquo; if they share both the same race and
                 faction, which affects NPC-to-NPC behavior.
               </li>
             </ul>
+
             <p>
               Certain races expect specific factions (generates LOG_LOW warnings
               if mismatched): Kobold = Logrus, Tytan = Galek, Wood Elf / Dryad /
@@ -807,6 +876,7 @@ export const mobFieldGroups: FieldGroupDef[] = [
               value acts as a power multiplier for cleric and deikhan prayers,
               affects spell success rolls, and drives piety regeneration rate.
             </p>
+
             <p>
               <strong>Currently has no gameplay effect.</strong> Factions are
               disabled at compile time, so this value is stored but ignored by

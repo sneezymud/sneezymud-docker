@@ -58,8 +58,10 @@ export function BitfieldEditor({
                     onChange(toggleBit(value, entry.bit));
                   }}
                 />
+
                 <label htmlFor={`${id}-${entry.bit}`}>{entry.label}</label>
               </div>
+
               {entry.tooltip ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -74,6 +76,7 @@ export function BitfieldEditor({
                       />
                     </button>
                   </TooltipTrigger>
+
                   <TooltipContent
                     className="max-w-xs text-sm text-wrap"
                     sideOffset={5}

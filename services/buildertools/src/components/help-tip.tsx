@@ -22,6 +22,7 @@ export function HelpTip({ text }: { text: string }) {
             />
           </button>
         </TooltipTrigger>
+
         <TooltipContent
           className="max-w-xs text-sm text-wrap"
           sideOffset={5}

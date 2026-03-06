@@ -26,6 +26,7 @@ export function Breadcrumbs({ items }: BreadcrumbsProps) {
         {items.map((item, index) => (
           <React.Fragment key={item.to ?? item.label}>
             {index > 0 ? <BreadcrumbSeparator /> : null}
+
             <BreadcrumbItem>
               {item.to ? (
                 <BreadcrumbLink asChild>

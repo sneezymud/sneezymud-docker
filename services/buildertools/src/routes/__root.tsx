@@ -22,12 +22,14 @@ export const Route = createRootRouteWithContext<{
         variant="destructive"
       >
         <AlertTitle>Something went wrong</AlertTitle>
+
         <AlertDescription>
           <pre className="overflow-auto text-xs whitespace-pre-wrap">
             {error instanceof Error ? error.message : "Unknown error"}
           </pre>
         </AlertDescription>
       </Alert>
+
       <Button
         onClick={() => {
           globalThis.location.reload();
@@ -41,6 +43,7 @@ export const Route = createRootRouteWithContext<{
   notFoundComponent: () => (
     <div className="bg-background text-muted-foreground flex min-h-screen flex-col items-center justify-center gap-4">
       <p>404 Not Found</p>
+
       <Button
         asChild
         variant="link"

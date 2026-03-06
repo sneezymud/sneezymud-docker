@@ -119,6 +119,7 @@ export function SubTable<T extends Record<string, number | string>>({
         title={label}
         tooltip={help}
       />
+
       {helpParagraph ? (
         <p className="text-muted-foreground mt-1 mb-3 text-sm">
           {helpParagraph}
@@ -144,6 +145,7 @@ export function SubTable<T extends Record<string, number | string>>({
                 return (
                   <div key={col.key}>
                     <Label htmlFor={cellId}>{col.label}</Label>
+
                     {col.type === "custom" ? (
                       col.renderCell(
                         row,
@@ -179,6 +181,7 @@ export function SubTable<T extends Record<string, number | string>>({
                 );
               })}
             </div>
+
             {readOnly ? null : (
               <Button
                 aria-label={`Remove row ${index + 1}`}

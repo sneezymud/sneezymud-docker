@@ -61,6 +61,7 @@ export function TagInput({ id, onChange, value }: TagInputProps) {
           variant="secondary"
         >
           {tag}
+
           <Button
             aria-label={`Remove ${tag}`}
             className="-mr-0.5 ml-0.5 h-auto p-0"
@@ -75,6 +76,7 @@ export function TagInput({ id, onChange, value }: TagInputProps) {
           </Button>
         </Badge>
       ))}
+
       <input
         className="text-foreground placeholder:text-muted-foreground min-w-16 flex-1 border-none bg-transparent text-sm outline-none"
         id={id}

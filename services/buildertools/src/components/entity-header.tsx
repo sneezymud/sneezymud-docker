@@ -85,6 +85,7 @@ export function EntityHeader({
           >
             {deletePending ? "Deleting..." : "Delete"}
           </Button>
+
           <ConfirmDialog
             confirmLabel="Yes, delete"
             message={deleteMessage ?? "Are you sure you want to delete this?"}

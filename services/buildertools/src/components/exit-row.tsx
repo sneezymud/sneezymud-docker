@@ -55,39 +55,46 @@ export function ExitRow({
         prefix={prefix}
         usedDirections={usedDirections}
       />
+
       <DoorNameField
         onUpdate={onUpdate}
         prefix={prefix}
         value={exit.name}
       />
+
       <ExitDescriptionField
         onUpdate={onUpdate}
         prefix={prefix}
         value={exit.description}
       />
+
       <div className="grid grid-cols-2 gap-2">
         <DestinationField
           onUpdate={onUpdate}
           prefix={prefix}
           value={exit.destination}
         />
+
         <DoorTypeField
           onUpdate={onUpdate}
           prefix={prefix}
           value={exit.type}
         />
       </div>
+
       <DoorLockFields
         lockDifficulty={exit.lock_difficulty}
         onUpdate={onUpdate}
         prefix={prefix}
         weight={exit.weight}
       />
+
       <KeyVnumField
         onUpdate={onUpdate}
         prefix={prefix}
         value={exit.key_num}
       />
+
       <ConditionFlagsField
         onUpdate={onUpdate}
         prefix={prefix}
@@ -122,6 +129,7 @@ function ExitHeader({
           <SelectTrigger id={`${prefix}-dir`}>
             <SelectValue />
           </SelectTrigger>
+
           <SelectContent position="popper">
             {DIRECTION_TYPES.filter(
               (d) => d.value === exit.direction || !usedDirections.has(d.value),
@@ -136,6 +144,7 @@ function ExitHeader({
           </SelectContent>
         </Select>
       </div>
+
       <Button
         aria-label={`Remove ${directionLabels.get(exit.direction) ?? ""} exit`}
         className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive shrink-0"
@@ -161,6 +170,7 @@ function ConditionFlagsField({
   return (
     <div>
       <Label htmlFor={`${prefix}-cond`}>Condition Flags</Label>
+
       <BitfieldEditor
         entries={EXIT_FLAGS}
         id={`${prefix}-cond`}
@@ -194,12 +204,14 @@ function DoorNameField({
             words are aliases (e.g., "gate large" lets players type "open gate"
             or "open large"). All lowercase.
           </p>
+
           <p>
             If the first word ends in 's', the game uses plural grammar ("The
             doors <strong>are</strong> closed"). If empty, defaults to "door".
           </p>
         </FieldTooltip>
       </Label>
+
       <Input
         className="px-2 py-1 disabled:opacity-30"
         id={`${prefix}-name`}
@@ -232,12 +244,14 @@ function ExitDescriptionField({
             (exit is open, or door type is see-through like grate, portcullis,
             or screen). If empty, the destination room's name is shown instead.
           </p>
+
           <p>
             Write as a full sentence. Examples: "The hallway stretches into
             darkness." or "Through the gate you can see a courtyard."
           </p>
         </FieldTooltip>
       </Label>
+
       <Textarea
         className="min-h-27 resize-y px-2 py-1 disabled:opacity-30"
         id={`${prefix}-desc`}
@@ -280,6 +294,7 @@ function DestinationField({
   return (
     <div>
       <Label htmlFor={`${prefix}-dest`}>Destination</Label>
+
       <RoomPicker
         id={`${prefix}-dest`}
         onChange={(v) => {
@@ -287,6 +302,7 @@ function DestinationField({
         }}
         value={value}
       />
+
       <DestinationPreview vnum={value} />
     </div>
   );
@@ -316,6 +332,7 @@ function DoorTypeField({
           </p>
         </FieldTooltip>
       </Label>
+
       <EnumSelect
         entries={DOOR_TYPES}
         id={`${prefix}-type`}
@@ -350,17 +367,20 @@ function DoorLockFields({
               whether a shaman's Shadow Walk can pass through: succeeds when the
               caster's skill exceeds this value.
             </p>
+
             <p>
               <strong>Picking:</strong> 0 = trivially easy (never jams, instant
               pick). 25 = easy. 50 = moderate (trained thief). 75 = very hard.
               100 = unpickable (sentinel - picking always fails).
             </p>
+
             <p>
               <strong>Doorbash:</strong> The bash check compares 2x lock
               difficulty against the basher's skill. At 51+, doorbash auto-fails
               even for a max-skill character. At 50 or below, bash success also
               depends on door weight.
             </p>
+
             <p>
               <strong>Shadow Walk:</strong> A shaman with maximum training (~85
               skill) can walk through doors with lock difficulty up to 84. At
@@ -368,6 +388,7 @@ function DoorLockFields({
             </p>
           </FieldTooltip>
         </Label>
+
         <NumberInput
           className="px-2 py-1 disabled:opacity-30"
           id={`${prefix}-lock`}
@@ -379,6 +400,7 @@ function DoorLockFields({
           value={lockDifficulty}
         />
       </div>
+
       <div>
         <Label htmlFor={`${prefix}-weight`}>
           Weight
@@ -387,27 +409,32 @@ function DoorLockFields({
               How heavy the door is (1-50). Affects opening, bash difficulty,
               and bash self-damage.
             </p>
+
             <p>
               <strong>Opening:</strong> Compared against character Strength.
               Average STR (105) can open doors up to weight ~48. Max STR (205)
               can open any door.
             </p>
+
             <p>
               <strong>Bashing hard-stop:</strong> The bash check doubles the
               weight. Average-STR characters auto-fail at weight 25+. Max-STR
               can always attempt (even weight 50).
             </p>
+
             <p>
               <strong>Bash success</strong> (lock difficulty 0): Max stats
               (skill 100, BRA 205) - weight 10: 100%, weight 25: 40%, weight 50:
               20%. Average BRA (105) halves these chances.
             </p>
+
             <p>
               <strong>Self-damage:</strong> Successful bash deals ~4 avg damage
               per weight point. Weight 25 = ~100 avg. Weight 50 = ~200 avg.
             </p>
           </FieldTooltip>
         </Label>
+
         <NumberInput
           className="px-2 py-1 disabled:opacity-30"
           id={`${prefix}-weight`}
@@ -460,12 +487,14 @@ function KeyVnumField({
             keyhole" - players cannot use a key but can still pick the lock.
             Positive value should reference a valid key object.
           </p>
+
           <p>
             If set to -1 on a locked exit, the only way through is lock picking
             (if difficulty &lt; 100) or Shadow Walk.
           </p>
         </FieldTooltip>
       </Label>
+
       <ObjectPicker
         id={`${prefix}-key`}
         min={-1}
@@ -474,6 +503,7 @@ function KeyVnumField({
         }}
         value={value}
       />
+
       <KeyPreview vnum={value} />
     </div>
   );
@@ -488,6 +518,7 @@ const doorTypeDetailedTooltip = (
       available commands, bash resistance, and line of sight. All non-None types
       reduce passage height by 10%.
     </p>
+
     <table className="w-full text-xs">
       <thead>
         <tr className="border-border border-b">
@@ -498,6 +529,7 @@ const doorTypeDetailedTooltip = (
           <th className="py-1 text-left font-semibold">Notes</th>
         </tr>
       </thead>
+
       <tbody className="[&_td]:py-1 [&_td]:pr-2">
         <tr className="border-border/50 border-b">
           <td className="font-medium">None</td>
@@ -506,6 +538,7 @@ const doorTypeDetailedTooltip = (
           <td className="text-muted-foreground">N/A</td>
           <td>Open passage, no barrier</td>
         </tr>
+
         <tr className="border-border/50 border-b">
           <td className="font-medium">Door</td>
           <td>open/close</td>
@@ -513,6 +546,7 @@ const doorTypeDetailedTooltip = (
           <td>No</td>
           <td>Only type with sound effects</td>
         </tr>
+
         <tr className="border-border/50 border-b">
           <td className="font-medium">Trapdoor</td>
           <td>open/close</td>
@@ -520,6 +554,7 @@ const doorTypeDetailedTooltip = (
           <td>No</td>
           <td>Direction-aware (ceiling/floor)</td>
         </tr>
+
         <tr className="border-border/50 border-b">
           <td className="font-medium">Gate</td>
           <td>open/close</td>
@@ -527,6 +562,7 @@ const doorTypeDetailedTooltip = (
           <td>No</td>
           <td>"Unlatch and swing" messages</td>
         </tr>
+
         <tr className="border-border/50 border-b">
           <td className="font-medium">Grate</td>
           <td>open/close</td>
@@ -534,6 +570,7 @@ const doorTypeDetailedTooltip = (
           <td>Yes</td>
           <td>Direction-aware messages</td>
         </tr>
+
         <tr className="border-border/50 border-b">
           <td className="font-medium">Portcullis</td>
           <td>raise/lower</td>
@@ -541,6 +578,7 @@ const doorTypeDetailedTooltip = (
           <td>Yes</td>
           <td>"Lowered" when closed</td>
         </tr>
+
         <tr className="border-border/50 border-b">
           <td className="font-medium">Drawbridge</td>
           <td>raise/lower</td>
@@ -548,6 +586,7 @@ const doorTypeDetailedTooltip = (
           <td>No</td>
           <td>Raise = close (inverted)</td>
         </tr>
+
         <tr className="border-border/50 border-b">
           <td className="font-medium">Rubble</td>
           <td>open/close</td>
@@ -555,6 +594,7 @@ const doorTypeDetailedTooltip = (
           <td>No</td>
           <td>"Push aside" messages</td>
         </tr>
+
         <tr className="border-border/50 border-b">
           <td className="font-medium">Panel</td>
           <td>open/close</td>
@@ -562,6 +602,7 @@ const doorTypeDetailedTooltip = (
           <td>No</td>
           <td>"Slide open" messages</td>
         </tr>
+
         <tr className="border-border/50 border-b">
           <td className="font-medium">Screen</td>
           <td>open/close</td>
@@ -569,6 +610,7 @@ const doorTypeDetailedTooltip = (
           <td>Yes</td>
           <td>"Slide open" messages</td>
         </tr>
+
         <tr>
           <td className="font-medium">Hatch</td>
           <td>open/close</td>

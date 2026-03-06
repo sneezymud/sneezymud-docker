@@ -97,6 +97,7 @@ function FieldGroup({
     >
       <legend className="text-foreground text-lg font-semibold">
         {title}
+
         {tooltip || detailedTooltip ? (
           <FieldTooltip
             detailedTooltip={detailedTooltip}
@@ -106,7 +107,9 @@ function FieldGroup({
           </FieldTooltip>
         ) : null}
       </legend>
+
       {header}
+
       <div
         className={cn(
           "grid grid-cols-[auto_auto_1.5rem] gap-x-3 gap-y-2",
@@ -133,6 +136,7 @@ function FieldGroup({
           return (
             <Fragment key={field.key}>
               {showSeparator ? <Separator className="col-span-full" /> : null}
+
               <FormField
                 field={field}
                 isDirty={fieldDirty}

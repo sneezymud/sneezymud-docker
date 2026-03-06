@@ -61,15 +61,19 @@ export function Nav({ className, onNavClick }: NavProps) {
           <p className="text-foreground font-mono text-lg font-bold tracking-tight">
             SneezyMUD
           </p>
+
           <p className="text-muted-foreground text-xs tracking-wide uppercase">
             Builder Tools
           </p>
         </div>
+
         <div className="text-right">
           <p className="text-muted-foreground text-xs">{user.playerName}</p>
+
           {user.username === user.playerName ? null : (
             <p className="text-muted-foreground text-xs">({user.username})</p>
           )}
+
           <Button
             className="h-auto p-0 text-xs"
             onClick={handleLogout}
@@ -90,6 +94,7 @@ export function Nav({ className, onNavClick }: NavProps) {
             Rooms
           </NavLink>
         ) : null}
+
         {hasPower(user.powers, POWER.MEDIT) ? (
           <NavLink
             icon={<User className="h-4 w-4 shrink-0" />}
@@ -99,6 +104,7 @@ export function Nav({ className, onNavClick }: NavProps) {
             Mobs
           </NavLink>
         ) : null}
+
         {hasPower(user.powers, POWER.OEDIT) ? (
           <NavLink
             icon={<Box className="h-4 w-4 shrink-0" />}
@@ -108,6 +114,7 @@ export function Nav({ className, onNavClick }: NavProps) {
             Objects
           </NavLink>
         ) : null}
+
         <NavLink
           icon={<Map className="h-4 w-4 shrink-0" />}
           onClick={onNavClick}

@@ -49,6 +49,7 @@ export const affectColumns: Array<ColumnDef<ObjAffect>> = [
       const label = (
         <span className="text-muted-foreground mb-0.5 block text-xs">
           {spec.mod1.label}
+
           {spec.mod1.help ? (
             <>
               {" "}
@@ -61,6 +62,7 @@ export const affectColumns: Array<ColumnDef<ObjAffect>> = [
         return (
           <>
             {label}
+
             <EnumSelect
               entries={spec.mod1.enumEntries}
               id={id}
@@ -76,6 +78,7 @@ export const affectColumns: Array<ColumnDef<ObjAffect>> = [
         return (
           <>
             {label}
+
             <Popover>
               <PopoverTrigger
                 aria-label={`${spec.mod1.label}: ${count} selected`}
@@ -85,6 +88,7 @@ export const affectColumns: Array<ColumnDef<ObjAffect>> = [
                   ? `${count} effect${count === 1 ? "" : "s"}`
                   : "None"}
               </PopoverTrigger>
+
               <PopoverContent
                 align="start"
                 className="max-h-80 w-96 overflow-y-auto"
@@ -92,6 +96,7 @@ export const affectColumns: Array<ColumnDef<ObjAffect>> = [
                 <p className="text-foreground mb-2 text-sm font-medium">
                   {spec.mod1.label}
                 </p>
+
                 <BitfieldEditor
                   entries={entries}
                   onChange={onChange}
@@ -105,6 +110,7 @@ export const affectColumns: Array<ColumnDef<ObjAffect>> = [
       return (
         <>
           {label}
+
           <NumberInput
             className="px-2 py-1"
             id={id}
@@ -145,6 +151,7 @@ export const affectColumns: Array<ColumnDef<ObjAffect>> = [
         <>
           <span className="text-muted-foreground mb-0.5 block text-xs">
             {spec.mod2.label}
+
             {spec.mod2.help ? (
               <>
                 {" "}
@@ -152,6 +159,7 @@ export const affectColumns: Array<ColumnDef<ObjAffect>> = [
               </>
             ) : null}
           </span>
+
           <NumberInput
             className="px-2 py-1"
             id={id}

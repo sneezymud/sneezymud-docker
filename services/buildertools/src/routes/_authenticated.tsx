@@ -49,6 +49,7 @@ export const Route = createFileRoute("/_authenticated")({
   notFoundComponent: () => (
     <div className="text-muted-foreground flex flex-col items-center gap-4 py-16">
       <p>Page not found</p>
+
       <Button
         asChild
         variant="link"
@@ -80,8 +81,8 @@ function AuthenticatedLayout() {
 
       {/* Desktop sidebar */}
       <Nav className="sticky top-0 hidden h-screen overflow-y-auto border-r lg:flex" />
-
       {/* Mobile sidebar */}
+
       <Sheet
         onOpenChange={(isOpen) => {
           if (!isOpen) closeSidebar();
@@ -94,6 +95,7 @@ function AuthenticatedLayout() {
           side="left"
         >
           <SheetTitle className="sr-only">Navigation</SheetTitle>
+
           <Nav
             className="flex h-full border-r-0"
             onNavClick={closeSidebar}
@@ -115,6 +117,7 @@ function AuthenticatedLayout() {
             <Menu className="h-5 w-5" />
           </Button>
         </div>
+
         <div className="3xl:max-w-none mx-auto max-w-screen-2xl transition-opacity duration-100">
           <Outlet />
         </div>

@@ -127,6 +127,7 @@ function RoomListPage() {
           </AlertDescription>
         </Alert>
       ) : null}
+
       <EntityList
         basePath="/rooms"
         createPending={createMutation.isPending}
@@ -139,6 +140,7 @@ function RoomListPage() {
         onDeleteSelected={setConfirmVnums}
         vnumBlocks={blocks}
       />
+
       <ConfirmDialog
         confirmLabel="Delete"
         message={`Delete ${confirmVnums.length} room${confirmVnums.length === 1 ? "" : "s"}? This cannot be undone.`}

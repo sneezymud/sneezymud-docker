@@ -12,6 +12,7 @@ export function SectionHeader({
   return (
     <>
       <legend className="sr-only">{title}</legend>
+
       <div className="text-foreground mb-3 flex items-center gap-2 text-lg font-semibold">
         <span>{title}</span>
         {tooltip ? <FieldTooltip label={title}>{tooltip}</FieldTooltip> : null}

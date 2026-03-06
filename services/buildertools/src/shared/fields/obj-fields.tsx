@@ -139,15 +139,18 @@ export function getObjFieldGroups(
                 <strong>lowercase</strong> with an article - the game
                 capitalizes automatically at the start of sentences.
               </p>
+
               <ul>
                 <li>
                   <strong>a long steel sword</strong> → "You pick up a long
                   steel sword."
                 </li>
+
                 <li>
                   <strong>an ornate golden ring</strong> → "An ornate golden
                   ring glows softly."
                 </li>
+
                 <li>
                   <strong>the Sword of Justice</strong> → for unique named items
                 </li>
@@ -252,60 +255,74 @@ export function getObjFieldGroups(
                 reaches 0 from combat damage, the item is either destroyed or
                 converted to a scrap pile (dropping any contents).
               </p>
+
               <p>
                 The item's visible condition is based on cur_struct /
                 max_struct:
               </p>
+
               <table className="border-border mt-2 w-full border-collapse text-sm">
                 <thead>
                   <tr>
                     <th className="border-border border px-2 py-1 text-left">
                       Ratio
                     </th>
+
                     <th className="border-border border px-2 py-1 text-left">
                       Condition
                     </th>
                   </tr>
                 </thead>
+
                 <tbody>
                   <tr>
                     <td className="border-border border px-2 py-1">1.0</td>
+
                     <td className="border-border border px-2 py-1">
                       brand new
                     </td>
                   </tr>
+
                   <tr>
                     <td className="border-border border px-2 py-1">&gt; 0.9</td>
                     <td className="border-border border px-2 py-1">like new</td>
                   </tr>
+
                   <tr>
                     <td className="border-border border px-2 py-1">&gt; 0.7</td>
+
                     <td className="border-border border px-2 py-1">
                       very good
                     </td>
                   </tr>
+
                   <tr>
                     <td className="border-border border px-2 py-1">&gt; 0.5</td>
                     <td className="border-border border px-2 py-1">fine</td>
                   </tr>
+
                   <tr>
                     <td className="border-border border px-2 py-1">&gt; 0.3</td>
                     <td className="border-border border px-2 py-1">poor</td>
                   </tr>
+
                   <tr>
                     <td className="border-border border px-2 py-1">&gt; 0.1</td>
                     <td className="border-border border px-2 py-1">bad</td>
                   </tr>
+
                   <tr>
                     <td className="border-border border px-2 py-1">
                       &le; 0.001
                     </td>
+
                     <td className="border-border border px-2 py-1">
                       destroyed
                     </td>
                   </tr>
                 </tbody>
               </table>
+
               <p className="mt-2">
                 Set max_struct = 0 for items that should not participate in the
                 durability system (they will always show as "brand new" and
@@ -339,54 +356,67 @@ export function getObjFieldGroups(
                 decrements while the item is sitting on the ground in a room -
                 items in inventory or equipped do not decay.
               </p>
+
               <p>
                 When the counter reaches 0, the item is destroyed with a
                 message. Container contents are spilled.
               </p>
+
               <table className="border-border mt-2 w-full border-collapse text-sm">
                 <thead>
                   <tr>
                     <th className="border-border border px-2 py-1 text-left">
                       decay_time
                     </th>
+
                     <th className="border-border border px-2 py-1 text-left">
                       Real-time lifespan
                     </th>
                   </tr>
                 </thead>
+
                 <tbody>
                   <tr>
                     <td className="border-border border px-2 py-1">-1</td>
+
                     <td className="border-border border px-2 py-1">
                       Never decays
                     </td>
                   </tr>
+
                   <tr>
                     <td className="border-border border px-2 py-1">1</td>
+
                     <td className="border-border border px-2 py-1">
                       ~2.4 minutes
                     </td>
                   </tr>
+
                   <tr>
                     <td className="border-border border px-2 py-1">10</td>
+
                     <td className="border-border border px-2 py-1">
                       ~24 minutes
                     </td>
                   </tr>
+
                   <tr>
                     <td className="border-border border px-2 py-1">25</td>
                     <td className="border-border border px-2 py-1">~1 hour</td>
                   </tr>
+
                   <tr>
                     <td className="border-border border px-2 py-1">50</td>
                     <td className="border-border border px-2 py-1">~2 hours</td>
                   </tr>
+
                   <tr>
                     <td className="border-border border px-2 py-1">100</td>
                     <td className="border-border border px-2 py-1">~4 hours</td>
                   </tr>
                 </tbody>
               </table>
+
               <p className="mt-2">
                 Common usage: -1 for permanent items, 1-10 for temporary spell
                 effects, 25-100 for items that should eventually clean up.
@@ -419,38 +449,48 @@ export function getObjFieldGroups(
                 see the item on the ground. Items in inventory or equipped are
                 4-7 points easier to see.
               </p>
+
               <table className="border-border mt-2 w-full border-collapse text-sm">
                 <thead>
                   <tr>
                     <th className="border-border border px-2 py-1 text-left">
                       Value
                     </th>
+
                     <th className="border-border border px-2 py-1 text-left">
                       Practical Effect
                     </th>
                   </tr>
                 </thead>
+
                 <tbody>
                   <tr>
                     <td className="border-border border px-2 py-1">0</td>
+
                     <td className="border-border border px-2 py-1">
                       Visible to anyone with any light source (default)
                     </td>
                   </tr>
+
                   <tr>
                     <td className="border-border border px-2 py-1">1-10</td>
+
                     <td className="border-border border px-2 py-1">
                       Hidden in dim rooms; visible in normal lighting
                     </td>
                   </tr>
+
                   <tr>
                     <td className="border-border border px-2 py-1">11-20</td>
+
                     <td className="border-border border px-2 py-1">
                       Only visible in bright conditions or with vision spells
                     </td>
                   </tr>
+
                   <tr>
                     <td className="border-border border px-2 py-1">21-25</td>
+
                     <td className="border-border border px-2 py-1">
                       Nearly invisible; requires True Sight, Clarity, or
                       excellent conditions
@@ -458,15 +498,18 @@ export function getObjFieldGroups(
                   </tr>
                 </tbody>
               </table>
+
               <p className="mt-2">
                 <strong>Bypasses (always visible):</strong> Item has GLOW or
                 BURNING flag, item emits light, room has ALWAYS_LIT, observer
                 has True Sight/Clarity.
               </p>
+
               <p>
                 <strong>Blocks (invisible regardless):</strong> Item has
                 INVISIBLE flag and observer lacks Detect Invisible.
               </p>
+
               <p>
                 <strong>Note:</strong> A value of 0 does NOT mean "always
                 visible" - the item is still invisible in pitch darkness with no

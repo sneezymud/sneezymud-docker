@@ -54,6 +54,7 @@ export function FormField({
   const labelContent = field.label ? (
     <span>
       {field.label}
+
       {field.required ? (
         <span
           aria-label="required"
@@ -71,6 +72,7 @@ export function FormField({
         <Label>
           {labelContent}
           {tooltipElement}
+
           <Button
             className="h-auto px-1 py-0"
             onClick={() => {
@@ -187,6 +189,7 @@ export function FormField({
           <Label htmlFor={field.key}>
             {labelContent}
             {tooltipElement}
+
             {field.addable ? (
               <Button
                 className="h-auto px-1 py-0"
@@ -201,6 +204,7 @@ export function FormField({
             ) : null}
           </Label>
         ) : null}
+
         {inputElement}
       </div>
     );
@@ -225,6 +229,7 @@ export function FormField({
       ) : (
         <div />
       )}
+
       <div className="min-w-0">{inputElement}</div>
       <div className="justify-self-center">{tooltipElement}</div>
     </div>

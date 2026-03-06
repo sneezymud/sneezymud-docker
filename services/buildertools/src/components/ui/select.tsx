@@ -55,6 +55,7 @@ function SelectTrigger({
       {...props}
     >
       {children}
+
       <SelectPrimitive.Icon asChild>
         <ChevronDownIcon className="size-4 opacity-50" />
       </SelectPrimitive.Icon>
@@ -120,6 +121,7 @@ function SelectContent({
         {...props}
       >
         <SelectScrollUpButton />
+
         <SelectPrimitive.Viewport
           className={cn(
             "p-1",
@@ -129,6 +131,7 @@ function SelectContent({
         >
           {children}
         </SelectPrimitive.Viewport>
+
         <SelectScrollDownButton />
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
@@ -170,6 +173,7 @@ function SelectItem({
           <CheckIcon className="size-4" />
         </SelectPrimitive.ItemIndicator>
       </span>
+
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
     </SelectPrimitive.Item>
   );

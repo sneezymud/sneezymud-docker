@@ -28,8 +28,10 @@ function LoginPage() {
           <CardTitle className="text-2xl">
             <span className="font-mono">SneezyMUD</span> Builder Tools
           </CardTitle>
+
           <CardDescription>Log in with your game account</CardDescription>
         </CardHeader>
+
         <CardContent>
           <LoginForm />
         </CardContent>

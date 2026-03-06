@@ -277,6 +277,7 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
             readOnly={!hasPower(powers, POWER.OEDIT_APPLYS)}
             rows={affectEdits ?? obj.affects}
           />
+
           <SubTable
             columns={extraColumns}
             emptyRow={{ description: "", name: "", vnum }}

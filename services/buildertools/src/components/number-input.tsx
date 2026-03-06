@@ -88,6 +88,7 @@ export function NumberInput({
         type="number"
         value={display}
       />
+
       {outOfRange ? (
         <p className="text-destructive mt-1 text-xs">
           {min !== undefined && max !== undefined
