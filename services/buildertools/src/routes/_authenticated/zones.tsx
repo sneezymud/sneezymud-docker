@@ -15,17 +15,12 @@ import { useDeferredValue, useState } from "react";
 import type { Zone } from "@/shared/schemas/zone.ts";
 
 import { QueryStatus } from "@/components/query-status.tsx";
+import { sortIndicator } from "@/components/sort-indicator.ts";
+import { TablePagination } from "@/components/table-pagination.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination.tsx";
 import {
   Table,
   TableBody,
@@ -121,12 +116,6 @@ const columns: Array<ColumnDef<Zone>> = [
     id: "entities",
   },
 ];
-
-function sortIndicator(sorted: "asc" | "desc" | false): string {
-  if (sorted === "asc") return " \u25B2";
-  if (sorted === "desc") return " \u25BC";
-  return "";
-}
 
 function ZonesPage() {
   const [search, setSearch] = useState("");
@@ -282,33 +271,18 @@ function ZonesPage() {
         </TableBody>
       </Table>
 
-      {totalPages > 1 ? (
-        <Pagination className="mt-3">
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                disabled={!table.getCanPreviousPage()}
-                onClick={() => {
-                  table.previousPage();
-                }}
-              />
-            </PaginationItem>
-            <PaginationItem>
-              <span className="text-muted-foreground text-sm">
-                Page {pageIndex + 1} of {totalPages}
-              </span>
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationNext
-                disabled={!table.getCanNextPage()}
-                onClick={() => {
-                  table.nextPage();
-                }}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      ) : null}
+      <TablePagination
+        canNextPage={table.getCanNextPage()}
+        canPreviousPage={table.getCanPreviousPage()}
+        onNextPage={() => {
+          table.nextPage();
+        }}
+        onPreviousPage={() => {
+          table.previousPage();
+        }}
+        pageIndex={pageIndex}
+        totalPages={totalPages}
+      />
 
       <p className="text-muted-foreground mt-2 text-xs">
         {search

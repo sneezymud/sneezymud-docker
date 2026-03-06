@@ -17,13 +17,6 @@ import { Button } from "@/components/ui/button.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination.tsx";
-import {
   Table,
   TableBody,
   TableCell,
@@ -32,6 +25,8 @@ import {
   TableRow,
 } from "@/components/ui/table.tsx";
 
+import { sortIndicator } from "./sort-indicator.ts";
+import { TablePagination } from "./table-pagination.tsx";
 import { VnumPicker } from "./vnum-picker.tsx";
 
 interface EntityListItem {
@@ -330,33 +325,18 @@ export function EntityList({
         </TableBody>
       </Table>
 
-      {totalPages > 1 ? (
-        <Pagination className="mt-3">
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                disabled={!table.getCanPreviousPage()}
-                onClick={() => {
-                  table.previousPage();
-                }}
-              />
-            </PaginationItem>
-            <PaginationItem>
-              <span className="text-muted-foreground text-sm">
-                Page {pageIndex + 1} of {totalPages}
-              </span>
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationNext
-                disabled={!table.getCanNextPage()}
-                onClick={() => {
-                  table.nextPage();
-                }}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      ) : null}
+      <TablePagination
+        canNextPage={table.getCanNextPage()}
+        canPreviousPage={table.getCanPreviousPage()}
+        onNextPage={() => {
+          table.nextPage();
+        }}
+        onPreviousPage={() => {
+          table.previousPage();
+        }}
+        pageIndex={pageIndex}
+        totalPages={totalPages}
+      />
 
       <p className="text-muted-foreground mt-2 text-xs">
         {search
@@ -365,12 +345,6 @@ export function EntityList({
       </p>
     </div>
   );
-}
-
-function sortIndicator(sorted: "asc" | "desc" | false): string {
-  if (sorted === "asc") return " \u25B2";
-  if (sorted === "desc") return " \u25BC";
-  return "";
 }
 
 function EmptyMessage({
