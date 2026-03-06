@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
+import { useRowKeys } from "@/hooks/use-row-keys.ts";
 import { mobExtraSchema, mobStringKeywords } from "@/shared/schemas/mob.ts";
 
 const MOB_STRING_LABELS: Record<MobStringKeyword, string> = {
@@ -36,22 +37,7 @@ export function MobStringsEditor({
   vnum: number;
 }) {
   const [pendingRemove, setPendingRemove] = useState<null | number>(null);
-  const [rowKeys, setRowKeys] = useState<string[]>(() =>
-    rows.map(() => crypto.randomUUID()),
-  );
-  const [lastRowCount, setLastRowCount] = useState(rows.length);
-
-  if (rows.length !== lastRowCount) {
-    setLastRowCount(rows.length);
-    if (rows.length > rowKeys.length) {
-      const extra = Array.from({ length: rows.length - rowKeys.length }, () =>
-        crypto.randomUUID(),
-      );
-      setRowKeys([...rowKeys, ...extra]);
-    } else if (rows.length < rowKeys.length) {
-      setRowKeys(rowKeys.slice(0, rows.length));
-    }
-  }
+  const { addKey, removeKey, rowKeys } = useRowKeys(rows.length);
 
   const usedKeywords = new Set(rows.map((r) => r.keyword));
   const availableKeywords = mobStringKeywords.filter(
@@ -63,12 +49,12 @@ export function MobStringsEditor({
     if (!keyword) {
       return;
     }
-    setRowKeys((prev) => [...prev, crypto.randomUUID()]);
+    addKey();
     onChange([...rows, { description: "", keyword, vnum }]);
   };
 
   const removeRow = (index: number) => {
-    setRowKeys((prev) => prev.filter((_, i) => i !== index));
+    removeKey(index);
     onChange(rows.filter((_, i) => i !== index));
   };
 

@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 import type { EnumEntry } from "@/shared/enums/types.ts";
 
 import { AddButton } from "@/components/add-button.tsx";
@@ -7,6 +5,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
+import { useRowKeys } from "@/hooks/use-row-keys.ts";
 
 import { EnumSelect } from "./enum-select.tsx";
 import { NumberInput } from "./number-input.tsx";
@@ -65,32 +64,15 @@ export function SubTable<T extends Record<string, number | string>>({
   readOnly,
   rows,
 }: SubTableProps<T>) {
-  // Stable row keys — track UUID per row via state
-  const [rowKeys, setRowKeys] = useState<string[]>(() =>
-    rows.map(() => crypto.randomUUID()),
-  );
-
-  // Sync key count with row count when rows change externally
-  const [lastRowCount, setLastRowCount] = useState(rows.length);
-  if (rows.length !== lastRowCount) {
-    setLastRowCount(rows.length);
-    if (rows.length > rowKeys.length) {
-      const extra = Array.from({ length: rows.length - rowKeys.length }, () =>
-        crypto.randomUUID(),
-      );
-      setRowKeys([...rowKeys, ...extra]);
-    } else if (rows.length < rowKeys.length) {
-      setRowKeys(rowKeys.slice(0, rows.length));
-    }
-  }
+  const { addKey, removeKey, rowKeys } = useRowKeys(rows.length);
 
   const addRow = () => {
-    setRowKeys((prev) => [...prev, crypto.randomUUID()]);
+    addKey();
     onChange([...rows, { ...emptyRow }]);
   };
 
   const removeRow = (index: number) => {
-    setRowKeys((prev) => prev.filter((_, i) => i !== index));
+    removeKey(index);
     onChange(rows.filter((_, i) => i !== index));
   };
 
