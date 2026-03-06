@@ -80,7 +80,7 @@
   "private": true,
   "scripts": {
     "build": "vite build",
-    "check": "bun run typecheck && bun run lint && bun run format",
+    "check": "bun run --parallel typecheck lint format",
     "check:fix": "bun run typecheck && bun run lint:fix && bun run format:write",
     "dev": "trap 'kill 0' SIGINT SIGTERM; bun --watch src/server/index.ts & vite; wait",
     "dev:api": "bun --watch src/server/index.ts",
