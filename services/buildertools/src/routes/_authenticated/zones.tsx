@@ -151,12 +151,7 @@ function ZonesPage() {
 
   return (
     <div>
-      <h2 className="text-foreground mb-4 text-2xl font-bold">
-        Zones{" "}
-        <span className="text-muted-foreground text-sm font-normal">
-          ({(zones ?? []).length})
-        </span>
-      </h2>
+      <h2 className="text-foreground mb-4 text-2xl font-bold">Zones</h2>
 
       <Alert className="border-l-accent mb-4 border-l-4">
         <AlertDescription>

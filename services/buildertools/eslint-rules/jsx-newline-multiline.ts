@@ -14,8 +14,8 @@ type JsxSibling =
  * - If either sibling spans multiple lines: require a blank line between them
  * - If both siblings are single-line: forbid a blank line between them
  *
- * Non-whitespace text nodes (JSXText) break adjacency - inline prose mixed
- * with elements is left alone. Applies in both JSXElements and JSXFragments.
+ * Parents containing inline prose (non-whitespace JSXText or {" "} spacers)
+ * are skipped entirely - Prettier controls whitespace in flow content.
  */
 export const jsxNewlineMultiline = {
   create(context: Rule.RuleContext) {
@@ -24,13 +24,25 @@ export const jsxNewlineMultiline = {
         return;
       }
 
+      // Skip parents with inline prose - text mixed with elements is flow
+      // content where Prettier controls whitespace. Detects both raw text
+      // nodes and {" "} spacer expressions.
+      const hasInlineContent = node.children.some(
+        (c) =>
+          (c.type === AST_NODE_TYPES.JSXText && c.value.trim()) ||
+          (c.type === AST_NODE_TYPES.JSXExpressionContainer &&
+            c.expression.type === AST_NODE_TYPES.Literal &&
+            typeof c.expression.value === "string" &&
+            !c.expression.value.trim()),
+      );
+      if (hasInlineContent) {
+        return;
+      }
+
       let prev: JsxSibling | null = null;
 
       for (const child of node.children) {
         if (child.type === AST_NODE_TYPES.JSXText) {
-          if (child.value.trim()) {
-            prev = null;
-          }
           continue;
         }
 
