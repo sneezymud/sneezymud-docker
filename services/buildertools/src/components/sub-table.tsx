@@ -143,7 +143,10 @@ export function SubTable<T extends Record<string, number | string>>({
               {columns.map((col) => {
                 const cellId = `${label}-${index}-${col.key}`;
                 return (
-                  <div key={col.key}>
+                  <div
+                    className="flex flex-col gap-1"
+                    key={col.key}
+                  >
                     <Label htmlFor={cellId}>{col.label}</Label>
 
                     {col.type === "custom" ? (

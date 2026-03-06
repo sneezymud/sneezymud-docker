@@ -80,7 +80,7 @@ export function EntityList({
   const selectedVnums = Object.keys(rowSelection).map(Number);
 
   return (
-    <div>
+    <>
       <div className="mb-4 flex items-center gap-3">
         <h2 className="text-foreground text-2xl font-bold">
           {label}{" "}
@@ -179,7 +179,7 @@ export function EntityList({
           ? `${filteredCount} results (${entities.length} total)`
           : `${entities.length} ${label.toLowerCase()}`}
       </p>
-    </div>
+    </>
   );
 }
 

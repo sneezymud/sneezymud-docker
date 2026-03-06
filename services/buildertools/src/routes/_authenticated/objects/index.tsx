@@ -83,7 +83,7 @@ function ObjectListPage() {
       : entities;
 
   return (
-    <div>
+    <>
       {from !== undefined && to !== undefined ? (
         <Alert className="mb-4">
           <AlertDescription className="flex items-center gap-2">
@@ -129,6 +129,6 @@ function ObjectListPage() {
         title="Confirm Bulk Delete"
         variant="danger"
       />
-    </div>
+    </>
   );
 }

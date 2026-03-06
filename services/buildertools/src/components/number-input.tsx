@@ -71,7 +71,7 @@ export function NumberInput({
       (max !== undefined && parsed > max));
 
   return (
-    <div>
+    <div className="flex flex-col gap-1">
       <Input
         {...rest}
         aria-invalid={outOfRange || undefined}
@@ -90,7 +90,7 @@ export function NumberInput({
       />
 
       {outOfRange ? (
-        <p className="text-destructive mt-1 text-xs">
+        <p className="text-destructive text-xs">
           {min !== undefined && max !== undefined
             ? `Must be between ${min} and ${max}`
             : min === undefined

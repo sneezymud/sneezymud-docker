@@ -168,7 +168,7 @@ function MobStringRow({
   return (
     <div className="border-border/30 bg-muted/20 space-y-2 rounded border p-3">
       <div className="flex items-center justify-between">
-        <div className="flex-1">
+        <div className="flex flex-1 flex-col gap-1">
           <Label htmlFor={`mstr-${index}-keyword`}>Type</Label>
 
           <Select
@@ -210,16 +210,18 @@ function MobStringRow({
         </Button>
       </div>
 
-      <Label htmlFor={`mstr-${index}-description`}>Message</Label>
+      <div className="flex flex-col gap-1">
+        <Label htmlFor={`mstr-${index}-description`}>Message</Label>
 
-      <Textarea
-        className="min-h-16 text-base"
-        id={`mstr-${index}-description`}
-        onChange={(e) => {
-          onDescriptionChange(e.target.value);
-        }}
-        value={row.description}
-      />
+        <Textarea
+          className="min-h-16 text-base"
+          id={`mstr-${index}-description`}
+          onChange={(e) => {
+            onDescriptionChange(e.target.value);
+          }}
+          value={row.description}
+        />
+      </div>
     </div>
   );
 }

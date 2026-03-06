@@ -23,9 +23,12 @@ export function EntityFormSkeleton() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((field) => (
-              <div key={field}>
+              <div
+                className="flex flex-col gap-1"
+                key={field}
+              >
                 <Skeleton className="h-4 w-15" />
-                <Skeleton className="mt-1 h-9 w-full" />
+                <Skeleton className="h-9 w-full" />
               </div>
             ))}
           </div>

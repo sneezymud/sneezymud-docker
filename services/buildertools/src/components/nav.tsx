@@ -57,7 +57,7 @@ export function Nav({ className, onNavClick }: NavProps) {
       className={cn("border-border bg-card flex w-56 flex-col p-4", className)}
     >
       <div className="mb-6 flex items-start justify-between">
-        <div>
+        <div className="flex flex-col">
           <p className="text-foreground font-mono text-lg font-bold tracking-tight">
             SneezyMUD
           </p>

@@ -53,7 +53,7 @@ export function LoginForm() {
       className="space-y-4"
       onSubmit={handleSubmit}
     >
-      <div>
+      <div className="flex flex-col gap-1">
         <Label htmlFor="username">Username</Label>
 
         <Input
@@ -69,7 +69,7 @@ export function LoginForm() {
         />
       </div>
 
-      <div>
+      <div className="flex flex-col gap-1">
         <Label htmlFor="password">Password</Label>
 
         <Input

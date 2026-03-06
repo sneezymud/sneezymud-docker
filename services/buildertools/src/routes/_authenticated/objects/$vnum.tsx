@@ -240,7 +240,7 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
   };
 
   return (
-    <div>
+    <>
       <EntityHeader
         before={
           <BackLink
@@ -294,7 +294,7 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
         blockerReset={blockerReset}
         blockerStatus={blockerStatus}
       />
-    </div>
+    </>
   );
 }
 

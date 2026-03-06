@@ -190,7 +190,7 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
   };
 
   return (
-    <div>
+    <>
       <EntityHeader
         before={
           <BackLink
@@ -244,7 +244,7 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
         blockerReset={blockerReset}
         blockerStatus={blockerStatus}
       />
-    </div>
+    </>
   );
 }
 

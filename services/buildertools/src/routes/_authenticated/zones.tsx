@@ -150,7 +150,7 @@ function ZonesPage() {
   }
 
   return (
-    <div>
+    <>
       <h2 className="text-foreground mb-4 text-2xl font-bold">Zones</h2>
 
       <Alert className="border-l-accent mb-4 border-l-4">
@@ -229,6 +229,6 @@ function ZonesPage() {
           ? `${filteredCount} results (${(zones ?? []).length} total)`
           : `${(zones ?? []).length} zones`}
       </p>
-    </div>
+    </>
   );
 }

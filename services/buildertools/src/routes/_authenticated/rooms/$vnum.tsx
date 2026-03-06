@@ -187,7 +187,7 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
   };
 
   return (
-    <div>
+    <>
       <EntityHeader
         before={
           <BackLink
@@ -237,7 +237,7 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
         blockerReset={blockerReset}
         blockerStatus={blockerStatus}
       />
-    </div>
+    </>
   );
 }
 

@@ -168,7 +168,7 @@ function ConditionFlagsField({
   value: number;
 }) {
   return (
-    <div>
+    <div className="flex flex-col gap-1">
       <Label htmlFor={`${prefix}-cond`}>Condition Flags</Label>
 
       <BitfieldEditor
@@ -194,7 +194,7 @@ function DoorNameField({
   value: string;
 }) {
   return (
-    <div>
+    <div className="flex flex-col gap-1">
       <Label htmlFor={`${prefix}-name`}>
         Door name
         <FieldTooltip label="Door name">
@@ -235,7 +235,7 @@ function ExitDescriptionField({
   value: string;
 }) {
   return (
-    <div>
+    <div className="flex flex-col gap-1">
       <Label htmlFor={`${prefix}-desc`}>
         Description
         <FieldTooltip label="Description">
@@ -292,7 +292,7 @@ function DestinationField({
   value: number;
 }) {
   return (
-    <div>
+    <div className="flex flex-col gap-1">
       <Label htmlFor={`${prefix}-dest`}>Destination</Label>
 
       <RoomPicker
@@ -318,7 +318,7 @@ function DoorTypeField({
   value: number;
 }) {
   return (
-    <div>
+    <div className="flex flex-col gap-1">
       <Label htmlFor={`${prefix}-type`}>
         Type
         <FieldTooltip
@@ -358,7 +358,7 @@ function DoorLockFields({
 }) {
   return (
     <div className="grid grid-cols-2 gap-2">
-      <div>
+      <div className="flex flex-col gap-1">
         <Label htmlFor={`${prefix}-lock`}>
           Lock diff.
           <FieldTooltip label="Lock Difficulty">
@@ -401,7 +401,7 @@ function DoorLockFields({
         />
       </div>
 
-      <div>
+      <div className="flex flex-col gap-1">
         <Label htmlFor={`${prefix}-weight`}>
           Weight
           <FieldTooltip label="Door Weight">
@@ -478,7 +478,7 @@ function KeyVnumField({
   value: number;
 }) {
   return (
-    <div className="w-1/2">
+    <div className="flex w-1/2 flex-col gap-1">
       <Label htmlFor={`${prefix}-key`}>
         Key vnum
         <FieldTooltip label="Key Vnum">
