@@ -2,7 +2,6 @@ import { Fragment, useState } from "react";
 
 import type { BitfieldEntry, EnumEntry } from "@/shared/enums/types.ts";
 
-import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -12,13 +11,13 @@ import { TooltipProvider } from "@/components/ui/tooltip.tsx";
 import { cn } from "@/lib/utils.ts";
 
 import { BitfieldEditor } from "./bitfield-editor.tsx";
-import { ConfirmDialog } from "./confirm-dialog.tsx";
 import { EnumSelect } from "./enum-select.tsx";
 import { FieldTooltip } from "./info-tooltip.tsx";
 import { NumberInput } from "./number-input.tsx";
 import { RoomPicker } from "./room-picker.tsx";
 
 interface FieldDefBase {
+  addable?: boolean;
   detailedTooltip?: React.ReactNode;
   fullWidth?: boolean;
   help?: string;
@@ -67,6 +66,7 @@ interface FieldGroupDef {
   fieldGroupSize?: number;
   fields: FieldDef[];
   gridCols?: string;
+  header?: React.ReactNode;
   labelClass?: string | undefined;
   title: string;
   tooltip?: React.ReactNode;
@@ -74,93 +74,22 @@ interface FieldGroupDef {
 
 interface EntityFormProps {
   children?: React.ReactNode;
-  deleteMessage?: string;
-  deletePending?: boolean;
-  dirty: boolean;
   groups: FieldGroupDef[];
   onChange: (key: string, value: number | string) => void;
-  onDelete?: () => void;
-  onReset?: () => void;
-  onSave: () => void;
   originalValues?: Record<string, number | string> | undefined;
-  saving: boolean;
   values: Record<string, number | string>;
 }
 
 export function EntityForm({
   children,
-  deleteMessage,
-  deletePending,
-  dirty,
   groups,
   onChange,
-  onDelete,
-  onReset,
-  onSave,
   originalValues,
-  saving,
   values,
 }: EntityFormProps) {
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    onSave();
-  };
-
   return (
     <TooltipProvider delayDuration={300}>
-      <form
-        className="space-y-6"
-        onSubmit={handleSubmit}
-      >
-        <div className="border-border bg-background/95 sticky top-0 z-10 flex items-center gap-3 border-b py-3 shadow-md backdrop-blur-sm">
-          <Button
-            disabled={!dirty || saving}
-            type="submit"
-          >
-            {saving ? "Saving..." : "Save"}
-          </Button>
-
-          <span
-            aria-live="polite"
-            className="contents"
-          >
-            {dirty ? (
-              <Badge
-                className="animate-in fade-in slide-in-from-top-1 gap-1.5 text-amber-400 duration-150"
-                variant="outline"
-              >
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
-                Unsaved changes
-                {onReset ? (
-                  <Button
-                    className="ml-1"
-                    onClick={onReset}
-                    size="xs"
-                    variant="link"
-                  >
-                    Discard
-                  </Button>
-                ) : null}
-              </Badge>
-            ) : null}
-          </span>
-
-          {onDelete ? (
-            <Button
-              className="text-muted-foreground hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive ml-6"
-              disabled={deletePending}
-              onClick={() => {
-                setShowDeleteConfirm(true);
-              }}
-              variant="outline"
-            >
-              {deletePending ? "Deleting..." : "Delete"}
-            </Button>
-          ) : null}
-        </div>
-
+      <div className="space-y-6">
         <div className="3xl:grid-cols-3 grid gap-6 lg:grid-cols-2">
           {groups.map((group) => (
             <FieldGroup
@@ -169,6 +98,7 @@ export function EntityForm({
               fieldGroupSize={group.fieldGroupSize}
               fields={group.fields}
               gridCols={group.gridCols}
+              header={group.header}
               key={group.title}
               labelClass={group.labelClass}
               onChange={onChange}
@@ -181,25 +111,7 @@ export function EntityForm({
         </div>
 
         {children}
-
-        {onDelete ? (
-          <ConfirmDialog
-            confirmLabel="Yes, delete"
-            message={deleteMessage ?? "Are you sure you want to delete this?"}
-            onCancel={() => {
-              setShowDeleteConfirm(false);
-            }}
-            onConfirm={() => {
-              if (deletePending) return;
-              setShowDeleteConfirm(false);
-              onDelete();
-            }}
-            open={showDeleteConfirm}
-            title="Confirm Delete"
-            variant="danger"
-          />
-        ) : null}
-      </form>
+      </div>
     </TooltipProvider>
   );
 }
@@ -207,20 +119,20 @@ export function EntityForm({
 function FormField({
   field,
   isDirty,
-  labelClass,
   onChange,
   value,
 }: {
   field: FieldDef;
   isDirty: boolean;
-  labelClass?: string | undefined;
   onChange: (key: string, value: number | string) => void;
   value: number | string | undefined;
 }) {
+  const hasValue =
+    typeof value === "string" ? value.trim() !== "" : value !== undefined;
+  const [expanded, setExpanded] = useState(!field.addable || hasValue);
+
   const isFullWidth =
     field.fullWidth ?? (field.type === "textarea" || field.type === "bitfield");
-  const isNarrowField =
-    !isFullWidth && field.type !== "bitfield" && field.type !== "textarea";
 
   const handleChange = field.readOnly
     ? undefined
@@ -228,130 +140,194 @@ function FormField({
         onChange(key, v);
       };
 
+  const tooltipElement =
+    field.tooltip || field.help || field.detailedTooltip ? (
+      <FieldTooltip
+        detailedTooltip={field.detailedTooltip}
+        label={field.label}
+      >
+        {field.help ? <p className="font-medium">{field.help}</p> : null}
+        {field.help && field.tooltip ? <Separator className="my-1.5" /> : null}
+        {field.tooltip}
+      </FieldTooltip>
+    ) : null;
+
+  const labelContent = field.label ? (
+    <span>
+      {field.label}
+      {field.required ? (
+        <span
+          aria-label="required"
+          className="text-amber-400"
+        >
+          *
+        </span>
+      ) : null}
+    </span>
+  ) : null;
+
+  if (field.addable && !expanded) {
+    return (
+      <div className="col-span-full border-l-2 border-l-transparent pl-2">
+        <Label>
+          {labelContent}
+          {tooltipElement}
+          <Button
+            className="h-auto px-1 py-0"
+            onClick={() => {
+              setExpanded(true);
+            }}
+            variant="link"
+          >
+            Add
+          </Button>
+        </Label>
+      </div>
+    );
+  }
+
+  const inputElement =
+    field.type === "textarea" ? (
+      <Textarea
+        className="min-h-27 text-base"
+        disabled={field.readOnly}
+        id={field.key}
+        onChange={(e) => {
+          handleChange?.(field.key, e.target.value);
+        }}
+        value={value ?? ""}
+      />
+    ) : field.type === "enum" ? (
+      <EnumSelect
+        disabled={field.readOnly}
+        entries={field.enumEntries}
+        id={field.key}
+        onChange={(v) => {
+          handleChange?.(field.key, v);
+        }}
+        value={
+          typeof value === "number"
+            ? value
+            : Number.isFinite(Number(value))
+              ? Number(value)
+              : 0
+        }
+      />
+    ) : field.type === "bitfield" ? (
+      <BitfieldEditor
+        entries={field.bitfieldEntries}
+        id={field.key}
+        onChange={(v) => {
+          handleChange?.(field.key, v);
+        }}
+        value={
+          typeof value === "number"
+            ? value
+            : Number.isFinite(Number(value))
+              ? Number(value)
+              : 0
+        }
+      />
+    ) : field.type === "number" ? (
+      <NumberInput
+        disabled={field.readOnly}
+        id={field.key}
+        max={field.max}
+        min={field.min}
+        onValueChange={(v) => {
+          handleChange?.(field.key, v);
+        }}
+        step={field.step}
+        value={
+          typeof value === "number"
+            ? value
+            : Number.isFinite(Number(value))
+              ? Number(value)
+              : 0
+        }
+      />
+    ) : field.type === "room" ? (
+      <RoomPicker
+        id={field.key}
+        onChange={(v) => {
+          handleChange?.(field.key, v);
+        }}
+        value={
+          typeof value === "number"
+            ? value
+            : Number.isFinite(Number(value))
+              ? Number(value)
+              : 0
+        }
+      />
+    ) : (
+      <Input
+        disabled={field.readOnly}
+        id={field.key}
+        onChange={(e) => {
+          handleChange?.(field.key, e.target.value);
+        }}
+        type="text"
+        value={value ?? ""}
+      />
+    );
+
+  const dirtyClass = isDirty ? "border-l-amber-400/50" : "border-l-transparent";
+
+  if (isFullWidth) {
+    return (
+      <div
+        className={cn(
+          "col-span-full pb-1",
+          "border-l-2 pl-2",
+          dirtyClass,
+          field.readOnly && "opacity-60",
+        )}
+      >
+        {labelContent || tooltipElement ? (
+          <Label htmlFor={field.key}>
+            {labelContent}
+            {tooltipElement}
+            {field.addable ? (
+              <Button
+                className="h-auto px-1 py-0"
+                onClick={() => {
+                  handleChange?.(field.key, "");
+                  setExpanded(false);
+                }}
+                variant="link"
+              >
+                Remove
+              </Button>
+            ) : null}
+          </Label>
+        ) : null}
+        {inputElement}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
-        isFullWidth && "col-span-full",
-        isNarrowField && "max-w-xs",
-        isDirty && "border-l-2 border-l-amber-400/50 pl-2",
+        "col-span-3 grid grid-cols-subgrid items-baseline",
+        "border-l-2 pl-2",
+        dirtyClass,
         field.readOnly && "opacity-60",
       )}
     >
-      {field.label || field.tooltip || field.help || field.detailedTooltip ? (
+      {labelContent ? (
         <Label
-          className={labelClass}
+          className="mb-0 justify-end"
           htmlFor={field.key}
         >
-          <span>
-            {field.label}
-            {field.required ? (
-              <span
-                aria-label="required"
-                className="text-amber-400"
-              >
-                *
-              </span>
-            ) : null}
-          </span>
-          {field.tooltip || field.help || field.detailedTooltip ? (
-            <FieldTooltip
-              detailedTooltip={field.detailedTooltip}
-              label={field.label}
-            >
-              {field.help ? <p className="font-medium">{field.help}</p> : null}
-              {field.help && field.tooltip ? (
-                <Separator className="my-1.5" />
-              ) : null}
-              {field.tooltip}
-            </FieldTooltip>
-          ) : null}
+          {labelContent}
         </Label>
-      ) : null}
-      {field.type === "textarea" ? (
-        <Textarea
-          className="min-h-27 text-base"
-          disabled={field.readOnly}
-          id={field.key}
-          onChange={(e) => {
-            handleChange?.(field.key, e.target.value);
-          }}
-          value={value ?? ""}
-        />
-      ) : field.type === "enum" ? (
-        <EnumSelect
-          disabled={field.readOnly}
-          entries={field.enumEntries}
-          id={field.key}
-          onChange={(v) => {
-            handleChange?.(field.key, v);
-          }}
-          value={
-            typeof value === "number"
-              ? value
-              : Number.isFinite(Number(value))
-                ? Number(value)
-                : 0
-          }
-        />
-      ) : field.type === "bitfield" ? (
-        <BitfieldEditor
-          entries={field.bitfieldEntries}
-          id={field.key}
-          onChange={(v) => {
-            handleChange?.(field.key, v);
-          }}
-          value={
-            typeof value === "number"
-              ? value
-              : Number.isFinite(Number(value))
-                ? Number(value)
-                : 0
-          }
-        />
-      ) : field.type === "number" ? (
-        <NumberInput
-          className="font-mono"
-          disabled={field.readOnly}
-          id={field.key}
-          max={field.max}
-          min={field.min}
-          onValueChange={(v) => {
-            handleChange?.(field.key, v);
-          }}
-          step={field.step}
-          value={
-            typeof value === "number"
-              ? value
-              : Number.isFinite(Number(value))
-                ? Number(value)
-                : 0
-          }
-        />
-      ) : field.type === "room" ? (
-        <RoomPicker
-          id={field.key}
-          onChange={(v) => {
-            handleChange?.(field.key, v);
-          }}
-          value={
-            typeof value === "number"
-              ? value
-              : Number.isFinite(Number(value))
-                ? Number(value)
-                : 0
-          }
-        />
       ) : (
-        <Input
-          disabled={field.readOnly}
-          id={field.key}
-          onChange={(e) => {
-            handleChange?.(field.key, e.target.value);
-          }}
-          type="text"
-          value={value ?? ""}
-        />
+        <div />
       )}
+      <div className="min-w-0">{inputElement}</div>
+      <div className="justify-self-center">{tooltipElement}</div>
     </div>
   );
 }
@@ -361,8 +337,9 @@ function FieldGroup({
   detailedTooltip,
   fieldGroupSize,
   fields,
-  gridCols,
-  labelClass,
+  gridCols: _gridCols,
+  header,
+  labelClass: _labelClass,
   onChange,
   originalValues,
   title,
@@ -374,6 +351,7 @@ function FieldGroup({
   fieldGroupSize?: number | undefined;
   fields: FieldDef[];
   gridCols?: string | undefined;
+  header?: React.ReactNode;
   labelClass?: string | undefined;
   onChange: (key: string, value: number | string) => void;
   originalValues?: Record<string, number | string> | undefined;
@@ -381,9 +359,17 @@ function FieldGroup({
   tooltip?: React.ReactNode;
   values: Record<string, number | string>;
 }) {
+  const allCompact = fields.every(
+    (f) => !(f.fullWidth ?? (f.type === "textarea" || f.type === "bitfield")),
+  );
+  const multiColumn = allCompact && fields.length > 1;
+
   return (
     <fieldset
-      className={cn("p-4 shadow-sm", colSpan === "full" && "col-span-full")}
+      className={cn(
+        "bg-card border-border/50 rounded-lg border p-5",
+        colSpan === "full" && "col-span-full",
+      )}
     >
       <legend className="text-foreground text-lg font-semibold">
         {title}
@@ -396,22 +382,36 @@ function FieldGroup({
           </FieldTooltip>
         ) : null}
       </legend>
+      {header}
       <div
-        className={cn("grid gap-4", gridCols ?? "grid-cols-1 sm:grid-cols-2")}
+        className={cn(
+          "grid grid-cols-[auto_auto_1.5rem] gap-x-3 gap-y-2",
+          multiColumn &&
+            "sm:grid-flow-col sm:grid-cols-[auto_auto_1.5rem_auto_auto_1.5rem]",
+        )}
+        style={
+          multiColumn
+            ? {
+                gridTemplateRows: `repeat(${Math.ceil(fields.length / 2)}, auto)`,
+              }
+            : undefined
+        }
       >
         {fields.map((field, i) => {
           const fieldDirty =
             originalValues !== undefined &&
             values[field.key] !== originalValues[field.key];
           const showSeparator =
-            fieldGroupSize !== undefined && i > 0 && i % fieldGroupSize === 0;
+            !multiColumn &&
+            fieldGroupSize !== undefined &&
+            i > 0 &&
+            i % fieldGroupSize === 0;
           return (
             <Fragment key={field.key}>
               {showSeparator ? <Separator className="col-span-full" /> : null}
               <FormField
                 field={field}
                 isDirty={fieldDirty}
-                labelClass={labelClass}
                 onChange={onChange}
                 value={values[field.key]}
               />

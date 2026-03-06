@@ -10,7 +10,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb.tsx";
 
-interface BreadcrumbEntry {
+export interface BreadcrumbEntry {
   label: string;
   to?: string | undefined;
 }

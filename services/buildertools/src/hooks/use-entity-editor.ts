@@ -28,6 +28,8 @@ interface UseEntityEditorOptions<T> {
   onReset: () => void;
   /** Performs the save API call. Return saved entity for cache update, or null to skip. */
   saveFn: () => Promise<null | T>;
+  /** Pre-save validation. Return an error message to block save, or null to proceed. */
+  validate?: () => null | string;
 }
 
 export function useEntityEditor<T>({
@@ -39,6 +41,7 @@ export function useEntityEditor<T>({
   listPath,
   onReset,
   saveFn,
+  validate,
 }: UseEntityEditorOptions<T>) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -110,6 +113,13 @@ export function useEntityEditor<T>({
   });
 
   const handleSave = () => {
+    if (validate) {
+      const error = validate();
+      if (error) {
+        toastError(error);
+        return;
+      }
+    }
     saveMutation.mutate();
   };
 

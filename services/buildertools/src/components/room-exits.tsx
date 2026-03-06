@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import type { RoomExit } from "@/shared/schemas/room.ts";
 
+import { AddButton } from "@/components/add-button.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -30,6 +31,7 @@ import { FieldTooltip } from "./info-tooltip.tsx";
 import { NumberInput } from "./number-input.tsx";
 import { ObjectPicker } from "./object-picker.tsx";
 import { RoomPicker } from "./room-picker.tsx";
+import { SectionHeader } from "./section-header.tsx";
 
 const directionLabels = new Map(DIRECTION_TYPES.map((d) => [d.value, d.label]));
 
@@ -266,31 +268,31 @@ export function RoomExits({ exits, onChange, vnum }: RoomExitsProps) {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <fieldset className="p-4 shadow-sm">
-        <legend className="text-foreground flex w-full items-center gap-2 text-lg font-semibold">
-          <span>Exits</span>
-          <FieldTooltip label="Exits">
-            <p>
-              Exits define how players move between rooms. Each direction can
-              have one exit with an optional door.
-            </p>
-            <p>
-              Exits work immediately from the database without zone file
-              entries. However, any door (Type other than None) will be closed
-              on every zone reset. A zone file "D" command controls whether a
-              door resets as open, closed, or locked.
-            </p>
-          </FieldTooltip>
-          <Button
-            className="ml-auto border-dashed"
-            disabled={availableDirections.length === 0}
-            onClick={addExit}
-            size="sm"
-            variant="outline"
-          >
-            + Add
-          </Button>
-        </legend>
+      <fieldset className="bg-card border-border/50 rounded-lg border p-5">
+        <SectionHeader
+          action={
+            <AddButton
+              aria-label="Add exit"
+              disabled={availableDirections.length === 0}
+              onClick={addExit}
+            />
+          }
+          title="Exits"
+          tooltip={
+            <>
+              <p>
+                Exits define how players move between rooms. Each direction can
+                have one exit with an optional door.
+              </p>
+              <p>
+                Exits work immediately from the database without zone file
+                entries. However, any door (Type other than None) will be closed
+                on every zone reset. A zone file "D" command controls whether a
+                door resets as open, closed, or locked.
+              </p>
+            </>
+          }
+        />
         <div className="space-y-3">
           {exits.map((exit, index) => {
             const prefix = `exit-${index}`;

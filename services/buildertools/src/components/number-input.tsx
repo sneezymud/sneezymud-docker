@@ -75,7 +75,11 @@ export function NumberInput({
       <Input
         {...rest}
         aria-invalid={outOfRange || undefined}
-        className={cn(className, outOfRange && "border-destructive")}
+        className={cn(
+          "font-mono",
+          className,
+          outOfRange && "border-destructive",
+        )}
         max={max}
         min={min}
         onBlur={handleBlur}

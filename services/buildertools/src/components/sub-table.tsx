@@ -1,21 +1,16 @@
-import { Info } from "lucide-react";
 import { useState } from "react";
 
 import type { EnumEntry } from "@/shared/enums/types.ts";
 
+import { AddButton } from "@/components/add-button.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip.tsx";
 
 import { EnumSelect } from "./enum-select.tsx";
 import { NumberInput } from "./number-input.tsx";
+import { SectionHeader } from "./section-header.tsx";
 import { TagInput } from "./tag-input.tsx";
 
 export type ColumnDef<T> =
@@ -126,46 +121,22 @@ export function SubTable<T extends Record<string, number | string>>({
 
   return (
     <fieldset
-      className="p-4"
+      className="bg-card border-border/50 rounded-lg border p-5"
       disabled={readOnly}
     >
-      <legend className="text-foreground flex w-full items-center gap-2 text-lg font-semibold">
-        <span>{label}</span>
-        {help ? (
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className="text-muted-foreground hover:text-foreground inline-flex cursor-help align-middle"
-                  type="button"
-                >
-                  <Info
-                    aria-hidden="true"
-                    className="h-3.5 w-3.5"
-                  />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent
-                className="max-w-sm text-sm text-wrap"
-                sideOffset={5}
-              >
-                {help}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        ) : null}
-        {readOnly ? null : (
-          <Button
-            className="border-dashed"
-            disabled={maxRows !== undefined && rows.length >= maxRows}
-            onClick={addRow}
-            size="sm"
-            variant="outline"
-          >
-            + Add
-          </Button>
-        )}
-      </legend>
+      <SectionHeader
+        action={
+          readOnly ? undefined : (
+            <AddButton
+              aria-label={`Add ${label.toLowerCase()}`}
+              disabled={maxRows !== undefined && rows.length >= maxRows}
+              onClick={addRow}
+            />
+          )
+        }
+        title={label}
+        tooltip={help}
+      />
       {helpParagraph ? (
         <p className="text-muted-foreground mt-1 mb-3 text-sm">
           {helpParagraph}
@@ -304,7 +275,7 @@ function CellInput({
   if (type === "number") {
     return (
       <NumberInput
-        className="px-2 py-1 font-mono"
+        className="px-2 py-1"
         id={id}
         onValueChange={onNumberChange}
         value={
