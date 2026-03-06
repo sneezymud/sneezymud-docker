@@ -2,9 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { Breadcrumbs } from "@/components/breadcrumbs.tsx";
+import { BackLink } from "@/components/back-link.tsx";
 import { CodeEditor } from "@/components/code-editor/code-editor.tsx";
 import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
+import { EntityHeader } from "@/components/entity-header.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import {
   Accordion,
@@ -12,8 +13,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion.tsx";
-import { Badge } from "@/components/ui/badge.tsx";
-import { Button } from "@/components/ui/button.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
 import { apiFetch } from "@/shared/api-client.ts";
@@ -123,53 +122,25 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-4 space-y-1">
-        <Breadcrumbs
-          items={[
-            { label: "Mobs", to: "/mobs" },
-            { label: mobName, to: `/mobs/${vnum}` },
-            { label: "Responses" },
-          ]}
-        />
-        <h2 className="text-foreground text-2xl font-bold">
-          Responses — {mobName}
-          <span className="text-muted-foreground ml-1 text-sm font-normal">
-            (#{vnum})
-          </span>
-        </h2>
-      </div>
-      <div className="border-border bg-background/95 mb-4 flex items-center gap-3 border-b py-3 shadow-sm backdrop-blur-sm">
-        <Button
-          disabled={!dirty || saving}
-          onClick={handleSave}
-        >
-          {saving ? "Saving..." : "Save"}
-        </Button>
-        <span
-          aria-live="polite"
-          className="contents"
-        >
-          {dirty ? (
-            <Badge
-              className="animate-in fade-in slide-in-from-top-1 gap-1.5 text-amber-400 duration-150"
-              variant="outline"
-            >
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
-              Unsaved changes
-              <Button
-                className="ml-1"
-                onClick={() => {
-                  setDraft(null);
-                }}
-                size="xs"
-                variant="link"
-              >
-                Discard
-              </Button>
-            </Badge>
-          ) : null}
-        </span>
-      </div>
+      <EntityHeader
+        before={
+          <BackLink
+            title="Back to mob"
+            to={`/mobs/${vnum}`}
+          />
+        }
+        breadcrumbs={[
+          { label: "Mobs", to: "/mobs" },
+          { label: mobName },
+          { label: "Responses" },
+        ]}
+        dirty={dirty}
+        onReset={() => {
+          setDraft(null);
+        }}
+        onSave={handleSave}
+        saving={saving}
+      />
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col">

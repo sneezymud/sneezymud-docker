@@ -6,14 +6,16 @@ import type { FieldDef, FieldGroupDef } from "@/components/entity-form.tsx";
 import type { EnumEntry } from "@/shared/enums/types.ts";
 import type { Room, RoomExit, RoomExtra } from "@/shared/schemas/room.ts";
 
-import { Breadcrumbs } from "@/components/breadcrumbs.tsx";
+import { BackLink } from "@/components/back-link.tsx";
 import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
 import { EntityForm } from "@/components/entity-form.tsx";
+import { EntityHeader } from "@/components/entity-header.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { RoomExits } from "@/components/room-exits.tsx";
 import { EntityFormSkeleton } from "@/components/skeleton.tsx";
 import { SubTable } from "@/components/sub-table.tsx";
 import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
+import { pruneEdits } from "@/lib/prune-edits.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import {
   DIRECTION_TYPES,
@@ -511,20 +513,22 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
         typeof edits?.room_flag === "number" ? edits.room_flag : room.room_flag;
       if (value === -1) {
         // Outdoor: clear INDOORS bit
-        setEdits((prev) => ({
-          ...prev,
-          height: value,
-          room_flag: currentFlags & ~indoorsBit,
-        }));
+        setEdits((prev) =>
+          pruneEdits(
+            { ...prev, height: value, room_flag: currentFlags & ~indoorsBit },
+            room,
+          ),
+        );
       } else if (value >= 1 && value <= 1000) {
         // Indoor: set INDOORS bit
-        setEdits((prev) => ({
-          ...prev,
-          height: value,
-          room_flag: currentFlags | indoorsBit,
-        }));
+        setEdits((prev) =>
+          pruneEdits(
+            { ...prev, height: value, room_flag: currentFlags | indoorsBit },
+            room,
+          ),
+        );
       } else {
-        setEdits((prev) => ({ ...prev, [key]: value }));
+        setEdits((prev) => pruneEdits({ ...prev, [key]: value }, room));
       }
       return;
     }
@@ -540,17 +544,21 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
 
       if (!wasIndoors && isIndoors && currentHeight === -1) {
         // Toggled INDOORS on while height is unlimited: set height to 100
-        setEdits((prev) => ({ ...prev, height: 100, room_flag: value }));
+        setEdits((prev) =>
+          pruneEdits({ ...prev, height: 100, room_flag: value }, room),
+        );
       } else if (wasIndoors && !isIndoors) {
         // Toggled INDOORS off: set height to -1
-        setEdits((prev) => ({ ...prev, height: -1, room_flag: value }));
+        setEdits((prev) =>
+          pruneEdits({ ...prev, height: -1, room_flag: value }, room),
+        );
       } else {
-        setEdits((prev) => ({ ...prev, [key]: value }));
+        setEdits((prev) => pruneEdits({ ...prev, [key]: value }, room));
       }
       return;
     }
 
-    setEdits((prev) => ({ ...prev, [key]: value }));
+    setEdits((prev) => pruneEdits({ ...prev, [key]: value }, room));
   };
 
   const handleExitChange = (exits: RoomExit[]) => {
@@ -559,24 +567,20 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
 
   return (
     <div>
-      <div className="mb-4 space-y-1">
-        <Breadcrumbs
-          items={[
-            { label: "Rooms", to: "/rooms" },
-            { label: `Room ${vnum}: ${room.name || "(unnamed)"}` },
-          ]}
-        />
-        <h2 className="text-foreground text-xl font-bold">
-          Room {vnum}: {room.name || "(unnamed)"}
-        </h2>
-      </div>
-
-      <EntityForm
+      <EntityHeader
+        before={
+          <BackLink
+            title="Back to rooms"
+            to="/rooms"
+          />
+        }
+        breadcrumbs={[
+          { label: "Rooms", to: "/rooms" },
+          { label: `Room ${vnum}: ${room.name || "(unnamed)"}` },
+        ]}
         deleteMessage={`Are you sure you want to delete room ${vnum}? This also removes all exits.`}
         deletePending={deletePending}
         dirty={dirty}
-        groups={getRoomFieldGroups(zoneEntries, zonesError, user?.powers ?? [])}
-        onChange={handleFieldChange}
         onDelete={handleDelete}
         onReset={() => {
           setEdits(null);
@@ -584,8 +588,13 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
           setExtraEdits(null);
         }}
         onSave={handleSave}
-        originalValues={roomToFormValues(room, null)}
         saving={saving}
+      />
+
+      <EntityForm
+        groups={getRoomFieldGroups(zoneEntries, zonesError, user?.powers ?? [])}
+        onChange={handleFieldChange}
+        originalValues={roomToFormValues(room, null)}
         values={currentValues}
       >
         <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">

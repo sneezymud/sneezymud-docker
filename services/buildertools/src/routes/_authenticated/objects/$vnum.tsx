@@ -7,10 +7,11 @@ import type { FieldDef, FieldGroupDef } from "@/components/entity-form.tsx";
 import type { ColumnDef } from "@/components/sub-table.tsx";
 import type { Obj, ObjAffect, ObjExtra } from "@/shared/schemas/obj.ts";
 
+import { BackLink } from "@/components/back-link.tsx";
 import { BitfieldEditor } from "@/components/bitfield-editor.tsx";
-import { Breadcrumbs } from "@/components/breadcrumbs.tsx";
 import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
 import { EntityForm } from "@/components/entity-form.tsx";
+import { EntityHeader } from "@/components/entity-header.tsx";
 import { EnumSelect } from "@/components/enum-select.tsx";
 import { NumberInput } from "@/components/number-input.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
@@ -28,6 +29,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip.tsx";
 import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
+import { pruneEdits } from "@/lib/prune-edits.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import { getApplyTypeSpec } from "@/shared/apply-type-specs.ts";
 import { hasBit } from "@/shared/bitfield.ts";
@@ -632,7 +634,7 @@ const affectColumns: Array<ColumnDef<ObjAffect>> = [
       if (!spec) {
         return (
           <NumberInput
-            className="px-2 py-1 font-mono"
+            className="px-2 py-1"
             id={id}
             onValueChange={onChange}
             value={row.mod1}
@@ -699,7 +701,7 @@ const affectColumns: Array<ColumnDef<ObjAffect>> = [
         <>
           {label}
           <NumberInput
-            className="px-2 py-1 font-mono"
+            className="px-2 py-1"
             id={id}
             max={spec.mod1.max}
             min={spec.mod1.min}
@@ -727,7 +729,7 @@ const affectColumns: Array<ColumnDef<ObjAffect>> = [
         }
         return (
           <NumberInput
-            className="px-2 py-1 font-mono"
+            className="px-2 py-1"
             id={id}
             onValueChange={onChange}
             value={row.mod2}
@@ -746,7 +748,7 @@ const affectColumns: Array<ColumnDef<ObjAffect>> = [
             ) : null}
           </span>
           <NumberInput
-            className="px-2 py-1 font-mono"
+            className="px-2 py-1"
             id={id}
             max={spec.mod2.max}
             min={spec.mod2.min}
@@ -897,7 +899,7 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
                   numValue,
                 )
               : numValue;
-          return { ...prev, [valKey]: packed };
+          return pruneEdits({ ...prev, [valKey]: packed }, obj);
         });
         return;
       }
@@ -930,43 +932,40 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
             }
           }
         }
-        return {
-          ...prev,
-          type: numValue,
-          val0: raw[0],
-          val1: raw[1],
-          val2: raw[2],
-          val3: raw[3],
-        };
+        return pruneEdits(
+          {
+            ...prev,
+            type: numValue,
+            val0: raw[0],
+            val1: raw[1],
+            val2: raw[2],
+            val3: raw[3],
+          },
+          obj,
+        );
       });
       return;
     }
 
-    setEdits((prev) => ({ ...prev, [key]: value }));
+    setEdits((prev) => pruneEdits({ ...prev, [key]: value }, obj));
   };
 
   return (
     <div>
-      <div className="mb-4 space-y-1">
-        <Breadcrumbs
-          items={[
-            { label: "Objects", to: "/objects" },
-            {
-              label: `Object ${vnum}: ${obj.short_desc || "(unnamed)"}`,
-            },
-          ]}
-        />
-        <h2 className="text-foreground text-xl font-bold">
-          Object {vnum}: {obj.short_desc || "(unnamed)"}
-        </h2>
-      </div>
-
-      <EntityForm
+      <EntityHeader
+        before={
+          <BackLink
+            title="Back to objects"
+            to="/objects"
+          />
+        }
+        breadcrumbs={[
+          { label: "Objects", to: "/objects" },
+          { label: `Object ${vnum}: ${obj.short_desc || "(unnamed)"}` },
+        ]}
         deleteMessage={`Are you sure you want to delete object ${vnum}? This also removes all affects and extra descriptions.`}
         deletePending={deletePending}
         dirty={dirty}
-        groups={getObjFieldGroups(currentItemType, user?.powers ?? [])}
-        onChange={handleFieldChange}
         onDelete={handleDelete}
         onReset={() => {
           setEdits(null);
@@ -974,8 +973,13 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
           setExtraEdits(null);
         }}
         onSave={handleSave}
-        originalValues={expandedOriginal}
         saving={saving}
+      />
+
+      <EntityForm
+        groups={getObjFieldGroups(currentItemType, user?.powers ?? [])}
+        onChange={handleFieldChange}
+        originalValues={expandedOriginal}
         values={expandedValues}
       >
         <div className="grid gap-6 lg:grid-cols-2">
