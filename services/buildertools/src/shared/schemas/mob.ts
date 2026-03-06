@@ -80,7 +80,8 @@ export const mobSchema = z.object({
 
 export type Mob = z.infer<typeof mobSchema>;
 
-// Medit-matching range constraints for write validation
+// Medit-matching range constraints for write validation.
+// String fields that medit requires non-empty for saving are enforced with min(1).
 export const mobInputSchema = mobSchema.extend({
   ac: z.number().min(0).max(127),
   agi: z.number().int().min(-25).max(25),
@@ -93,6 +94,7 @@ export const mobInputSchema = mobSchema.extend({
   damage_level: z.number().min(0).max(127),
   damage_precision: z.number().int().min(0).max(100),
   def_position: z.number().int().min(0).max(12),
+  description: z.string().min(1),
   dex: z.number().int().min(-25).max(25),
   fact_perc: z.number().int().min(0).max(100),
   faction: z.number().int().min(0).max(3),
@@ -103,10 +105,13 @@ export const mobInputSchema = mobSchema.extend({
   intel: z.number().int().min(-25).max(25),
   kar: z.number().int().min(-25).max(25),
   level: z.number().int().min(1).max(100),
+  long_desc: z.string().min(1),
   max_exist: z.number().int().min(0).max(9999),
+  name: z.string().min(1),
   per: z.number().int().min(-25).max(25),
   race: z.number().int().min(0).max(126),
   sex: z.number().int().min(0).max(2),
+  short_desc: z.string().min(1),
   skin: z.number().int().min(-200).max(200),
   spe: z.number().int().min(-25).max(25),
   spec_proc: z.number().int().min(0).max(222),

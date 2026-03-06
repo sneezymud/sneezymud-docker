@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Info } from "lucide-react";
 import { useState } from "react";
 
 import type { FieldGroupDef } from "@/components/entity-form.tsx";
@@ -12,10 +11,13 @@ import type {
   MobStringKeyword,
 } from "@/shared/schemas/mob.ts";
 
-import { Breadcrumbs } from "@/components/breadcrumbs.tsx";
+import { AddButton } from "@/components/add-button.tsx";
+import { BackLink } from "@/components/back-link.tsx";
 import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
 import { EntityForm } from "@/components/entity-form.tsx";
+import { EntityHeader } from "@/components/entity-header.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
+import { SectionHeader } from "@/components/section-header.tsx";
 import { EntityFormSkeleton } from "@/components/skeleton.tsx";
 import { SubTable } from "@/components/sub-table.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -28,12 +30,8 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip.tsx";
 import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
+import { pruneEdits } from "@/lib/prune-edits.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import {
   CLASS_TYPES,
@@ -49,6 +47,7 @@ import {
 } from "@/shared/enums/index.ts";
 import { hasPower, POWER } from "@/shared/powers.ts";
 import { mobKeys } from "@/shared/query-keys.ts";
+import { mobResponseSchema } from "@/shared/schemas/mob-response.ts";
 import {
   mobExtraSchema,
   mobSchema,
@@ -113,6 +112,7 @@ const mobFieldGroups: FieldGroupDef[] = [
       {
         key: "long_desc",
         label: "Long Description",
+        required: true,
         tooltip: (
           <p>
             What players see when they enter the room, but only while the mob is
@@ -125,6 +125,7 @@ const mobFieldGroups: FieldGroupDef[] = [
       {
         key: "description",
         label: "Detailed Description",
+        required: true,
         tooltip: (
           <>
             <p>
@@ -148,6 +149,31 @@ const mobFieldGroups: FieldGroupDef[] = [
         ),
         type: "textarea",
       },
+      {
+        addable: true,
+        key: "local_sound",
+        label: "Local Sound",
+        tooltip: (
+          <p>
+            Ambient message shown periodically in the mob's room while idle.
+            Plain text only. Example: "The guard shifts his weight restlessly."
+          </p>
+        ),
+        type: "textarea",
+      },
+      {
+        addable: true,
+        key: "adjacent_sound",
+        label: "Adjacent Sound",
+        tooltip: (
+          <p>
+            Ambient message shown periodically in rooms adjacent to the mob
+            while idle. Used for sounds that carry through walls. Example: "You
+            hear heavy footsteps nearby."
+          </p>
+        ),
+        type: "textarea",
+      },
     ],
     title: "Identity",
   },
@@ -158,7 +184,6 @@ const mobFieldGroups: FieldGroupDef[] = [
         label: "Level",
         max: 100,
         min: 1,
-        required: true,
         tooltip: (
           <p>
             The mob's power level. Determines base HP, damage output, and
@@ -766,41 +791,6 @@ const mobFieldGroups: FieldGroupDef[] = [
   {
     fields: [
       {
-        key: "local_sound",
-        label: "Local Sound",
-        tooltip: (
-          <p>
-            Ambient message shown periodically in the mob's room while idle.
-            Plain text only. Example: "The guard shifts his weight restlessly."
-          </p>
-        ),
-        type: "textarea",
-      },
-      {
-        key: "adjacent_sound",
-        label: "Adjacent Sound",
-        tooltip: (
-          <p>
-            Ambient message shown periodically in rooms adjacent to the mob
-            while idle. Used for sounds that carry through walls. Example: "You
-            hear heavy footsteps nearby."
-          </p>
-        ),
-        type: "textarea",
-      },
-    ],
-    title: "Sounds",
-    tooltip: (
-      <p>
-        Periodic ambient messages that play while the mob is idle. Both fields
-        are optional. If only Local Sound is set, it plays in the mob's room. If
-        both are set, each plays in its respective area.
-      </p>
-    ),
-  },
-  {
-    fields: [
-      {
         enumEntries: CLASS_TYPES,
         key: "class",
         label: "Class",
@@ -1009,25 +999,18 @@ function MobStringsEditor({
   };
 
   return (
-    <fieldset className="p-4">
-      <legend className="text-foreground text-lg font-semibold">
-        Mobile Strings
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              className="text-muted-foreground hover:text-foreground ml-1 inline-flex cursor-help"
-              type="button"
-            >
-              <Info
-                aria-hidden="true"
-                className="h-3.5 w-3.5"
-              />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent
-            className="max-w-sm text-sm text-wrap"
-            sideOffset={5}
-          >
+    <fieldset className="bg-card border-border/50 rounded-lg border p-5">
+      <SectionHeader
+        action={
+          <AddButton
+            aria-label="Add mobile string"
+            disabled={availableKeywords.length === 0}
+            onClick={addRow}
+          />
+        }
+        title="Mobile Strings"
+        tooltip={
+          <>
             <p className="font-medium">
               Custom messages displayed during mob events.
             </p>
@@ -1054,9 +1037,9 @@ function MobStringsEditor({
                 leaving a room
               </li>
             </ul>
-          </TooltipContent>
-        </Tooltip>
-      </legend>
+          </>
+        }
+      />
       <div className="space-y-3">
         {rows.map((row, index) => (
           <div
@@ -1122,16 +1105,6 @@ function MobStringsEditor({
             />
           </div>
         ))}
-
-        <Button
-          className="border-dashed"
-          disabled={availableKeywords.length === 0}
-          onClick={addRow}
-          size="sm"
-          variant="outline"
-        >
-          + Add mobile string
-        </Button>
       </div>
 
       <ConfirmDialog
@@ -1166,6 +1139,11 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
   } = useQuery({
     queryFn: () => apiFetch(`/api/mobs/${vnum}`, mobSchema),
     queryKey: mobKeys.detail(vnum),
+  });
+
+  const { data: mobResponse } = useQuery({
+    queryFn: () => apiFetch(`/api/mob-responses/${vnum}`, mobResponseSchema),
+    queryKey: ["mob-responses", vnum],
   });
 
   const [edits, setEdits] = useState<null | Partial<Mob>>(null);
@@ -1209,6 +1187,23 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
         method: "PUT",
       });
     },
+    validate: () => {
+      if (!mob) return null;
+      const merged = { ...mob, ...edits };
+      const requiredFields = [
+        { key: "name" as const, label: "Keywords" },
+        { key: "short_desc" as const, label: "Short Description" },
+        { key: "long_desc" as const, label: "Long Description" },
+        { key: "description" as const, label: "Detailed Description" },
+      ];
+      const missing = requiredFields
+        .filter((f) => !merged[f.key].trim())
+        .map((f) => f.label);
+      if (missing.length > 0) {
+        return `Required fields cannot be empty: ${missing.join(", ")}`;
+      }
+      return null;
+    },
   });
 
   if (isLoading || isError || !mob) {
@@ -1228,62 +1223,25 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
   const currentValues = mobToFormValues(mob, edits);
 
   const handleFieldChange = (key: string, value: number | string) => {
-    setEdits((prev) => ({ ...prev, [key]: value }));
+    setEdits((prev) => pruneEdits({ ...prev, [key]: value }, mob));
   };
 
   return (
     <div>
-      <div className="mb-4 space-y-1">
-        <Breadcrumbs
-          items={[
-            { label: "Mobs", to: "/mobs" },
-            {
-              label: `Mob ${vnum}: ${mob.short_desc || "(unnamed)"}`,
-            },
-          ]}
-        />
-        <div className="flex items-center gap-3">
-          <h2 className="text-foreground text-xl font-bold">
-            Mob {vnum}: {mob.short_desc || "(unnamed)"}
-          </h2>
-          <Button
-            asChild
-            size="sm"
-            variant="link"
-          >
-            <Link
-              params={{ vnum: vnumParam }}
-              to="/mobs/$vnum/responses"
-            >
-              Edit Responses
-            </Link>
-          </Button>
-        </div>
-      </div>
-
-      <EntityForm
+      <EntityHeader
+        before={
+          <BackLink
+            title="Back to mobs"
+            to="/mobs"
+          />
+        }
+        breadcrumbs={[
+          { label: "Mobs", to: "/mobs" },
+          { label: `Mob ${vnum}: ${mob.short_desc || "(unnamed)"}` },
+        ]}
         deleteMessage={`Are you sure you want to delete mob ${vnum}? This also removes extras, immunities, and responses.`}
         deletePending={deletePending}
         dirty={dirty}
-        groups={
-          hasPower(powers, POWER.MEDIT_IMP_POWER)
-            ? mobFieldGroups
-            : mobFieldGroups.map((g) => ({
-                ...g,
-                fields: g.fields.map((f) =>
-                  f.key === "spec_proc" && f.type === "enum"
-                    ? {
-                        ...f,
-                        enumEntries: gateSpecProcs(
-                          f.enumEntries,
-                          isUnassignableMobSpecProc,
-                        ),
-                      }
-                    : f,
-                ),
-              }))
-        }
-        onChange={handleFieldChange}
         onDelete={handleDelete}
         onReset={() => {
           setEdits(null);
@@ -1291,8 +1249,50 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
           setImmEdits(null);
         }}
         onSave={handleSave}
-        originalValues={mobToFormValues(mob, null)}
         saving={saving}
+      />
+
+      <EntityForm
+        groups={mobFieldGroups.map((g, i) => {
+          const group = { ...g };
+          if (i === 0) {
+            const hasResponses = !!mobResponse?.response.trim();
+            group.header = (
+              <Button
+                asChild
+                className="mb-2"
+                size="sm"
+                variant="link"
+              >
+                <Link
+                  params={{ vnum: vnumParam }}
+                  to="/mobs/$vnum/responses"
+                >
+                  {hasResponses ? "Edit Mob Responses" : "Add Mob Response"}
+                </Link>
+              </Button>
+            );
+          }
+          if (
+            !hasPower(powers, POWER.MEDIT_IMP_POWER) &&
+            g.fields.some((f) => f.key === "spec_proc")
+          ) {
+            group.fields = g.fields.map((f) =>
+              f.key === "spec_proc" && f.type === "enum"
+                ? {
+                    ...f,
+                    enumEntries: gateSpecProcs(
+                      f.enumEntries,
+                      isUnassignableMobSpecProc,
+                    ),
+                  }
+                : f,
+            );
+          }
+          return group;
+        })}
+        onChange={handleFieldChange}
+        originalValues={mobToFormValues(mob, null)}
         values={currentValues}
       >
         <div className="grid gap-6 lg:grid-cols-2">
