@@ -142,7 +142,7 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
         saving={saving}
       />
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4">
         <div className="flex flex-col">
           <span className="text-muted-foreground mb-1 text-xs">
             Response Script

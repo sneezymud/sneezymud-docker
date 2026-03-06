@@ -27,7 +27,7 @@ export function EntityForm({
   return (
     <TooltipProvider delayDuration={300}>
       <div className="space-y-6">
-        <div className="3xl:grid-cols-3 grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6">
           {groups.map((group) => (
             <FieldGroup
               group={group}
@@ -65,11 +65,6 @@ function FieldGroup({
     title,
     tooltip,
   } = group;
-  const allCompact = fields.every(
-    (f) => !(f.fullWidth ?? (f.type === "textarea" || f.type === "bitfield")),
-  );
-  const multiColumn = allCompact && fields.length > 1;
-
   return (
     <fieldset
       className={cn(
@@ -92,29 +87,13 @@ function FieldGroup({
 
       {header}
 
-      <div
-        className={cn(
-          "grid grid-cols-[auto_auto_1.5rem] gap-x-3 gap-y-2",
-          multiColumn &&
-            "sm:grid-flow-col sm:grid-cols-[auto_auto_1.5rem_auto_auto_1.5rem]",
-        )}
-        style={
-          multiColumn
-            ? {
-                gridTemplateRows: `repeat(${Math.ceil(fields.length / 2)}, auto)`,
-              }
-            : undefined
-        }
-      >
+      <div className="grid grid-cols-[auto_auto_1.5rem] gap-x-3 gap-y-2">
         {fields.map((field, i) => {
           const fieldDirty =
             originalValues !== undefined &&
             values[field.key] !== originalValues[field.key];
           const showSeparator =
-            !multiColumn &&
-            fieldGroupSize !== undefined &&
-            i > 0 &&
-            i % fieldGroupSize === 0;
+            fieldGroupSize !== undefined && i > 0 && i % fieldGroupSize === 0;
           return (
             <Fragment key={field.key}>
               {showSeparator ? <Separator className="col-span-full" /> : null}

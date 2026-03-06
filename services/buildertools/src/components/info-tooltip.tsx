@@ -80,7 +80,7 @@ export function FieldTooltip({
           onOpenChange={setSheetOpen}
           open={sheetOpen}
         >
-          <SheetContent className="sm:max-w-lg lg:max-w-xl xl:max-w-2xl">
+          <SheetContent>
             <SheetHeader>
               <SheetTitle>{label ?? "Details"}</SheetTitle>
               <SheetDescription>Detailed field reference</SheetDescription>

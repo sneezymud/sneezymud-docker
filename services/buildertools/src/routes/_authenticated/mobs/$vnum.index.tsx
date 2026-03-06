@@ -221,7 +221,7 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
         originalValues={mobToFormValues(mob, null)}
         values={currentValues}
       >
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6">
           <MobStringsEditor
             onChange={setExtraEdits}
             rows={extraEdits ?? mob.extras}

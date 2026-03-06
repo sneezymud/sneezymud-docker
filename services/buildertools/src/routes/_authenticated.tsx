@@ -118,7 +118,7 @@ function AuthenticatedLayout() {
           </Button>
         </div>
 
-        <div className="3xl:max-w-none mx-auto max-w-screen-2xl transition-opacity duration-100">
+        <div className="mx-auto max-w-screen-2xl transition-opacity duration-100">
           <Outlet />
         </div>
       </main>

@@ -124,7 +124,7 @@ export function EntityList({
               : id === "vnum"
                 ? "w-24"
                 : id === "secondary"
-                  ? "hidden sm:table-cell"
+                  ? "hidden"
                   : undefined
           }
           headerGroups={table.getHeaderGroups()}
@@ -339,7 +339,7 @@ function EntityRow({
       </TableCell>
 
       {secondaryLabel ? (
-        <TableCell className="hidden p-0 sm:table-cell">
+        <TableCell className="hidden p-0">
           <Link
             className="text-muted-foreground block px-2 py-2.5 outline-none"
             tabIndex={-1}

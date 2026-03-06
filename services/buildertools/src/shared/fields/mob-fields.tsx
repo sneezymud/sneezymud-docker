@@ -368,7 +368,7 @@ export const mobFieldGroups: FieldGroupDef[] = [
       { key: "cha", label: "Charisma", max: 25, min: -25, type: "number" },
       { key: "kar", label: "Karma", max: 25, min: -25, type: "number" },
     ],
-    gridCols: "grid-cols-1 sm:grid-cols-3",
+    gridCols: "grid-cols-1",
     labelClass: "tracking-wide",
     title: "Attributes",
     tooltip: (

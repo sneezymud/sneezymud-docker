@@ -267,7 +267,7 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
         originalValues={expandedOriginal}
         values={expandedValues}
       >
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6">
           <SubTable
             columns={affectColumns}
             emptyRow={{ mod1: 0, mod2: 0, type: 0, vnum }}
