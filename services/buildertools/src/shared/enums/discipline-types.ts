@@ -1,7 +1,7 @@
 // Discipline file IDs (0-71 with gaps) from mapDiscToFile() in enum.cc.
 // Used by APPLY_DISCIPLINE (file value 38) mod1 field.
 
-import type { EnumEntry } from "./types.ts";
+import type { EnumEntry } from "../types/enums.ts";
 
 export const DISCIPLINE_TYPES: EnumEntry[] = [
   { label: "Mage", value: 0 },

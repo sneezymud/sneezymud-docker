@@ -1,4 +1,4 @@
-import type { EnumEntry } from "./types.ts";
+import type { EnumEntry } from "../types/enums.ts";
 
 export const SECTOR_TYPES: EnumEntry[] = [
   // Arctic (file IDs 0-16)

@@ -1,4 +1,4 @@
-import type { BitfieldEntry } from "./types.ts";
+import type { BitfieldEntry } from "../types/enums.ts";
 
 export const MOB_AFFECTS: BitfieldEntry[] = [
   {

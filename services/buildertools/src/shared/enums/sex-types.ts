@@ -1,4 +1,4 @@
-import type { EnumEntry } from "./types.ts";
+import type { EnumEntry } from "../types/enums.ts";
 
 export const SEX_TYPES: EnumEntry[] = [
   { label: "Neuter", value: 0 },

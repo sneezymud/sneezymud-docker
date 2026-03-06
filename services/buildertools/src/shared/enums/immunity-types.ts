@@ -1,4 +1,4 @@
-import type { EnumEntry } from "./types.ts";
+import type { EnumEntry } from "../types/enums.ts";
 
 export const IMMUNITY_TYPES: EnumEntry[] = [
   { label: "Heat", value: 0 },

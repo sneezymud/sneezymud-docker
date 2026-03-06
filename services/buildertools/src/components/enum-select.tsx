@@ -1,4 +1,4 @@
-import type { EnumEntry } from "@/shared/enums/types.ts";
+import type { EnumEntry } from "@/shared/types/enums.ts";
 
 import {
   Combobox,

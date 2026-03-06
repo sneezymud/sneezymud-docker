@@ -1,7 +1,7 @@
 // Specs describing how mod1/mod2 should be rendered for each apply type.
 // Apply type file values from apply-types.ts (mapApplyToFile/mapFileToApply).
 
-import type { BitfieldEntry, EnumEntry } from "./enums/types.ts";
+import type { BitfieldEntry, EnumEntry } from "./types/enums.ts";
 
 import { INT32_MAX, INT32_MIN } from "./constants.ts";
 import { AFF_FLAGS } from "./enums/aff-flags.ts";

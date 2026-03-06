@@ -22,5 +22,4 @@ export { ROOM_SPEC_PROCS } from "./room-spec-procs.ts";
 export { SECTOR_TYPES } from "./sector-types.ts";
 export { SEX_TYPES } from "./sex-types.ts";
 export { SPELL_TYPES } from "./spell-types.ts";
-export type { BitfieldEntry, EnumEntry } from "./types.ts";
 export { WEAR_FLAGS } from "./wear-flags.ts";

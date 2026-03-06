@@ -6,7 +6,7 @@
 // cross-referencing C++ getFourValues/assignFourValues overrides, ItemInfo[],
 // and the GET_BITS/SET_BITS macro semantics.
 
-import type { EnumEntry } from "./enums/types.ts";
+import type { EnumEntry } from "./types/enums.ts";
 
 import { FACTION_TYPES } from "./enums/faction-types.ts";
 import { POSITION_TYPES } from "./enums/position-types.ts";

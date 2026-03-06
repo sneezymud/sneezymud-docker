@@ -1,5 +1,5 @@
-import type { FieldDef, FieldGroupDef } from "@/components/entity-form.tsx";
-import type { EnumEntry } from "@/shared/enums/types.ts";
+import type { FieldDef, FieldGroupDef } from "@/shared/types/entity-form.ts";
+import type { EnumEntry } from "@/shared/types/enums.ts";
 
 import {
   DIRECTION_TYPES,

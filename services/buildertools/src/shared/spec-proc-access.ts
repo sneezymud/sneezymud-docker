@@ -1,4 +1,4 @@
-import type { EnumEntry } from "./enums/types.ts";
+import type { EnumEntry } from "./types/enums.ts";
 
 /**
  * Spec proc assignability data from C++ mob_specials[], obj_specials[],

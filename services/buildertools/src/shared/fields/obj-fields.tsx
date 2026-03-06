@@ -1,5 +1,5 @@
-import type { FieldDef, FieldGroupDef } from "@/components/entity-form.tsx";
 import type { ObjValueField } from "@/shared/obj-type-specs.ts";
+import type { FieldDef, FieldGroupDef } from "@/shared/types/entity-form.ts";
 
 import {
   EXTRA_FLAGS,

@@ -1,4 +1,4 @@
-import type { FieldGroupDef } from "@/components/entity-form.tsx";
+import type { FieldGroupDef } from "@/shared/types/entity-form.ts";
 
 import {
   CLASS_TYPES,

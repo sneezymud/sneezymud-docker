@@ -1,4 +1,4 @@
-import type { EnumEntry } from "@/shared/enums/types.ts";
+import type { EnumEntry } from "@/shared/types/enums.ts";
 
 import { AddButton } from "@/components/add-button.tsx";
 import { Button } from "@/components/ui/button.tsx";

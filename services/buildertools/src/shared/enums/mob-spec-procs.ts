@@ -1,4 +1,4 @@
-import type { EnumEntry } from "./types.ts";
+import type { EnumEntry } from "../types/enums.ts";
 
 export const MOB_SPEC_PROCS: EnumEntry[] = [
   { label: "None", value: 0 },

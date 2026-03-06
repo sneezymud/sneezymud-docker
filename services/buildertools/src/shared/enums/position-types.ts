@@ -1,4 +1,4 @@
-import type { EnumEntry } from "./types.ts";
+import type { EnumEntry } from "../types/enums.ts";
 
 // Values use the legacy "file format" mapping (mapPosToFile in C++) which is
 // what the DB stores. Positions 0-6 and 12 match the runtime enum, but 7-11

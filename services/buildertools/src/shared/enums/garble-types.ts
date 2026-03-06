@@ -1,7 +1,7 @@
 // Garble speech modification types (0-23).
 // Source: GarbleData[] in garble.cc.
 
-import type { EnumEntry } from "./types.ts";
+import type { EnumEntry } from "../types/enums.ts";
 
 export const GARBLE_TYPES: EnumEntry[] = [
   { label: "Innuendo", value: 0 },

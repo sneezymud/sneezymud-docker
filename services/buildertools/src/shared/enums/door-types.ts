@@ -1,4 +1,4 @@
-import type { EnumEntry } from "./types.ts";
+import type { EnumEntry } from "../types/enums.ts";
 
 export const DOOR_TYPES: EnumEntry[] = [
   { label: "None", value: 0 },

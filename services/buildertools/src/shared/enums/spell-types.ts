@@ -1,7 +1,7 @@
 // Spell/skill file IDs from mapSpellnumToFile() in spell_num.cc.
 // Used by APPLY_SPELL (file value 23) mod1 field.
 
-import type { EnumEntry } from "./types.ts";
+import type { EnumEntry } from "../types/enums.ts";
 
 export const SPELL_TYPES: EnumEntry[] = [
   { label: "Gust", value: 0 },

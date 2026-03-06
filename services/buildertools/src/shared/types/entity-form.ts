@@ -1,4 +1,4 @@
-import type { BitfieldEntry, EnumEntry } from "@/shared/enums/types.ts";
+import type { BitfieldEntry, EnumEntry } from "@/shared/types/enums.ts";
 
 export type FieldDef =
   | BitfieldFieldDef

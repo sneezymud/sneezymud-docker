@@ -1,6 +1,6 @@
 import { Info } from "lucide-react";
 
-import type { BitfieldEntry } from "@/shared/enums/types.ts";
+import type { BitfieldEntry } from "@/shared/types/enums.ts";
 
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import {

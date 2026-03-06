@@ -3,7 +3,7 @@
 // Only bits 0-30 are included - the DB column (signed 32-bit int) cannot
 // store bits 31+ (AFF_CLARITY through AFF_ORIENT).
 
-import type { BitfieldEntry } from "./types.ts";
+import type { BitfieldEntry } from "../types/enums.ts";
 
 export const AFF_FLAGS: BitfieldEntry[] = [
   { bit: 0, label: "Blind" },

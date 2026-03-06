@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import type { FieldDef } from "@/components/entity-form-types.ts";
+import type { FieldDef } from "@/shared/types/entity-form.ts";
 
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";

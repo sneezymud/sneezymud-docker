@@ -1,9 +1,6 @@
 import { Fragment } from "react";
 
-import type {
-  FieldDef,
-  FieldGroupDef,
-} from "@/components/entity-form-types.ts";
+import type { FieldGroupDef } from "@/shared/types/entity-form.ts";
 
 import { Separator } from "@/components/ui/separator.tsx";
 import { TooltipProvider } from "@/components/ui/tooltip.tsx";
@@ -33,18 +30,10 @@ export function EntityForm({
         <div className="3xl:grid-cols-3 grid gap-6 lg:grid-cols-2">
           {groups.map((group) => (
             <FieldGroup
-              colSpan={group.colSpan}
-              detailedTooltip={group.detailedTooltip}
-              fieldGroupSize={group.fieldGroupSize}
-              fields={group.fields}
-              gridCols={group.gridCols}
-              header={group.header}
+              group={group}
               key={group.title}
-              labelClass={group.labelClass}
               onChange={onChange}
               originalValues={originalValues}
-              title={group.title}
-              tooltip={group.tooltip}
               values={values}
             />
           ))}
@@ -57,32 +46,25 @@ export function EntityForm({
 }
 
 function FieldGroup({
-  colSpan,
-  detailedTooltip,
-  fieldGroupSize,
-  fields,
-  gridCols: _gridCols,
-  header,
-  labelClass: _labelClass,
+  group,
   onChange,
   originalValues,
-  title,
-  tooltip,
   values,
 }: {
-  colSpan?: "full" | undefined;
-  detailedTooltip?: React.ReactNode;
-  fieldGroupSize?: number | undefined;
-  fields: FieldDef[];
-  gridCols?: string | undefined;
-  header?: React.ReactNode;
-  labelClass?: string | undefined;
+  group: FieldGroupDef;
   onChange: (key: string, value: number | string) => void;
   originalValues?: Record<string, number | string> | undefined;
-  title: string;
-  tooltip?: React.ReactNode;
   values: Record<string, number | string>;
 }) {
+  const {
+    colSpan,
+    detailedTooltip,
+    fieldGroupSize,
+    fields,
+    header,
+    title,
+    tooltip,
+  } = group;
   const allCompact = fields.every(
     (f) => !(f.fullWidth ?? (f.type === "textarea" || f.type === "bitfield")),
   );
@@ -150,8 +132,3 @@ function FieldGroup({
     </fieldset>
   );
 }
-
-export {
-  type FieldDef,
-  type FieldGroupDef,
-} from "@/components/entity-form-types.ts";

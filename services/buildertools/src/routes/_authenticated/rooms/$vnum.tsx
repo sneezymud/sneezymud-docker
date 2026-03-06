@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
-import type { EnumEntry } from "@/shared/enums/types.ts";
 import type { Room, RoomExit, RoomExtra } from "@/shared/schemas/room.ts";
+import type { EnumEntry } from "@/shared/types/enums.ts";
 
 import { BackLink } from "@/components/back-link.tsx";
 import { EntityForm } from "@/components/entity-form.tsx";

@@ -1,4 +1,4 @@
-import type { EnumEntry } from "./types.ts";
+import type { EnumEntry } from "../types/enums.ts";
 
 export const DIRECTION_TYPES: EnumEntry[] = [
   { label: "North", value: 0 },

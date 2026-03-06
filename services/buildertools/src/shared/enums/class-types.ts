@@ -1,4 +1,4 @@
-import type { EnumEntry } from "./types.ts";
+import type { EnumEntry } from "../types/enums.ts";
 
 // Values are bitmasks (1 << classIndex) matching the DB column format.
 // The C++ medit uses `1 << classIndex` when writing the class field.

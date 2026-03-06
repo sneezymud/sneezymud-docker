@@ -1,4 +1,4 @@
-import type { EnumEntry } from "./types.ts";
+import type { EnumEntry } from "../types/enums.ts";
 
 export const ITEM_TYPES: EnumEntry[] = [
   { disabledReason: "Cannot be set by builders", label: "Undefined", value: 0 },

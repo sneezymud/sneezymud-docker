@@ -1,4 +1,4 @@
-import type { EnumEntry } from "./types.ts";
+import type { EnumEntry } from "../types/enums.ts";
 
 // File values from mapApplyToFile()/mapFileToApply() in enum.cc.
 // Labels and assignability from apply_types[] in constants.cc.
