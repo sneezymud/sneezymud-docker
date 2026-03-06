@@ -1,7 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
@@ -9,12 +8,11 @@ import { EntityList } from "@/components/entity-list.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
+import { useEntityListMutations } from "@/hooks/use-entity-list-mutations.ts";
+import { apiFetch } from "@/shared/api-client.ts";
 import { hasPower, POWER } from "@/shared/powers.ts";
 import { roomKeys } from "@/shared/query-keys.ts";
-import { bulkDeleteResponseSchema } from "@/shared/schemas/common.ts";
 import { roomListSchema, roomSchema } from "@/shared/schemas/room.ts";
-import { toastError } from "@/shared/toast.ts";
 import { useAuthStore } from "@/state/auth.ts";
 
 const searchSchema = z.object({
@@ -39,7 +37,6 @@ function RoomListPage() {
     hasPower(powers, POWER.LOW) && hasPower(powers, POWER.NO_LIMITS);
   const blocks = expandedAccess ? [] : (user?.blocks ?? []);
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { from, to } = Route.useSearch();
 
   const {
@@ -54,42 +51,13 @@ function RoomListPage() {
 
   const [confirmVnums, setConfirmVnums] = useState<number[]>([]);
 
-  const deleteMutation = useMutation({
-    mutationFn: (vnums: number[]) =>
-      apiFetch("/api/rooms/bulk", bulkDeleteResponseSchema, {
-        body: JSON.stringify({ vnums }),
-        headers: { "Content-Type": "application/json" },
-        method: "DELETE",
-      }),
-    onError: (err) => {
-      toastError(
-        err instanceof ApiResponseError
-          ? err.message
-          : "Failed to delete rooms",
-      );
-    },
-    onSuccess: async (_data, vnums) => {
-      toast.success(
-        `Deleted ${vnums.length} room${vnums.length === 1 ? "" : "s"}`,
-      );
-      await queryClient.invalidateQueries({ queryKey: roomKeys.all });
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (vnum: number) =>
-      apiFetch("/api/rooms", roomSchema, {
-        body: JSON.stringify({ vnum }),
-        method: "POST",
-      }),
-    onError: (err) => {
-      toastError(
-        err instanceof ApiResponseError ? err.message : "Failed to create room",
-      );
-    },
-    onSuccess: async (data) => {
-      await queryClient.invalidateQueries({ queryKey: roomKeys.all });
-      await navigate({ to: `/rooms/${data.vnum}` });
+  const { createMutation, deleteMutation } = useEntityListMutations({
+    apiPath: "/api/rooms",
+    createSchema: roomSchema,
+    entityLabel: "room",
+    listQueryKey: roomKeys.all,
+    onCreated: async (vnum) => {
+      await navigate({ to: `/rooms/${vnum}` });
     },
   });
 

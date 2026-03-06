@@ -1,7 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
@@ -9,12 +8,11 @@ import { EntityList } from "@/components/entity-list.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
+import { useEntityListMutations } from "@/hooks/use-entity-list-mutations.ts";
+import { apiFetch } from "@/shared/api-client.ts";
 import { hasPower, POWER } from "@/shared/powers.ts";
 import { mobKeys } from "@/shared/query-keys.ts";
-import { bulkDeleteResponseSchema } from "@/shared/schemas/common.ts";
 import { mobListSchema, mobSchema } from "@/shared/schemas/mob.ts";
-import { toastError } from "@/shared/toast.ts";
 import { useAuthStore } from "@/state/auth.ts";
 
 const searchSchema = z.object({
@@ -33,7 +31,6 @@ export const Route = createFileRoute("/_authenticated/mobs/")({
 });
 
 function MobListPage() {
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const powers = user?.powers ?? [];
@@ -53,40 +50,13 @@ function MobListPage() {
 
   const [confirmVnums, setConfirmVnums] = useState<number[]>([]);
 
-  const deleteMutation = useMutation({
-    mutationFn: (vnums: number[]) =>
-      apiFetch("/api/mobs/bulk", bulkDeleteResponseSchema, {
-        body: JSON.stringify({ vnums }),
-        headers: { "Content-Type": "application/json" },
-        method: "DELETE",
-      }),
-    onError: (err) => {
-      toastError(
-        err instanceof ApiResponseError ? err.message : "Failed to delete mobs",
-      );
-    },
-    onSuccess: async (_data, vnums) => {
-      toast.success(
-        `Deleted ${vnums.length} mob${vnums.length === 1 ? "" : "s"}`,
-      );
-      await queryClient.invalidateQueries({ queryKey: mobKeys.all });
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (vnum: number) =>
-      apiFetch("/api/mobs", mobSchema, {
-        body: JSON.stringify({ vnum }),
-        method: "POST",
-      }),
-    onError: (err) => {
-      toastError(
-        err instanceof ApiResponseError ? err.message : "Failed to create mob",
-      );
-    },
-    onSuccess: async (data) => {
-      await queryClient.invalidateQueries({ queryKey: mobKeys.all });
-      await navigate({ to: `/mobs/${data.vnum}` });
+  const { createMutation, deleteMutation } = useEntityListMutations({
+    apiPath: "/api/mobs",
+    createSchema: mobSchema,
+    entityLabel: "mob",
+    listQueryKey: mobKeys.all,
+    onCreated: async (vnum) => {
+      await navigate({ to: `/mobs/${vnum}` });
     },
   });
 

@@ -87,91 +87,13 @@ export function FormField({
     );
   }
 
-  const inputElement =
-    field.type === "textarea" ? (
-      <Textarea
-        className="min-h-27 text-base"
-        disabled={field.readOnly}
-        id={field.key}
-        onChange={(e) => {
-          handleChange?.(field.key, e.target.value);
-        }}
-        value={value ?? ""}
-      />
-    ) : field.type === "enum" ? (
-      <EnumSelect
-        disabled={field.readOnly}
-        entries={field.enumEntries}
-        id={field.key}
-        onChange={(v) => {
-          handleChange?.(field.key, v);
-        }}
-        value={
-          typeof value === "number"
-            ? value
-            : Number.isFinite(Number(value))
-              ? Number(value)
-              : 0
-        }
-      />
-    ) : field.type === "bitfield" ? (
-      <BitfieldEditor
-        entries={field.bitfieldEntries}
-        id={field.key}
-        onChange={(v) => {
-          handleChange?.(field.key, v);
-        }}
-        value={
-          typeof value === "number"
-            ? value
-            : Number.isFinite(Number(value))
-              ? Number(value)
-              : 0
-        }
-      />
-    ) : field.type === "number" ? (
-      <NumberInput
-        disabled={field.readOnly}
-        id={field.key}
-        max={field.max}
-        min={field.min}
-        onValueChange={(v) => {
-          handleChange?.(field.key, v);
-        }}
-        step={field.step}
-        value={
-          typeof value === "number"
-            ? value
-            : Number.isFinite(Number(value))
-              ? Number(value)
-              : 0
-        }
-      />
-    ) : field.type === "room" ? (
-      <RoomPicker
-        id={field.key}
-        onChange={(v) => {
-          handleChange?.(field.key, v);
-        }}
-        value={
-          typeof value === "number"
-            ? value
-            : Number.isFinite(Number(value))
-              ? Number(value)
-              : 0
-        }
-      />
-    ) : (
-      <Input
-        disabled={field.readOnly}
-        id={field.key}
-        onChange={(e) => {
-          handleChange?.(field.key, e.target.value);
-        }}
-        type="text"
-        value={value ?? ""}
-      />
-    );
+  const inputElement = (
+    <FieldInput
+      field={field}
+      onChange={handleChange}
+      value={value}
+    />
+  );
 
   const dirtyClass = isDirty ? "border-l-amber-400/50" : "border-l-transparent";
 
@@ -233,5 +155,102 @@ export function FormField({
       <div className="min-w-0">{inputElement}</div>
       <div className="justify-self-center">{tooltipElement}</div>
     </div>
+  );
+}
+
+function toNumericValue(value: number | string | undefined): number {
+  if (typeof value === "number") return value;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function FieldInput({
+  field,
+  onChange,
+  value,
+}: {
+  field: FieldDef;
+  onChange: ((key: string, value: number | string) => void) | undefined;
+  value: number | string | undefined;
+}) {
+  if (field.type === "textarea") {
+    return (
+      <Textarea
+        className="min-h-27 text-base"
+        disabled={field.readOnly}
+        id={field.key}
+        onChange={(e) => {
+          onChange?.(field.key, e.target.value);
+        }}
+        value={value ?? ""}
+      />
+    );
+  }
+
+  if (field.type === "enum") {
+    return (
+      <EnumSelect
+        disabled={field.readOnly}
+        entries={field.enumEntries}
+        id={field.key}
+        onChange={(v) => {
+          onChange?.(field.key, v);
+        }}
+        value={toNumericValue(value)}
+      />
+    );
+  }
+
+  if (field.type === "bitfield") {
+    return (
+      <BitfieldEditor
+        entries={field.bitfieldEntries}
+        id={field.key}
+        onChange={(v) => {
+          onChange?.(field.key, v);
+        }}
+        value={toNumericValue(value)}
+      />
+    );
+  }
+
+  if (field.type === "number") {
+    return (
+      <NumberInput
+        disabled={field.readOnly}
+        id={field.key}
+        max={field.max}
+        min={field.min}
+        onValueChange={(v) => {
+          onChange?.(field.key, v);
+        }}
+        step={field.step}
+        value={toNumericValue(value)}
+      />
+    );
+  }
+
+  if (field.type === "room") {
+    return (
+      <RoomPicker
+        id={field.key}
+        onChange={(v) => {
+          onChange?.(field.key, v);
+        }}
+        value={toNumericValue(value)}
+      />
+    );
+  }
+
+  return (
+    <Input
+      disabled={field.readOnly}
+      id={field.key}
+      onChange={(e) => {
+        onChange?.(field.key, e.target.value);
+      }}
+      type="text"
+      value={value ?? ""}
+    />
   );
 }

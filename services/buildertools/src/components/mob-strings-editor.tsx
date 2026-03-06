@@ -109,73 +109,25 @@ export function MobStringsEditor({
 
       <div className="space-y-3">
         {rows.map((row, index) => (
-          <div
-            className="border-border/30 bg-muted/20 space-y-2 rounded border p-3"
+          <MobStringRow
+            index={index}
             key={rowKeys[index]}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <Label htmlFor={`mstr-${index}-keyword`}>Type</Label>
-
-                <Select
-                  onValueChange={(v) => {
-                    const keyword = mobExtraSchema.shape.keyword.parse(v);
-                    onChange(
-                      rows.map((r, i) => (i === index ? { ...r, keyword } : r)),
-                    );
-                  }}
-                  value={row.keyword}
-                >
-                  <SelectTrigger
-                    className="w-full"
-                    id={`mstr-${index}-keyword`}
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-
-                  <SelectContent position="popper">
-                    {mobStringKeywords
-                      .filter((k) => k === row.keyword || !usedKeywords.has(k))
-                      .map((k) => (
-                        <SelectItem
-                          key={k}
-                          value={k}
-                        >
-                          {MOB_STRING_LABELS[k]}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button
-                aria-label={`Remove ${MOB_STRING_LABELS[row.keyword]} string`}
-                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive mt-5 ml-2 shrink-0"
-                onClick={() => {
-                  setPendingRemove(index);
-                }}
-                size="xs"
-                variant="ghost"
-              >
-                Remove
-              </Button>
-            </div>
-
-            <Label htmlFor={`mstr-${index}-description`}>Message</Label>
-
-            <Textarea
-              className="min-h-16 text-base"
-              id={`mstr-${index}-description`}
-              onChange={(e) => {
-                onChange(
-                  rows.map((r, i) =>
-                    i === index ? { ...r, description: e.target.value } : r,
-                  ),
-                );
-              }}
-              value={row.description}
-            />
-          </div>
+            onDescriptionChange={(description) => {
+              onChange(
+                rows.map((r, i) => (i === index ? { ...r, description } : r)),
+              );
+            }}
+            onKeywordChange={(keyword) => {
+              onChange(
+                rows.map((r, i) => (i === index ? { ...r, keyword } : r)),
+              );
+            }}
+            onRemove={() => {
+              setPendingRemove(index);
+            }}
+            row={row}
+            usedKeywords={usedKeywords}
+          />
         ))}
       </div>
 
@@ -195,5 +147,79 @@ export function MobStringsEditor({
         variant="danger"
       />
     </fieldset>
+  );
+}
+
+function MobStringRow({
+  index,
+  onDescriptionChange,
+  onKeywordChange,
+  onRemove,
+  row,
+  usedKeywords,
+}: {
+  index: number;
+  onDescriptionChange: (description: string) => void;
+  onKeywordChange: (keyword: MobStringKeyword) => void;
+  onRemove: () => void;
+  row: MobExtra;
+  usedKeywords: Set<MobStringKeyword>;
+}) {
+  return (
+    <div className="border-border/30 bg-muted/20 space-y-2 rounded border p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <Label htmlFor={`mstr-${index}-keyword`}>Type</Label>
+
+          <Select
+            onValueChange={(v) => {
+              onKeywordChange(mobExtraSchema.shape.keyword.parse(v));
+            }}
+            value={row.keyword}
+          >
+            <SelectTrigger
+              className="w-full"
+              id={`mstr-${index}-keyword`}
+            >
+              <SelectValue />
+            </SelectTrigger>
+
+            <SelectContent position="popper">
+              {mobStringKeywords
+                .filter((k) => k === row.keyword || !usedKeywords.has(k))
+                .map((k) => (
+                  <SelectItem
+                    key={k}
+                    value={k}
+                  >
+                    {MOB_STRING_LABELS[k]}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <Button
+          aria-label={`Remove ${MOB_STRING_LABELS[row.keyword]} string`}
+          className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive mt-5 ml-2 shrink-0"
+          onClick={onRemove}
+          size="xs"
+          variant="ghost"
+        >
+          Remove
+        </Button>
+      </div>
+
+      <Label htmlFor={`mstr-${index}-description`}>Message</Label>
+
+      <Textarea
+        className="min-h-16 text-base"
+        id={`mstr-${index}-description`}
+        onChange={(e) => {
+          onDescriptionChange(e.target.value);
+        }}
+        value={row.description}
+      />
+    </div>
   );
 }
