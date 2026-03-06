@@ -1,21 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  type ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  type SortingState,
-  useReactTable,
-} from "@tanstack/react-table";
-import { useDeferredValue, useState } from "react";
+import { type ColumnDef, flexRender } from "@tanstack/react-table";
 
 import type { Zone } from "@/shared/schemas/zone.ts";
 
 import { QueryStatus } from "@/components/query-status.tsx";
-import { sortIndicator } from "@/components/sort-indicator.ts";
+import { SortableTableHeader } from "@/components/sortable-table-header.tsx";
 import { TablePagination } from "@/components/table-pagination.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -25,10 +15,9 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
-  TableHeader,
   TableRow,
 } from "@/components/ui/table.tsx";
+import { useSearchableTable } from "@/hooks/use-searchable-table.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import { zoneKeys } from "@/shared/query-keys.ts";
 import { zoneListSchema } from "@/shared/schemas/zone.ts";
@@ -36,8 +25,6 @@ import { zoneListSchema } from "@/shared/schemas/zone.ts";
 export const Route = createFileRoute("/_authenticated/zones")({
   component: ZonesPage,
 });
-
-const PAGE_SIZE = 50;
 
 const columns: Array<ColumnDef<Zone>> = [
   { accessorKey: "zone_nr", header: "#" },
@@ -118,13 +105,6 @@ const columns: Array<ColumnDef<Zone>> = [
 ];
 
 function ZonesPage() {
-  const [search, setSearch] = useState("");
-  const [sorting, setSorting] = useState<SortingState>([
-    { desc: false, id: "zone_nr" },
-  ]);
-
-  const deferredSearch = useDeferredValue(search);
-
   const {
     data: zones,
     error,
@@ -135,29 +115,24 @@ function ZonesPage() {
     queryKey: zoneKeys.all,
   });
 
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const table = useReactTable({
+  const {
+    filteredCount,
+    pageIndex,
+    rows,
+    search,
+    setSearch,
+    table,
+    totalPages,
+  } = useSearchableTable({
     columns,
     data: zones ?? [],
-    enableSortingRemoval: false,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    globalFilterFn: (row, _columnId, filterValue: string) => {
+    defaultSort: [{ desc: false, id: "zone_nr" }],
+    globalFilterFn: (row, _, filterValue) => {
       const searchLower = filterValue.toLowerCase();
       return (
         row.original.zone_name.toLowerCase().includes(searchLower) ||
         String(row.original.zone_nr).includes(filterValue)
       );
-    },
-    initialState: {
-      pagination: { pageSize: PAGE_SIZE },
-    },
-    onSortingChange: setSorting,
-    state: {
-      globalFilter: deferredSearch,
-      sorting,
     },
   });
 
@@ -171,11 +146,6 @@ function ZonesPage() {
       />
     );
   }
-
-  const rows = table.getRowModel().rows;
-  const filteredCount = table.getFilteredRowModel().rows.length;
-  const totalPages = table.getPageCount();
-  const pageIndex = table.getState().pagination.pageIndex;
 
   return (
     <div>
@@ -204,39 +174,10 @@ function ZonesPage() {
       />
 
       <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <TableHead
-                  className={
-                    header.column.id === "zone_nr" ? "w-24" : undefined
-                  }
-                  key={header.id}
-                >
-                  {header.column.getCanSort() ? (
-                    <Button
-                      className="h-auto p-0"
-                      onClick={header.column.getToggleSortingHandler()}
-                      variant="ghost"
-                    >
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                      {sortIndicator(header.column.getIsSorted())}
-                    </Button>
-                  ) : (
-                    flexRender(
-                      header.column.columnDef.header,
-                      header.getContext(),
-                    )
-                  )}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
+        <SortableTableHeader
+          columnClassName={(id) => (id === "zone_nr" ? "w-24" : undefined)}
+          headerGroups={table.getHeaderGroups()}
+        />
         <TableBody>
           {rows.map((row) => (
             <TableRow key={row.original.zone_nr}>

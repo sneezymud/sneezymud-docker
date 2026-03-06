@@ -1,17 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import {
-  type ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  type RowSelectionState,
-  type SortingState,
-  useReactTable,
-} from "@tanstack/react-table";
+import { type ColumnDef, type Row } from "@tanstack/react-table";
 import { FolderOpen, SearchX, Trash2 } from "lucide-react";
-import { useDeferredValue, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
@@ -20,12 +10,11 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
-  TableHeader,
   TableRow,
 } from "@/components/ui/table.tsx";
+import { useSearchableTable } from "@/hooks/use-searchable-table.ts";
 
-import { sortIndicator } from "./sort-indicator.ts";
+import { SortableTableHeader } from "./sortable-table-header.tsx";
 import { TablePagination } from "./table-pagination.tsx";
 import { VnumPicker } from "./vnum-picker.tsx";
 
@@ -47,8 +36,6 @@ interface EntityListProps {
   vnumBlocks?: Array<{ end: number; start: number }> | undefined;
 }
 
-const PAGE_SIZE = 50;
-
 export function EntityList({
   basePath,
   createPending,
@@ -60,66 +47,27 @@ export function EntityList({
   secondaryLabel,
   vnumBlocks,
 }: EntityListProps) {
-  const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [sorting, setSorting] = useState<SortingState>([
-    { desc: false, id: "vnum" },
-  ]);
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   const selectable = Boolean(onDeleteSelected);
+  const columns = buildColumns(selectable, secondaryLabel);
 
-  const deferredSearch = useDeferredValue(search);
-
-  const columns: Array<ColumnDef<EntityListItem>> = [];
-
-  if (selectable) {
-    columns.push({
-      enableSorting: false,
-      header: ({ table: t }) => (
-        <Checkbox
-          aria-label="Select all on this page"
-          checked={
-            t.getIsAllPageRowsSelected()
-              ? true
-              : t.getIsSomePageRowsSelected()
-                ? "indeterminate"
-                : false
-          }
-          onCheckedChange={(checked) => {
-            t.toggleAllPageRowsSelected(checked === true);
-          }}
-        />
-      ),
-      id: "select",
-    });
-  }
-
-  columns.push(
-    { accessorKey: "vnum", header: "Vnum" },
-    { accessorKey: "name", header: "Name", sortingFn: "text" },
-  );
-
-  if (secondaryLabel) {
-    columns.push({
-      accessorKey: "secondary",
-      enableSorting: false,
-      header: secondaryLabel,
-    });
-  }
-
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const table = useReactTable({
+  const {
+    filteredCount,
+    pageIndex,
+    rows,
+    rowSelection,
+    search,
+    setSearch,
+    table,
+    totalPages,
+  } = useSearchableTable({
     columns,
     data: entities,
+    defaultSort: [{ desc: false, id: "vnum" }],
     enableRowSelection: selectable,
-    enableSortingRemoval: false,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getRowId: (row) => String(row.vnum),
-    getSortedRowModel: getSortedRowModel(),
-    globalFilterFn: (row, _columnId, filterValue: string) => {
+    globalFilterFn: (row, _, filterValue) => {
       const searchLower = filterValue.toLowerCase();
       return (
         row.original.name.toLowerCase().includes(searchLower) ||
@@ -127,22 +75,8 @@ export function EntityList({
         (row.original.secondary?.toLowerCase().includes(searchLower) ?? false)
       );
     },
-    initialState: {
-      pagination: { pageSize: PAGE_SIZE },
-    },
-    onRowSelectionChange: setRowSelection,
-    onSortingChange: setSorting,
-    state: {
-      globalFilter: deferredSearch,
-      rowSelection,
-      sorting,
-    },
   });
 
-  const rows = table.getRowModel().rows;
-  const filteredCount = table.getFilteredRowModel().rows.length;
-  const totalPages = table.getPageCount();
-  const pageIndex = table.getState().pagination.pageIndex;
   const selectedVnums = Object.keys(rowSelection).map(Number);
 
   return (
@@ -167,144 +101,43 @@ export function EntityList({
         ) : null}
       </div>
 
-      <div className="mb-4 flex items-center gap-3">
-        <div className="relative max-w-lg flex-1">
-          <Input
-            aria-label="Search by vnum or name"
-            className="pr-8"
-            onChange={(e) => {
-              setSearch(e.target.value);
-            }}
-            placeholder="Search by vnum or name..."
-            type="text"
-            value={search}
-          />
-          {search ? (
-            <Button
-              aria-label="Clear search"
-              className="absolute top-1/2 right-1 -translate-y-1/2"
-              onClick={() => {
-                setSearch("");
-              }}
-              size="icon-xs"
-              variant="ghost"
-            >
-              {"\u2715"}
-            </Button>
-          ) : null}
-        </div>
-        {onDeleteSelected && selectedVnums.length > 0 ? (
-          <Button
-            disabled={deletePending}
-            onClick={() => {
-              onDeleteSelected(selectedVnums);
-            }}
-            size="sm"
-            variant="destructive"
-          >
-            <Trash2 className="mr-1.5 h-4 w-4" />
-            Delete {selectedVnums.length}
-          </Button>
-        ) : null}
-      </div>
+      <EntityListToolbar
+        deletePending={deletePending}
+        onDelete={
+          onDeleteSelected
+            ? () => {
+                onDeleteSelected(selectedVnums);
+              }
+            : undefined
+        }
+        search={search}
+        selectedCount={selectedVnums.length}
+        setSearch={setSearch}
+      />
 
       <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <TableHead
-                  className={
-                    header.column.id === "select"
-                      ? "w-10"
-                      : header.column.id === "vnum"
-                        ? "w-24"
-                        : header.column.id === "secondary"
-                          ? "hidden sm:table-cell"
-                          : undefined
-                  }
-                  key={header.id}
-                >
-                  {header.column.getCanSort() ? (
-                    <Button
-                      className="h-auto p-0"
-                      onClick={header.column.getToggleSortingHandler()}
-                      variant="ghost"
-                    >
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                      {sortIndicator(header.column.getIsSorted())}
-                    </Button>
-                  ) : (
-                    flexRender(
-                      header.column.columnDef.header,
-                      header.getContext(),
-                    )
-                  )}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
+        <SortableTableHeader
+          columnClassName={(id) =>
+            id === "select"
+              ? "w-10"
+              : id === "vnum"
+                ? "w-24"
+                : id === "secondary"
+                  ? "hidden sm:table-cell"
+                  : undefined
+          }
+          headerGroups={table.getHeaderGroups()}
+        />
         <TableBody>
-          {rows.map((row) => {
-            const entity = row.original;
-            const to = `${basePath}/${entity.vnum}`;
-            return (
-              <TableRow
-                aria-label={`${entity.name || "(unnamed)"} (vnum ${entity.vnum})`}
-                className="has-[a:focus-visible]:ring-accent group hover:bg-muted/50 has-[a:focus-visible]:bg-muted/30 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-inset"
-                key={entity.vnum}
-              >
-                {selectable ? (
-                  <TableCell
-                    className="px-2 py-2.5"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                    }}
-                  >
-                    <Checkbox
-                      aria-label={`Select ${entity.name || entity.vnum}`}
-                      checked={row.getIsSelected()}
-                      onCheckedChange={(checked) => {
-                        row.toggleSelected(checked === true);
-                      }}
-                    />
-                  </TableCell>
-                ) : null}
-                <TableCell className="p-0">
-                  <Link
-                    className="text-accent hover:text-accent/80 block px-2 py-2.5 font-mono outline-none"
-                    to={to}
-                  >
-                    {entity.vnum}
-                  </Link>
-                </TableCell>
-                <TableCell className="p-0">
-                  <Link
-                    className="text-foreground group-hover:text-foreground block px-2 py-2.5 outline-none"
-                    tabIndex={-1}
-                    to={to}
-                  >
-                    {entity.name || "(unnamed)"}
-                  </Link>
-                </TableCell>
-                {secondaryLabel ? (
-                  <TableCell className="hidden p-0 sm:table-cell">
-                    <Link
-                      className="text-muted-foreground block px-2 py-2.5 outline-none"
-                      tabIndex={-1}
-                      to={to}
-                    >
-                      {entity.secondary ?? ""}
-                    </Link>
-                  </TableCell>
-                ) : null}
-              </TableRow>
-            );
-          })}
+          {rows.map((row) => (
+            <EntityRow
+              basePath={basePath}
+              key={row.original.vnum}
+              row={row}
+              secondaryLabel={secondaryLabel}
+              selectable={selectable}
+            />
+          ))}
           {rows.length === 0 ? (
             <TableRow>
               <TableCell
@@ -344,6 +177,171 @@ export function EntityList({
           : `${entities.length} ${label.toLowerCase()}`}
       </p>
     </div>
+  );
+}
+
+function buildColumns(
+  selectable: boolean,
+  secondaryLabel?: string,
+): Array<ColumnDef<EntityListItem>> {
+  const columns: Array<ColumnDef<EntityListItem>> = [];
+
+  if (selectable) {
+    columns.push({
+      enableSorting: false,
+      header: ({ table: t }) => (
+        <Checkbox
+          aria-label="Select all on this page"
+          checked={
+            t.getIsAllPageRowsSelected()
+              ? true
+              : t.getIsSomePageRowsSelected()
+                ? "indeterminate"
+                : false
+          }
+          onCheckedChange={(checked) => {
+            t.toggleAllPageRowsSelected(checked === true);
+          }}
+        />
+      ),
+      id: "select",
+    });
+  }
+
+  columns.push(
+    { accessorKey: "vnum", header: "Vnum" },
+    { accessorKey: "name", header: "Name", sortingFn: "text" },
+  );
+
+  if (secondaryLabel) {
+    columns.push({
+      accessorKey: "secondary",
+      enableSorting: false,
+      header: secondaryLabel,
+    });
+  }
+
+  return columns;
+}
+
+function EntityListToolbar({
+  deletePending,
+  onDelete,
+  search,
+  selectedCount,
+  setSearch,
+}: {
+  deletePending?: boolean | undefined;
+  onDelete?: (() => void) | undefined;
+  search: string;
+  selectedCount: number;
+  setSearch: (value: string) => void;
+}) {
+  return (
+    <div className="mb-4 flex items-center gap-3">
+      <div className="relative max-w-lg flex-1">
+        <Input
+          aria-label="Search by vnum or name"
+          className="pr-8"
+          onChange={(e) => {
+            setSearch(e.target.value);
+          }}
+          placeholder="Search by vnum or name..."
+          type="text"
+          value={search}
+        />
+        {search ? (
+          <Button
+            aria-label="Clear search"
+            className="absolute top-1/2 right-1 -translate-y-1/2"
+            onClick={() => {
+              setSearch("");
+            }}
+            size="icon-xs"
+            variant="ghost"
+          >
+            {"\u2715"}
+          </Button>
+        ) : null}
+      </div>
+      {onDelete && selectedCount > 0 ? (
+        <Button
+          disabled={deletePending}
+          onClick={onDelete}
+          size="sm"
+          variant="destructive"
+        >
+          <Trash2 className="mr-1.5 h-4 w-4" />
+          Delete {selectedCount}
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function EntityRow({
+  basePath,
+  row,
+  secondaryLabel,
+  selectable,
+}: {
+  basePath: string;
+  row: Row<EntityListItem>;
+  secondaryLabel?: string | undefined;
+  selectable: boolean;
+}) {
+  const entity = row.original;
+  const to = `${basePath}/${entity.vnum}`;
+  return (
+    <TableRow
+      aria-label={`${entity.name || "(unnamed)"} (vnum ${entity.vnum})`}
+      className="has-[a:focus-visible]:ring-accent group hover:bg-muted/50 has-[a:focus-visible]:bg-muted/30 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-inset"
+    >
+      {selectable ? (
+        <TableCell
+          className="px-2 py-2.5"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+        >
+          <Checkbox
+            aria-label={`Select ${entity.name || entity.vnum}`}
+            checked={row.getIsSelected()}
+            onCheckedChange={(checked) => {
+              row.toggleSelected(checked === true);
+            }}
+          />
+        </TableCell>
+      ) : null}
+      <TableCell className="p-0">
+        <Link
+          className="text-accent hover:text-accent/80 block px-2 py-2.5 font-mono outline-none"
+          to={to}
+        >
+          {entity.vnum}
+        </Link>
+      </TableCell>
+      <TableCell className="p-0">
+        <Link
+          className="text-foreground group-hover:text-foreground block px-2 py-2.5 outline-none"
+          tabIndex={-1}
+          to={to}
+        >
+          {entity.name || "(unnamed)"}
+        </Link>
+      </TableCell>
+      {secondaryLabel ? (
+        <TableCell className="hidden p-0 sm:table-cell">
+          <Link
+            className="text-muted-foreground block px-2 py-2.5 outline-none"
+            tabIndex={-1}
+            to={to}
+          >
+            {entity.secondary ?? ""}
+          </Link>
+        </TableCell>
+      ) : null}
+    </TableRow>
   );
 }
 
