@@ -51,11 +51,7 @@ const queryClient = new QueryClient({
 
 const router = createRouter({
   context: { queryClient },
-  defaultPendingMinMs: 0,
-  defaultPendingMs: 0,
-  // Keep previous route visible during navigation until new route is ready
   defaultPreload: "intent",
-  defaultViewTransition: true,
   routeTree,
 });
 
