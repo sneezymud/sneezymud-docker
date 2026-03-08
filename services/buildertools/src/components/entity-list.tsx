@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { type ColumnDef, type Row } from "@tanstack/react-table";
 import { FolderOpen, SearchX, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -12,7 +11,12 @@ import {
   TableCell,
   TableRow,
 } from "@/components/ui/table.tsx";
-import { useSearchableTable } from "@/hooks/use-searchable-table.ts";
+import {
+  type Column,
+  numericSort,
+  textSort,
+  useSearchableTable,
+} from "@/hooks/use-searchable-table.ts";
 
 import { SortableTableHeader } from "./sortable-table-header.tsx";
 import { TablePagination } from "./table-pagination.tsx";
@@ -53,41 +57,42 @@ export function EntityList({
   const columns = buildColumns(selectable, secondaryLabel);
 
   const {
+    canNextPage,
+    canPreviousPage,
     filteredCount,
+    nextPage,
     pageIndex,
+    previousPage,
     rows,
-    rowSelection,
     search,
+    selectedIds,
     setSearch,
-    table,
+    sorting,
+    toggleAllPageSelected,
+    toggleSelected,
+    toggleSort,
     totalPages,
   } = useSearchableTable({
     columns,
     data: entities,
-    defaultSort: [{ desc: false, id: "vnum" }],
-    enableRowSelection: selectable,
-    getRowId: (row) => String(row.vnum),
-    globalFilterFn: (row, _, filterValue) => {
-      const searchLower = filterValue.toLowerCase();
+    defaultSort: { desc: false, id: "vnum" },
+    filterFn: (item, search) => {
+      const searchLower = search.toLowerCase();
       return (
-        row.original.name.toLowerCase().includes(searchLower) ||
-        String(row.original.vnum).includes(filterValue) ||
-        (row.original.secondary?.toLowerCase().includes(searchLower) ?? false)
+        item.name.toLowerCase().includes(searchLower) ||
+        String(item.vnum).includes(search) ||
+        (item.secondary?.toLowerCase().includes(searchLower) ?? false)
       );
     },
+    getRowId: (row) => String(row.vnum),
   });
 
-  const selectedVnums = Object.keys(rowSelection).map(Number);
+  const selectedVnums = Object.keys(selectedIds).map(Number);
 
   return (
     <>
       <div className="mb-4 flex items-center gap-3">
-        <h2 className="text-foreground text-2xl font-bold">
-          {label}{" "}
-          <span className="text-muted-foreground text-sm font-normal">
-            ({entities.length})
-          </span>
-        </h2>
+        <h2 className="text-foreground text-2xl font-bold">{label}</h2>
 
         {onCreateVnum && vnumBlocks ? (
           <VnumPicker
@@ -96,7 +101,7 @@ export function EntityList({
             onCreate={onCreateVnum}
             onOpenChange={setShowCreate}
             open={showCreate}
-            triggerLabel={`New ${label.slice(0, -1)}`}
+            triggerLabel={`Add`}
             vnumBlocks={vnumBlocks}
           />
         ) : null}
@@ -127,15 +132,43 @@ export function EntityList({
                   ? "hidden"
                   : undefined
           }
-          headerGroups={table.getHeaderGroups()}
+          columns={columns}
+          headerOverrides={
+            selectable
+              ? {
+                  select: (
+                    <Checkbox
+                      aria-label="Select all on this page"
+                      checked={
+                        rows.length > 0 &&
+                        rows.every((r) => selectedIds[String(r.vnum)])
+                          ? true
+                          : rows.some((r) => selectedIds[String(r.vnum)])
+                            ? "indeterminate"
+                            : false
+                      }
+                      onCheckedChange={(checked) => {
+                        toggleAllPageSelected(checked === true);
+                      }}
+                    />
+                  ),
+                }
+              : undefined
+          }
+          onToggleSort={toggleSort}
+          sorting={sorting}
         />
 
         <TableBody>
-          {rows.map((row) => (
+          {rows.map((entity) => (
             <EntityRow
               basePath={basePath}
-              key={row.original.vnum}
-              row={row}
+              entity={entity}
+              isSelected={selectedIds[String(entity.vnum)] === true}
+              key={entity.vnum}
+              onToggleSelected={(checked) => {
+                toggleSelected(String(entity.vnum), checked);
+              }}
               secondaryLabel={secondaryLabel}
               selectable={selectable}
             />
@@ -162,14 +195,10 @@ export function EntityList({
       </Table>
 
       <TablePagination
-        canNextPage={table.getCanNextPage()}
-        canPreviousPage={table.getCanPreviousPage()}
-        onNextPage={() => {
-          table.nextPage();
-        }}
-        onPreviousPage={() => {
-          table.previousPage();
-        }}
+        canNextPage={canNextPage}
+        canPreviousPage={canPreviousPage}
+        onNextPage={nextPage}
+        onPreviousPage={previousPage}
         pageIndex={pageIndex}
         totalPages={totalPages}
       />
@@ -186,42 +215,20 @@ export function EntityList({
 function buildColumns(
   selectable: boolean,
   secondaryLabel?: string,
-): Array<ColumnDef<EntityListItem>> {
-  const columns: Array<ColumnDef<EntityListItem>> = [];
+): Array<Column<EntityListItem>> {
+  const columns: Array<Column<EntityListItem>> = [];
 
   if (selectable) {
-    columns.push({
-      enableSorting: false,
-      header: ({ table: t }) => (
-        <Checkbox
-          aria-label="Select all on this page"
-          checked={
-            t.getIsAllPageRowsSelected()
-              ? true
-              : t.getIsSomePageRowsSelected()
-                ? "indeterminate"
-                : false
-          }
-          onCheckedChange={(checked) => {
-            t.toggleAllPageRowsSelected(checked === true);
-          }}
-        />
-      ),
-      id: "select",
-    });
+    columns.push({ header: "", id: "select" });
   }
 
   columns.push(
-    { accessorKey: "vnum", header: "Vnum" },
-    { accessorKey: "name", header: "Name", sortingFn: "text" },
+    { compare: numericSort("vnum"), header: "Vnum", id: "vnum" },
+    { compare: textSort("name"), header: "Name", id: "name" },
   );
 
   if (secondaryLabel) {
-    columns.push({
-      accessorKey: "secondary",
-      enableSorting: false,
-      header: secondaryLabel,
-    });
+    columns.push({ header: secondaryLabel, id: "secondary" });
   }
 
   return columns;
@@ -286,16 +293,19 @@ function EntityListToolbar({
 
 function EntityRow({
   basePath,
-  row,
+  entity,
+  isSelected,
+  onToggleSelected,
   secondaryLabel,
   selectable,
 }: {
   basePath: string;
-  row: Row<EntityListItem>;
+  entity: EntityListItem;
+  isSelected: boolean;
+  onToggleSelected: (selected: boolean) => void;
   secondaryLabel?: string | undefined;
   selectable: boolean;
 }) {
-  const entity = row.original;
   const to = `${basePath}/${entity.vnum}`;
   return (
     <TableRow
@@ -311,9 +321,9 @@ function EntityRow({
         >
           <Checkbox
             aria-label={`Select ${entity.name || entity.vnum}`}
-            checked={row.getIsSelected()}
+            checked={isSelected}
             onCheckedChange={(checked) => {
-              row.toggleSelected(checked === true);
+              onToggleSelected(checked === true);
             }}
           />
         </TableCell>

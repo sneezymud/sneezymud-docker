@@ -1,45 +1,51 @@
-import { flexRender, type HeaderGroup } from "@tanstack/react-table";
+import type { Column, SortState } from "@/hooks/use-searchable-table.ts";
 
 import { sortIndicator } from "@/components/sort-indicator.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
 
-export function SortableTableHeader<TData>({
+export function SortableTableHeader<T>({
   columnClassName,
-  headerGroups,
+  columns,
+  headerOverrides,
+  onToggleSort,
+  sorting,
 }: {
   columnClassName?: (columnId: string) => string | undefined;
-  headerGroups: Array<HeaderGroup<TData>>;
+  columns: Array<Column<T>>;
+  headerOverrides?: Record<string, React.ReactNode> | undefined;
+  onToggleSort: (id: string) => void;
+  sorting: SortState;
 }) {
   return (
     <TableHeader>
-      {headerGroups.map((headerGroup) => (
-        <TableRow key={headerGroup.id}>
-          {headerGroup.headers.map((header) => (
-            <TableHead
-              className={columnClassName?.(header.column.id)}
-              key={header.id}
-            >
-              {header.column.getCanSort() ? (
+      <TableRow>
+        {columns.map((col) => (
+          <TableHead
+            className={columnClassName?.(col.id)}
+            key={col.id}
+          >
+            {headerOverrides?.[col.id] ??
+              (col.compare ? (
                 <Button
                   className="h-auto p-0"
-                  onClick={header.column.getToggleSortingHandler()}
+                  onClick={() => {
+                    onToggleSort(col.id);
+                  }}
                   variant="ghost"
                 >
-                  {flexRender(
-                    header.column.columnDef.header,
-                    header.getContext(),
-                  )}
+                  {col.header}
 
-                  {sortIndicator(header.column.getIsSorted())}
+                  {sorting.id === col.id
+                    ? sortIndicator(sorting.desc ? "desc" : "asc")
+                    : ""}
                 </Button>
               ) : (
-                flexRender(header.column.columnDef.header, header.getContext())
-              )}
-            </TableHead>
-          ))}
-        </TableRow>
-      ))}
+                col.header
+              ))}
+          </TableHead>
+        ))}
+      </TableRow>
     </TableHeader>
   );
 }

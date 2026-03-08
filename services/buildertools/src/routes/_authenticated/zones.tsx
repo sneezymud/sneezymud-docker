@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { type ColumnDef, flexRender } from "@tanstack/react-table";
 
 import type { Zone } from "@/shared/schemas/zone.ts";
 
@@ -17,7 +16,12 @@ import {
   TableCell,
   TableRow,
 } from "@/components/ui/table.tsx";
-import { useSearchableTable } from "@/hooks/use-searchable-table.ts";
+import {
+  type Column,
+  numericSort,
+  textSort,
+  useSearchableTable,
+} from "@/hooks/use-searchable-table.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import { zoneKeys } from "@/shared/query-keys.ts";
 import { zoneListSchema } from "@/shared/schemas/zone.ts";
@@ -26,36 +30,48 @@ export const Route = createFileRoute("/_authenticated/zones")({
   component: ZonesPage,
 });
 
-const columns: Array<ColumnDef<Zone>> = [
-  { accessorKey: "zone_nr", header: "#" },
-  { accessorKey: "zone_name", header: "Name", sortingFn: "text" },
+const columns: Array<Column<Zone>> = [
   {
-    accessorFn: (zone) =>
+    compare: numericSort("zone_nr"),
+    header: "#",
+    id: "zone_nr",
+    render: (z) => z.zone_nr,
+  },
+  {
+    compare: textSort("zone_name"),
+    header: "Name",
+    id: "zone_name",
+    render: (z) => z.zone_name,
+  },
+  {
+    header: "Range",
+    id: "range",
+    render: (zone) =>
       zone.bottom != null && zone.top != null
         ? `${zone.bottom}-${zone.top}`
         : "\u2014",
-    enableSorting: false,
-    header: "Range",
-    id: "range",
   },
   {
-    accessorKey: "lifespan",
-    cell: ({ getValue }) => getValue<null | number>() ?? "\u2014",
+    compare: numericSort("lifespan"),
     header: "Lifespan",
+    id: "lifespan",
+    render: (zone) => zone.lifespan ?? "\u2014",
   },
   {
-    accessorKey: "zone_enabled",
-    cell: ({ getValue }) =>
-      getValue<null | number>() === 1 ? (
+    compare: numericSort("zone_enabled"),
+    header: "Enabled",
+    id: "zone_enabled",
+    render: (zone) =>
+      zone.zone_enabled === 1 ? (
         <Badge variant="outline">Yes</Badge>
       ) : (
         <Badge variant="secondary">No</Badge>
       ),
-    header: "Enabled",
   },
   {
-    cell: ({ row }) => {
-      const zone = row.original;
+    header: "Entities",
+    id: "entities",
+    render: (zone) => {
       if (zone.bottom == null || zone.top == null) return "\u2014";
       return (
         <div className="flex gap-2">
@@ -100,9 +116,6 @@ const columns: Array<ColumnDef<Zone>> = [
         </div>
       );
     },
-    enableSorting: false,
-    header: "Entities",
-    id: "entities",
   },
 ];
 
@@ -118,22 +131,27 @@ function ZonesPage() {
   });
 
   const {
+    canNextPage,
+    canPreviousPage,
     filteredCount,
+    nextPage,
     pageIndex,
+    previousPage,
     rows,
     search,
     setSearch,
-    table,
+    sorting,
+    toggleSort,
     totalPages,
   } = useSearchableTable({
     columns,
     data: zones ?? [],
-    defaultSort: [{ desc: false, id: "zone_nr" }],
-    globalFilterFn: (row, _, filterValue) => {
-      const searchLower = filterValue.toLowerCase();
+    defaultSort: { desc: false, id: "zone_nr" },
+    filterFn: (zone, search) => {
+      const searchLower = search.toLowerCase();
       return (
-        row.original.zone_name.toLowerCase().includes(searchLower) ||
-        String(row.original.zone_nr).includes(filterValue)
+        zone.zone_name.toLowerCase().includes(searchLower) ||
+        String(zone.zone_nr).includes(search)
       );
     },
   });
@@ -173,26 +191,26 @@ function ZonesPage() {
       <Table>
         <SortableTableHeader
           columnClassName={(id) => (id === "zone_nr" ? "w-24" : undefined)}
-          headerGroups={table.getHeaderGroups()}
+          columns={columns}
+          onToggleSort={toggleSort}
+          sorting={sorting}
         />
 
         <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.original.zone_nr}>
-              {row.getVisibleCells().map((cell) => (
+          {rows.map((zone) => (
+            <TableRow key={zone.zone_nr}>
+              {columns.map((col) => (
                 <TableCell
                   className={
-                    cell.column.id === "zone_nr"
+                    col.id === "zone_nr" || col.id === "range"
                       ? "text-muted-foreground font-mono"
-                      : cell.column.id === "range"
-                        ? "text-muted-foreground font-mono"
-                        : cell.column.id === "lifespan"
-                          ? "text-muted-foreground"
-                          : undefined
+                      : col.id === "lifespan"
+                        ? "text-muted-foreground"
+                        : undefined
                   }
-                  key={cell.id}
+                  key={col.id}
                 >
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  {col.render?.(zone)}
                 </TableCell>
               ))}
             </TableRow>
@@ -212,14 +230,10 @@ function ZonesPage() {
       </Table>
 
       <TablePagination
-        canNextPage={table.getCanNextPage()}
-        canPreviousPage={table.getCanPreviousPage()}
-        onNextPage={() => {
-          table.nextPage();
-        }}
-        onPreviousPage={() => {
-          table.previousPage();
-        }}
+        canNextPage={canNextPage}
+        canPreviousPage={canPreviousPage}
+        onNextPage={nextPage}
+        onPreviousPage={previousPage}
         pageIndex={pageIndex}
         totalPages={totalPages}
       />
