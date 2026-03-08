@@ -42,57 +42,50 @@ function applyRoomFieldChange(
   key: string,
   value: number | string,
   room: Room,
-  edits: null | Partial<Room>,
   setEdits: React.Dispatch<React.SetStateAction<null | Partial<Room>>>,
 ) {
   if (key === "height" && typeof value === "number") {
     const indoorsBit = 1 << 3;
-    const currentFlags =
-      typeof edits?.room_flag === "number" ? edits.room_flag : room.room_flag;
-    if (value === -1) {
-      // Outdoor: clear INDOORS bit
-      setEdits((prev) =>
-        pruneEdits(
+    setEdits((prev) => {
+      const currentFlags =
+        typeof prev?.room_flag === "number" ? prev.room_flag : room.room_flag;
+      if (value === -1) {
+        // Outdoor: clear INDOORS bit
+        return pruneEdits(
           { ...prev, height: value, room_flag: currentFlags & ~indoorsBit },
           room,
-        ),
-      );
-    } else if (value >= 1 && value <= 1000) {
-      // Indoor: set INDOORS bit
-      setEdits((prev) =>
-        pruneEdits(
+        );
+      } else if (value >= 1 && value <= 1000) {
+        // Indoor: set INDOORS bit
+        return pruneEdits(
           { ...prev, height: value, room_flag: currentFlags | indoorsBit },
           room,
-        ),
-      );
-    } else {
-      setEdits((prev) => pruneEdits({ ...prev, [key]: value }, room));
-    }
+        );
+      }
+      return pruneEdits({ ...prev, [key]: value }, room);
+    });
     return;
   }
 
   if (key === "room_flag" && typeof value === "number") {
     const indoorsBit = 1 << 3;
-    const currentFlags =
-      typeof edits?.room_flag === "number" ? edits.room_flag : room.room_flag;
-    const wasIndoors = (currentFlags & indoorsBit) !== 0;
-    const isIndoors = (value & indoorsBit) !== 0;
-    const currentHeight =
-      typeof edits?.height === "number" ? edits.height : room.height;
+    setEdits((prev) => {
+      const currentFlags =
+        typeof prev?.room_flag === "number" ? prev.room_flag : room.room_flag;
+      const wasIndoors = (currentFlags & indoorsBit) !== 0;
+      const isIndoors = (value & indoorsBit) !== 0;
+      const currentHeight =
+        typeof prev?.height === "number" ? prev.height : room.height;
 
-    if (!wasIndoors && isIndoors && currentHeight === -1) {
-      // Toggled INDOORS on while height is unlimited: set height to 100
-      setEdits((prev) =>
-        pruneEdits({ ...prev, height: 100, room_flag: value }, room),
-      );
-    } else if (wasIndoors && !isIndoors) {
-      // Toggled INDOORS off: set height to -1
-      setEdits((prev) =>
-        pruneEdits({ ...prev, height: -1, room_flag: value }, room),
-      );
-    } else {
-      setEdits((prev) => pruneEdits({ ...prev, [key]: value }, room));
-    }
+      if (!wasIndoors && isIndoors && currentHeight === -1) {
+        // Toggled INDOORS on while height is unlimited: set height to 100
+        return pruneEdits({ ...prev, height: 100, room_flag: value }, room);
+      } else if (wasIndoors && !isIndoors) {
+        // Toggled INDOORS off: set height to -1
+        return pruneEdits({ ...prev, height: -1, room_flag: value }, room);
+      }
+      return pruneEdits({ ...prev, [key]: value }, room);
+    });
     return;
   }
 
@@ -183,7 +176,7 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
   const currentValues = roomToFormValues(room, edits);
 
   const handleFieldChange = (key: string, value: number | string) => {
-    applyRoomFieldChange(key, value, room, edits, setEdits);
+    applyRoomFieldChange(key, value, room, setEdits);
   };
 
   return (
