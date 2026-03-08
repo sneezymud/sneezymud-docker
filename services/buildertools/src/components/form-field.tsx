@@ -135,8 +135,7 @@ export function FormField({
   return (
     <div
       className={cn(
-        "col-span-3 grid grid-cols-subgrid items-baseline",
-        "border-l-2 pl-2",
+        "col-span-3 grid grid-cols-subgrid items-baseline border-l-2 pl-2",
         dirtyClass,
         field.readOnly && "opacity-60",
       )}

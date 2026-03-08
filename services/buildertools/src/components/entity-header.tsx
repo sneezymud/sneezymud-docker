@@ -34,75 +34,79 @@ export function EntityHeader({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   return (
-    <div className="mb-4 flex items-center gap-3">
-      {before}
-      <Breadcrumbs items={breadcrumbs} />
-      {children}
+    <div className="bg-background border-border/50 sticky top-0 z-10 mb-4 flex flex-col gap-4 border-b py-2">
+      <div className="flex items-center gap-3">
+        {before}
+        <Breadcrumbs items={breadcrumbs} />
+        {children}
+      </div>
 
-      <Button
-        disabled={!dirty || saving}
-        onClick={onSave}
-        size="sm"
-      >
-        {saving ? "Saving..." : "Save"}
-      </Button>
+      <div className="flex items-center gap-3">
+        <Button
+          disabled={!dirty || saving}
+          onClick={onSave}
+          size="sm"
+        >
+          {saving ? "Saving..." : "Save"}
+        </Button>
 
-      <span
-        aria-live="polite"
-        className="contents"
-      >
-        {dirty ? (
-          <Badge
-            className="animate-in fade-in slide-in-from-top-1 gap-1.5 text-amber-400 duration-150"
-            variant="outline"
-          >
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
-            Unsaved changes
-            {onReset ? (
-              <Button
-                className="ml-1"
-                onClick={onReset}
-                size="xs"
-                variant="link"
-              >
-                Discard
-              </Button>
-            ) : null}
-          </Badge>
+        <span
+          aria-live="polite"
+          className="contents"
+        >
+          {dirty ? (
+            <Badge
+              className="animate-in fade-in slide-in-from-top-1 gap-1.5 text-amber-400 duration-150"
+              variant="outline"
+            >
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+              Unsaved changes
+              {onReset ? (
+                <Button
+                  className="ml-1"
+                  onClick={onReset}
+                  size="xs"
+                  variant="link"
+                >
+                  Discard
+                </Button>
+              ) : null}
+            </Badge>
+          ) : null}
+        </span>
+
+        {onDelete ? (
+          <>
+            <Button
+              className="text-destructive/80 hover:text-destructive ml-auto hover:cursor-pointer hover:no-underline"
+              disabled={deletePending}
+              onClick={() => {
+                setShowDeleteConfirm(true);
+              }}
+              size="sm"
+              variant="link"
+            >
+              {deletePending ? "Deleting..." : "Delete"}
+            </Button>
+
+            <ConfirmDialog
+              confirmLabel="Yes, delete"
+              message={deleteMessage ?? "Are you sure you want to delete this?"}
+              onCancel={() => {
+                setShowDeleteConfirm(false);
+              }}
+              onConfirm={() => {
+                if (deletePending) return;
+                setShowDeleteConfirm(false);
+                onDelete();
+              }}
+              open={showDeleteConfirm}
+              title="Confirm Delete"
+              variant="danger"
+            />
+          </>
         ) : null}
-      </span>
-
-      {onDelete ? (
-        <>
-          <Button
-            className="text-muted-foreground hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive ml-auto"
-            disabled={deletePending}
-            onClick={() => {
-              setShowDeleteConfirm(true);
-            }}
-            size="sm"
-            variant="outline"
-          >
-            {deletePending ? "Deleting..." : "Delete"}
-          </Button>
-
-          <ConfirmDialog
-            confirmLabel="Yes, delete"
-            message={deleteMessage ?? "Are you sure you want to delete this?"}
-            onCancel={() => {
-              setShowDeleteConfirm(false);
-            }}
-            onConfirm={() => {
-              if (deletePending) return;
-              setShowDeleteConfirm(false);
-              onDelete();
-            }}
-            open={showDeleteConfirm}
-            title="Confirm Delete"
-            variant="danger"
-          />
-        </>
-      ) : null}
+      </div>
     </div>
   );
 }

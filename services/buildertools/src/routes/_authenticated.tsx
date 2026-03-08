@@ -71,7 +71,7 @@ function AuthenticatedLayout() {
   }, [pathname]);
 
   return (
-    <div className="bg-background flex h-screen overflow-y-auto">
+    <div className="bg-background flex h-screen">
       <a
         className="focus:bg-accent sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded focus:px-4 focus:py-2 focus:text-sm focus:text-white"
         href="#main-content"
@@ -104,10 +104,10 @@ function AuthenticatedLayout() {
       </Sheet>
 
       <main
-        className="min-w-0 flex-1 p-6"
+        className="min-w-0 flex-1 overflow-y-auto px-6 pb-6"
         id="main-content"
       >
-        <div className="mb-4 lg:hidden">
+        <div className="mb-4 pt-6 lg:hidden">
           <Button
             aria-label="Open navigation"
             onClick={toggleSidebar}
@@ -118,7 +118,7 @@ function AuthenticatedLayout() {
           </Button>
         </div>
 
-        <div className="mx-auto max-w-screen-2xl transition-opacity duration-100">
+        <div className="max-w-90 pt-6 transition-opacity duration-100">
           <Outlet />
         </div>
       </main>
