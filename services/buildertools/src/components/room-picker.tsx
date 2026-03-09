@@ -58,7 +58,13 @@ export function RoomPicker({ id, onChange, value }: RoomPickerProps) {
   const showDropdown = focused && inputText.length >= 2;
 
   const commitText = () => {
-    const num = Number.parseInt(inputText, 10);
+    const trimmed = inputText.trim();
+    if (trimmed === "") {
+      onChange(0);
+      setInputText("");
+      return;
+    }
+    const num = Number.parseInt(trimmed, 10);
     if (!Number.isNaN(num) && num >= 0 && num <= 49_999) {
       onChange(num);
       setInputText(num === 0 ? "" : String(num));
@@ -103,7 +109,7 @@ export function RoomPicker({ id, onChange, value }: RoomPickerProps) {
                 inputRef.current?.blur();
               }
             }}
-            placeholder="Vnum or search by name..."
+            placeholder="Enter vnum or search by name..."
             ref={inputRef}
             value={inputText}
           />

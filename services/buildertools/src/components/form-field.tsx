@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import type { FieldDef } from "@/shared/types/entity-form.ts";
@@ -7,12 +8,15 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
+import { useObjectName } from "@/hooks/use-object-name.ts";
+import { useRoomName } from "@/hooks/use-room-name.ts";
 import { cn } from "@/lib/utils.ts";
 
 import { BitfieldEditor } from "./bitfield-editor.tsx";
 import { EnumSelect } from "./enum-select.tsx";
 import { FieldTooltip } from "./info-tooltip.tsx";
 import { NumberInput } from "./number-input.tsx";
+import { ObjectPicker } from "./object-picker.tsx";
 import { RoomPicker } from "./room-picker.tsx";
 
 export function FormField({
@@ -26,36 +30,46 @@ export function FormField({
   onChange: (key: string, value: number | string) => void;
   value: number | string | undefined;
 }) {
+  const {
+    addable,
+    detailedTooltip,
+    fullWidth,
+    help,
+    key,
+    label,
+    readOnly,
+    required,
+    tooltip,
+    type,
+  } = field;
+
   const hasValue =
     typeof value === "string" ? value.trim() !== "" : value !== undefined;
-  const [expanded, setExpanded] = useState(!field.addable || hasValue);
+  const [expanded, setExpanded] = useState(!addable || hasValue);
 
-  const isFullWidth =
-    field.fullWidth ?? (field.type === "textarea" || field.type === "bitfield");
-
-  const handleChange = field.readOnly
+  const handleChange = readOnly
     ? undefined
     : (key: string, v: number | string) => {
         onChange(key, v);
       };
 
   const tooltipElement =
-    field.tooltip || field.help || field.detailedTooltip ? (
+    tooltip || help || detailedTooltip ? (
       <FieldTooltip
-        detailedTooltip={field.detailedTooltip}
-        label={field.label}
+        detailedTooltip={detailedTooltip}
+        label={label}
       >
-        {field.help ? <p className="font-medium">{field.help}</p> : null}
-        {field.help && field.tooltip ? <Separator className="my-1.5" /> : null}
-        {field.tooltip}
+        {help ? <p className="font-medium">{help}</p> : null}
+        {help && tooltip ? <Separator className="my-1.5" /> : null}
+        {tooltip}
       </FieldTooltip>
     ) : null;
 
-  const labelContent = field.label ? (
+  const labelContent = label ? (
     <span>
-      {field.label}
+      {label}
 
-      {field.required ? (
+      {required ? (
         <span
           aria-label="required"
           className="text-amber-400"
@@ -66,7 +80,7 @@ export function FormField({
     </span>
   ) : null;
 
-  if (field.addable && !expanded) {
+  if (addable && !expanded) {
     return (
       <div className="col-span-full border-l-2 border-l-transparent pl-2">
         <Label>
@@ -97,18 +111,18 @@ export function FormField({
 
   const dirtyClass = isDirty ? "border-l-amber-400/50" : "border-l-transparent";
 
-  if (isFullWidth) {
+  if (fullWidth ?? (type === "textarea" || type === "bitfield")) {
     return (
       <div
         className={cn(
           "col-span-full pb-1",
           "border-l-2 pl-2",
           dirtyClass,
-          field.readOnly && "opacity-60",
+          readOnly && "opacity-60",
         )}
       >
         {labelContent || tooltipElement ? (
-          <Label htmlFor={field.key}>
+          <Label htmlFor={key}>
             {labelContent}
             {tooltipElement}
 
@@ -116,7 +130,7 @@ export function FormField({
               <Button
                 className="h-auto px-1 py-0"
                 onClick={() => {
-                  handleChange?.(field.key, "");
+                  handleChange?.(key, "");
                   setExpanded(false);
                 }}
                 variant="link"
@@ -137,13 +151,13 @@ export function FormField({
       className={cn(
         "col-span-3 grid grid-cols-subgrid items-baseline border-l-2 pl-2",
         dirtyClass,
-        field.readOnly && "opacity-60",
+        readOnly && "opacity-60",
       )}
     >
       {labelContent ? (
         <Label
           className="mb-0 justify-end"
-          htmlFor={field.key}
+          htmlFor={key}
         >
           {labelContent}
         </Label>
@@ -161,6 +175,53 @@ function toNumericValue(value: number | string | undefined): number {
   if (typeof value === "number") return value;
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+const routesByType = {
+  object: "/objects/$vnum",
+  room: "/rooms/$vnum",
+} as const;
+
+function EntityPreview({
+  name,
+  type,
+  vnum,
+}: {
+  name: null | string | undefined;
+  type: "object" | "room";
+  vnum: number;
+}) {
+  return name ? (
+    <Link
+      className="text-muted-foreground hover:text-foreground mt-0.5 block truncate text-xs"
+      params={{ vnum: String(vnum) }}
+      to={routesByType[type]}
+    >
+      {name}
+    </Link>
+  ) : null;
+}
+
+function ObjectPreview({ vnum }: { vnum: number }) {
+  const { data } = useObjectName(vnum);
+  return (
+    <EntityPreview
+      name={data?.name}
+      type="object"
+      vnum={vnum}
+    />
+  );
+}
+
+function RoomPreview({ vnum }: { vnum: number }) {
+  const { data } = useRoomName(vnum);
+  return (
+    <EntityPreview
+      name={data?.name}
+      type="room"
+      vnum={vnum}
+    />
+  );
 }
 
 function FieldInput({
@@ -229,15 +290,39 @@ function FieldInput({
     );
   }
 
-  if (field.type === "room") {
+  if (field.type === "object") {
+    const vnum = toNumericValue(value);
     return (
-      <RoomPicker
-        id={field.key}
-        onChange={(v) => {
-          onChange?.(field.key, v);
-        }}
-        value={toNumericValue(value)}
-      />
+      <>
+        <ObjectPicker
+          id={field.key}
+          max={field.max}
+          min={field.min}
+          onChange={(v) => {
+            onChange?.(field.key, v);
+          }}
+          value={vnum}
+        />
+
+        <ObjectPreview vnum={vnum} />
+      </>
+    );
+  }
+
+  if (field.type === "room") {
+    const vnum = toNumericValue(value);
+    return (
+      <>
+        <RoomPicker
+          id={field.key}
+          onChange={(v) => {
+            onChange?.(field.key, v);
+          }}
+          value={vnum}
+        />
+
+        <RoomPreview vnum={vnum} />
+      </>
     );
   }
 

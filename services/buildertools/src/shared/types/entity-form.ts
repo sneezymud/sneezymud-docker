@@ -4,6 +4,7 @@ export type FieldDef =
   | BitfieldFieldDef
   | EnumFieldDef
   | NumberFieldDef
+  | ObjectFieldDef
   | RoomFieldDef
   | TextFieldDef;
 
@@ -50,6 +51,12 @@ interface EnumFieldDef extends FieldDefBase {
 interface BitfieldFieldDef extends FieldDefBase {
   bitfieldEntries: BitfieldEntry[];
   type: "bitfield";
+}
+
+interface ObjectFieldDef extends FieldDefBase {
+  max?: number;
+  min?: number;
+  type: "object";
 }
 
 interface RoomFieldDef extends FieldDefBase {

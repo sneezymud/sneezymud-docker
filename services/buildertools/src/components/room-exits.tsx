@@ -160,7 +160,6 @@ export function RoomExits({ exits, onChange, vnum }: RoomExitsProps) {
           {exits.map((exit, index) => (
             <ExitRow
               exit={exit}
-              index={index}
               key={rowKeys[index]}
               onChangeDirection={(dir) => {
                 changeDirection(index, dir);
@@ -175,6 +174,7 @@ export function RoomExits({ exits, onChange, vnum }: RoomExitsProps) {
               onUpdate={(field, value) => {
                 update(index, field, value);
               }}
+              prefix={rowKeys[index] ?? ""}
               usedDirections={usedDirections}
             />
           ))}

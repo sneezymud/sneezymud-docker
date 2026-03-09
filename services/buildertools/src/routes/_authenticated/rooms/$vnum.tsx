@@ -10,8 +10,8 @@ import { EntityForm } from "@/components/entity-form.tsx";
 import { EntityHeader } from "@/components/entity-header.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { RoomExits } from "@/components/room-exits.tsx";
+import { RoomExtras } from "@/components/room-extras.tsx";
 import { EntityFormSkeleton } from "@/components/skeleton.tsx";
-import { SubTable } from "@/components/sub-table.tsx";
 import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog.tsx";
 import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
 import { pruneEdits } from "@/lib/prune-edits.ts";
@@ -214,13 +214,10 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
             vnum={vnum}
           />
 
-          <SubTable
-            columns={extraDescColumns}
-            emptyRow={{ description: "", name: "", vnum }}
-            help="Extra descriptions for 'look <keyword>' in-game. Keywords are space-separated."
-            label="Extra Descriptions"
+          <RoomExtras
+            extras={extraEdits ?? room.extras}
             onChange={setExtraEdits}
-            rows={extraEdits ?? room.extras}
+            vnum={vnum}
           />
         </div>
       </EntityForm>
@@ -243,18 +240,3 @@ function RoomEditorPage() {
     />
   );
 }
-
-const extraDescColumns = [
-  {
-    key: "name" as const,
-    label: "Keywords",
-    type: "text" as const,
-    width: "1fr",
-  },
-  {
-    key: "description" as const,
-    label: "Description",
-    type: "textarea" as const,
-    width: "2fr",
-  },
-];
