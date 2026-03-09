@@ -1,9 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
 
 import type { ColumnDef } from "@/components/sub-table.tsx";
-import type { Mob, MobExtra, MobImm } from "@/shared/schemas/mob.ts";
+import type { MobImm } from "@/shared/schemas/mob.ts";
 
 import { BackLink } from "@/components/back-link.tsx";
 import { EntityForm } from "@/components/entity-form.tsx";
@@ -14,20 +12,14 @@ import { EntityFormSkeleton } from "@/components/skeleton.tsx";
 import { SubTable } from "@/components/sub-table.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog.tsx";
-import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
-import { pruneEdits } from "@/lib/prune-edits.ts";
-import { apiFetch } from "@/shared/api-client.ts";
+import { useMobEditor } from "@/hooks/use-mob-editor.ts";
 import { IMMUNITY_TYPES } from "@/shared/enums/index.ts";
 import { mobFieldGroups } from "@/shared/fields/mob-fields.tsx";
 import { hasPower, POWER } from "@/shared/powers.ts";
-import { mobKeys } from "@/shared/query-keys.ts";
-import { mobResponseSchema } from "@/shared/schemas/mob-response.ts";
-import { mobSchema } from "@/shared/schemas/mob.ts";
 import {
   gateSpecProcs,
   isUnassignableMobSpecProc,
 } from "@/shared/spec-proc-access.ts";
-import { useAuthStore } from "@/state/auth.ts";
 
 export const Route = createFileRoute("/_authenticated/mobs/$vnum/")({
   component: MobEditorPage,
@@ -77,97 +69,32 @@ function prepareMobFieldGroups(
   });
 }
 
-function mobToFormValues(
-  mob: Mob,
-  edits: null | Partial<Mob>,
-): Record<string, number | string> {
-  const { extras: _e, immunities: _i, ...fields } = mob;
-  if (!edits) {
-    return fields;
-  }
-  const { extras: _ee, immunities: _ei, ...editFields } = edits;
-  return { ...fields, ...editFields };
-}
-
 function MobEditorInner({ vnumParam }: { vnumParam: string }) {
-  const vnum = Number(vnumParam);
-  const user = useAuthStore((s) => s.user);
-  const powers = user?.powers ?? [];
-
-  const {
-    data: mob,
-    error,
-    isError,
-    isLoading,
-  } = useQuery({
-    queryFn: () => apiFetch(`/api/mobs/${vnum}`, mobSchema),
-    queryKey: mobKeys.detail(vnum),
-  });
-
-  const { data: mobResponse } = useQuery({
-    queryFn: () => apiFetch(`/api/mob-responses/${vnum}`, mobResponseSchema),
-    queryKey: ["mob-responses", vnum],
-  });
-
-  const [edits, setEdits] = useState<null | Partial<Mob>>(null);
-  const [extraEdits, setExtraEdits] = useState<MobExtra[] | null>(null);
-  const [immEdits, setImmEdits] = useState<MobImm[] | null>(null);
-
-  const dirty = edits !== null || extraEdits !== null || immEdits !== null;
-
-  const resetEdits = () => {
-    setEdits(null);
-    setExtraEdits(null);
-    setImmEdits(null);
-  };
-
   const {
     blockerProceed,
     blockerReset,
     blockerStatus,
+    currentValues,
     deletePending,
-    handleDelete,
-    handleSave,
-    saving,
-  } = useEntityEditor({
-    allKey: mobKeys.all,
-    data: mob,
-    deletePath: `/api/mobs/${vnum}`,
-    detailKey: mobKeys.detail(vnum),
     dirty,
-    listPath: "/mobs",
-    onReset: resetEdits,
-    saveFn: async () => {
-      if (!mob) return null;
-      const body: Mob = {
-        ...mob,
-        ...edits,
-        extras: extraEdits ?? mob.extras,
-        immunities: immEdits ?? mob.immunities,
-      };
-      return apiFetch(`/api/mobs/${vnum}`, mobSchema, {
-        body: JSON.stringify(body),
-        method: "PUT",
-      });
-    },
-    validate: () => {
-      if (!mob) return null;
-      const merged = { ...mob, ...edits };
-      const requiredFields = [
-        { key: "name" as const, label: "Keywords" },
-        { key: "short_desc" as const, label: "Short Description" },
-        { key: "long_desc" as const, label: "Long Description" },
-        { key: "description" as const, label: "Detailed Description" },
-      ];
-      const missing = requiredFields
-        .filter((f) => !merged[f.key].trim())
-        .map((f) => f.label);
-      if (missing.length > 0) {
-        return `Required fields cannot be empty: ${missing.join(", ")}`;
-      }
-      return null;
-    },
-  });
+    error,
+    extraEdits,
+    handleDelete,
+    handleFieldChange,
+    handleSave,
+    immEdits,
+    isError,
+    isLoading,
+    mob,
+    mobResponse,
+    originalValues,
+    powers,
+    resetEdits,
+    saving,
+    setExtraEdits,
+    setImmEdits,
+    vnum,
+  } = useMobEditor(vnumParam);
 
   if (isLoading || isError || !mob) {
     return (
@@ -182,12 +109,6 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
       />
     );
   }
-
-  const currentValues = mobToFormValues(mob, edits);
-
-  const handleFieldChange = (key: string, value: number | string) => {
-    setEdits((prev) => pruneEdits({ ...prev, [key]: value }, mob));
-  };
 
   return (
     <>
@@ -218,7 +139,7 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
           !!mobResponse?.response.trim(),
         )}
         onChange={handleFieldChange}
-        originalValues={mobToFormValues(mob, null)}
+        originalValues={originalValues}
         values={currentValues}
       >
         <div className="grid gap-6">
