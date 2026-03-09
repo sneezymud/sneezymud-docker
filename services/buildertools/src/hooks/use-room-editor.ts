@@ -5,7 +5,7 @@ import type { Room, RoomExit, RoomExtra } from "@/shared/schemas/room.ts";
 import type { EnumEntry } from "@/shared/types/enums.ts";
 
 import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
-import { pruneEdits } from "@/lib/prune-edits.ts";
+import { diffEdits } from "@/lib/diff-edits.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import { roomKeys, zoneKeys } from "@/shared/query-keys.ts";
 import { roomSchema } from "@/shared/schemas/room.ts";
@@ -49,13 +49,13 @@ export function useRoomEditor(vnumParam: string) {
   };
 
   const {
-    blockerProceed,
-    blockerReset,
-    blockerStatus,
     deletePending,
     handleDelete,
     handleSave,
     saving,
+    unsavedNavProceed,
+    unsavedNavReset,
+    unsavedNavStatus,
   } = useEntityEditor({
     allKey: roomKeys.all,
     data: room,
@@ -88,9 +88,6 @@ export function useRoomEditor(vnumParam: string) {
   };
 
   return {
-    blockerProceed,
-    blockerReset,
-    blockerStatus,
     currentValues,
     deletePending,
     dirty,
@@ -108,6 +105,9 @@ export function useRoomEditor(vnumParam: string) {
     saving,
     setExitEdits,
     setExtraEdits,
+    unsavedNavProceed,
+    unsavedNavReset,
+    unsavedNavStatus,
     user,
     vnum,
     zoneEntries,
@@ -127,6 +127,10 @@ function roomToFormValues(
   return { ...roomFields, ...editFields };
 }
 
+// Height and room_flag (INDOORS bit) are bidirectionally linked: setting a
+// valid indoor height auto-sets the INDOORS flag, and toggling INDOORS adjusts
+// height to match. Both branches must go through diffEdits to preserve dirty
+// detection.
 function applyRoomFieldChange(
   key: string,
   value: number | string,
@@ -140,18 +144,18 @@ function applyRoomFieldChange(
         typeof prev?.room_flag === "number" ? prev.room_flag : room.room_flag;
       if (value === -1) {
         // Outdoor: clear INDOORS bit
-        return pruneEdits(
+        return diffEdits(
           { ...prev, height: value, room_flag: currentFlags & ~indoorsBit },
           room,
         );
       } else if (value >= 1 && value <= 1000) {
         // Indoor: set INDOORS bit
-        return pruneEdits(
+        return diffEdits(
           { ...prev, height: value, room_flag: currentFlags | indoorsBit },
           room,
         );
       }
-      return pruneEdits({ ...prev, [key]: value }, room);
+      return diffEdits({ ...prev, [key]: value }, room);
     });
     return;
   }
@@ -168,15 +172,15 @@ function applyRoomFieldChange(
 
       if (!wasIndoors && isIndoors && currentHeight === -1) {
         // Toggled INDOORS on while height is unlimited: set height to 100
-        return pruneEdits({ ...prev, height: 100, room_flag: value }, room);
+        return diffEdits({ ...prev, height: 100, room_flag: value }, room);
       } else if (wasIndoors && !isIndoors) {
         // Toggled INDOORS off: set height to -1
-        return pruneEdits({ ...prev, height: -1, room_flag: value }, room);
+        return diffEdits({ ...prev, height: -1, room_flag: value }, room);
       }
-      return pruneEdits({ ...prev, [key]: value }, room);
+      return diffEdits({ ...prev, [key]: value }, room);
     });
     return;
   }
 
-  setEdits((prev) => pruneEdits({ ...prev, [key]: value }, room));
+  setEdits((prev) => diffEdits({ ...prev, [key]: value }, room));
 }

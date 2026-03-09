@@ -1,25 +1,25 @@
 import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
 
 export function UnsavedChangesDialog({
-  blockerProceed,
-  blockerReset,
-  blockerStatus,
+  unsavedNavProceed,
+  unsavedNavReset,
+  unsavedNavStatus,
 }: {
-  blockerProceed: (() => void) | undefined;
-  blockerReset: (() => void) | undefined;
-  blockerStatus: "blocked" | "idle";
+  unsavedNavProceed: (() => void) | undefined;
+  unsavedNavReset: (() => void) | undefined;
+  unsavedNavStatus: "blocked" | "idle";
 }) {
   return (
     <ConfirmDialog
       confirmLabel="Discard changes"
       message="You have unsaved changes that will be lost."
       onCancel={() => {
-        blockerReset?.();
+        unsavedNavReset?.();
       }}
       onConfirm={() => {
-        blockerProceed?.();
+        unsavedNavProceed?.();
       }}
-      open={blockerStatus === "blocked"}
+      open={unsavedNavStatus === "blocked"}
       title="Unsaved Changes"
       variant="danger"
     />

@@ -22,9 +22,6 @@ export const Route = createFileRoute("/_authenticated/objects/$vnum")({
 function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
   const {
     affectEdits,
-    blockerProceed,
-    blockerReset,
-    blockerStatus,
     currentItemType,
     deletePending,
     dirty,
@@ -43,6 +40,9 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
     saving,
     setAffectEdits,
     setExtraEdits,
+    unsavedNavProceed,
+    unsavedNavReset,
+    unsavedNavStatus,
     vnum,
   } = useObjectEditor(vnumParam);
 
@@ -111,9 +111,9 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
       </EntityForm>
 
       <UnsavedChangesDialog
-        blockerProceed={blockerProceed}
-        blockerReset={blockerReset}
-        blockerStatus={blockerStatus}
+        unsavedNavProceed={unsavedNavProceed}
+        unsavedNavReset={unsavedNavReset}
+        unsavedNavStatus={unsavedNavStatus}
       />
     </>
   );

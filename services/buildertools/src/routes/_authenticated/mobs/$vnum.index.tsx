@@ -71,9 +71,6 @@ function prepareMobFieldGroups(
 
 function MobEditorInner({ vnumParam }: { vnumParam: string }) {
   const {
-    blockerProceed,
-    blockerReset,
-    blockerStatus,
     currentValues,
     deletePending,
     dirty,
@@ -93,6 +90,9 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
     saving,
     setExtraEdits,
     setImmEdits,
+    unsavedNavProceed,
+    unsavedNavReset,
+    unsavedNavStatus,
     vnum,
   } = useMobEditor(vnumParam);
 
@@ -161,9 +161,9 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
       </EntityForm>
 
       <UnsavedChangesDialog
-        blockerProceed={blockerProceed}
-        blockerReset={blockerReset}
-        blockerStatus={blockerStatus}
+        unsavedNavProceed={unsavedNavProceed}
+        unsavedNavReset={unsavedNavReset}
+        unsavedNavStatus={unsavedNavStatus}
       />
     </>
   );

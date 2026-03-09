@@ -45,6 +45,8 @@ export function EntityPicker({
   const [inputText, setInputText] = useState(() => formatValue(value));
   const [focused, setFocused] = useState(false);
 
+  // Sync from parent when value changes externally (e.g. reset, save round-trip).
+  // Render-time comparison pattern - intentional, not a bug.
   const [syncedValue, setSyncedValue] = useState(value);
   if (value !== syncedValue) {
     setSyncedValue(value);

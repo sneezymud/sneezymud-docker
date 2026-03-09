@@ -46,6 +46,8 @@ export function useEntityEditor<T>({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
+  // Side effects: useSyncDirty keeps the tab title's dirty indicator in sync,
+  // useConcurrentEditWarning toasts if the server data changes while editing.
   useSyncDirty(dirty);
   useConcurrentEditWarning(data, dirty);
 
@@ -126,14 +128,14 @@ export function useEntityEditor<T>({
   useKeyboardSave(handleSave, dirty && !saveMutation.isPending);
 
   return {
-    blockerProceed: proceed,
-    blockerReset: reset,
-    blockerStatus: status,
     deletePending: deleteMutation.isPending,
     handleDelete: () => {
       deleteMutation.mutate();
     },
     handleSave,
     saving: saveMutation.isPending,
+    unsavedNavProceed: proceed,
+    unsavedNavReset: reset,
+    unsavedNavStatus: status,
   };
 }

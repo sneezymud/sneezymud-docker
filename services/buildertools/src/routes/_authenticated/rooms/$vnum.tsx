@@ -17,9 +17,6 @@ export const Route = createFileRoute("/_authenticated/rooms/$vnum")({
 
 function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
   const {
-    blockerProceed,
-    blockerReset,
-    blockerStatus,
     currentValues,
     deletePending,
     dirty,
@@ -37,6 +34,9 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
     saving,
     setExitEdits,
     setExtraEdits,
+    unsavedNavProceed,
+    unsavedNavReset,
+    unsavedNavStatus,
     user,
     vnum,
     zoneEntries,
@@ -101,9 +101,9 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
       </EntityForm>
 
       <UnsavedChangesDialog
-        blockerProceed={blockerProceed}
-        blockerReset={blockerReset}
-        blockerStatus={blockerStatus}
+        unsavedNavProceed={unsavedNavProceed}
+        unsavedNavReset={unsavedNavReset}
+        unsavedNavStatus={unsavedNavStatus}
       />
     </>
   );

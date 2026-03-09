@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { Obj, ObjAffect, ObjExtra } from "@/shared/schemas/obj.ts";
 
 import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
-import { pruneEdits } from "@/lib/prune-edits.ts";
+import { diffEdits } from "@/lib/diff-edits.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import { VAL_KEYS } from "@/shared/fields/obj-fields.tsx";
 import {
@@ -44,13 +44,13 @@ export function useObjectEditor(vnumParam: string) {
   };
 
   const {
-    blockerProceed,
-    blockerReset,
-    blockerStatus,
     deletePending,
     handleDelete,
     handleSave,
     saving,
+    unsavedNavProceed,
+    unsavedNavReset,
+    unsavedNavStatus,
   } = useEntityEditor({
     allKey: objectKeys.all,
     data: obj,
@@ -90,9 +90,6 @@ export function useObjectEditor(vnumParam: string) {
 
   return {
     affectEdits,
-    blockerProceed,
-    blockerReset,
-    blockerStatus,
     currentItemType,
     deletePending,
     dirty,
@@ -111,6 +108,9 @@ export function useObjectEditor(vnumParam: string) {
     saving,
     setAffectEdits,
     setExtraEdits,
+    unsavedNavProceed,
+    unsavedNavReset,
+    unsavedNavStatus,
     vnum,
   };
 }
@@ -183,7 +183,7 @@ function applyObjFieldChange(
                 numValue,
               )
             : numValue;
-        return pruneEdits({ ...prev, [valKey]: packed }, obj);
+        return diffEdits({ ...prev, [valKey]: packed }, obj);
       });
       return;
     }
@@ -216,7 +216,7 @@ function applyObjFieldChange(
           }
         }
       }
-      return pruneEdits(
+      return diffEdits(
         {
           ...prev,
           type: numValue,
@@ -231,5 +231,5 @@ function applyObjFieldChange(
     return;
   }
 
-  setEdits((prev) => pruneEdits({ ...prev, [key]: value }, obj));
+  setEdits((prev) => diffEdits({ ...prev, [key]: value }, obj));
 }

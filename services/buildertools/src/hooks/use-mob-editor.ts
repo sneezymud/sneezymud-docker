@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { Mob, MobExtra, MobImm } from "@/shared/schemas/mob.ts";
 
 import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
-import { pruneEdits } from "@/lib/prune-edits.ts";
+import { diffEdits } from "@/lib/diff-edits.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import { mobKeys } from "@/shared/query-keys.ts";
 import { mobResponseSchema } from "@/shared/schemas/mob-response.ts";
@@ -44,13 +44,13 @@ export function useMobEditor(vnumParam: string) {
   };
 
   const {
-    blockerProceed,
-    blockerReset,
-    blockerStatus,
     deletePending,
     handleDelete,
     handleSave,
     saving,
+    unsavedNavProceed,
+    unsavedNavReset,
+    unsavedNavStatus,
   } = useEntityEditor({
     allKey: mobKeys.all,
     data: mob,
@@ -96,13 +96,10 @@ export function useMobEditor(vnumParam: string) {
 
   const handleFieldChange = (key: string, value: number | string) => {
     if (!mob) return;
-    setEdits((prev) => pruneEdits({ ...prev, [key]: value }, mob));
+    setEdits((prev) => diffEdits({ ...prev, [key]: value }, mob));
   };
 
   return {
-    blockerProceed,
-    blockerReset,
-    blockerStatus,
     currentValues,
     deletePending,
     dirty,
@@ -122,6 +119,9 @@ export function useMobEditor(vnumParam: string) {
     saving,
     setExtraEdits,
     setImmEdits,
+    unsavedNavProceed,
+    unsavedNavReset,
+    unsavedNavStatus,
     vnum,
     vnumParam,
   };

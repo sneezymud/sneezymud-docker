@@ -10,6 +10,8 @@ export function useRowKeys(rowCount: number) {
     Array.from({ length: rowCount }, () => crypto.randomUUID()),
   );
 
+  // Sync key array when external row count changes (e.g. after save round-trip).
+  // Render-time comparison pattern - intentional, not a bug.
   const [lastRowCount, setLastRowCount] = useState(rowCount);
   if (rowCount !== lastRowCount) {
     setLastRowCount(rowCount);

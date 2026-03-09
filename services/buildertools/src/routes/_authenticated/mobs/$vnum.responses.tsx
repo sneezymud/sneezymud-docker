@@ -91,21 +91,26 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
   const currentText = draft ?? data?.response ?? "";
   const dirty = draft !== null && draft !== (data?.response ?? "");
 
-  const { blockerProceed, blockerReset, blockerStatus, handleSave, saving } =
-    useEntityEditor({
-      allKey: mobKeys.all,
-      data,
-      detailKey: mobKeys.response(vnum),
-      dirty,
-      onReset: () => {
-        setDraft(null);
-      },
-      saveFn: async () =>
-        apiFetch(`/api/mob-responses/${vnum}`, mobResponseSchema, {
-          body: JSON.stringify({ response: currentText, vnum }),
-          method: "PUT",
-        }),
-    });
+  const {
+    handleSave,
+    saving,
+    unsavedNavProceed,
+    unsavedNavReset,
+    unsavedNavStatus,
+  } = useEntityEditor({
+    allKey: mobKeys.all,
+    data,
+    detailKey: mobKeys.response(vnum),
+    dirty,
+    onReset: () => {
+      setDraft(null);
+    },
+    saveFn: async () =>
+      apiFetch(`/api/mob-responses/${vnum}`, mobResponseSchema, {
+        body: JSON.stringify({ response: currentText, vnum }),
+        method: "PUT",
+      }),
+  });
 
   if (isLoading || isError) {
     return (
@@ -190,12 +195,12 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
         confirmLabel="Discard changes"
         message="You have unsaved changes that will be lost."
         onCancel={() => {
-          blockerReset?.();
+          unsavedNavReset?.();
         }}
         onConfirm={() => {
-          blockerProceed?.();
+          unsavedNavProceed?.();
         }}
-        open={blockerStatus === "blocked"}
+        open={unsavedNavStatus === "blocked"}
         title="Unsaved Changes"
         variant="danger"
       />

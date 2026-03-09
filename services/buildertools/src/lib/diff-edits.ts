@@ -1,9 +1,9 @@
 /**
- * Remove keys from an edits object whose values match the original entity.
- * Returns null when no actual changes remain, allowing `edits !== null`
- * dirty checks to work correctly after a user reverts a field.
+ * Compare an edits object against the original entity and return only keys
+ * that actually changed. Returns null when no real changes remain - this is
+ * load-bearing for dirty detection (`edits !== null`).
  */
-export function pruneEdits<T extends Record<string, unknown>>(
+export function diffEdits<T extends Record<string, unknown>>(
   next: Partial<T>,
   original: T,
 ): null | Partial<T> {
