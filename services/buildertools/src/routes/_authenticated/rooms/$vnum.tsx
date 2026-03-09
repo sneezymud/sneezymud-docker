@@ -4,7 +4,7 @@ import { BackLink } from "@/components/back-link.tsx";
 import { EntityForm } from "@/components/entity-form.tsx";
 import { EntityHeader } from "@/components/entity-header.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
-import { RoomExits } from "@/components/room-exits.tsx";
+import { RoomExits } from "@/components/room-exits/room-exits.tsx";
 import { RoomExtras } from "@/components/room-extras.tsx";
 import { EntityFormSkeleton } from "@/components/skeleton.tsx";
 import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog.tsx";

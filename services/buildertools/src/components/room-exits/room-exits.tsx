@@ -1,12 +1,12 @@
 import type { RoomExit } from "@/shared/schemas/room.ts";
 
 import { AddButton } from "@/components/add-button.tsx";
+import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
+import { SectionHeader } from "@/components/section-header.tsx";
 import { TooltipProvider } from "@/components/ui/tooltip.tsx";
-import { hasExitData, useExitEditor } from "@/hooks/use-exit-editor.ts";
 
-import { ConfirmDialog } from "./confirm-dialog.tsx";
 import { ExitRow } from "./exit-row.tsx";
-import { SectionHeader } from "./section-header.tsx";
+import { hasExitData, useExitEditor } from "./use-exit-editor.ts";
 
 interface RoomExitsProps {
   exits: RoomExit[];

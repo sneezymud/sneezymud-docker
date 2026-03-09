@@ -1,5 +1,6 @@
 import type { RoomExit } from "@/shared/schemas/room.ts";
 
+import { FormField } from "@/components/form-field.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
   Select,
@@ -11,7 +12,6 @@ import {
 import { DIRECTION_TYPES } from "@/shared/enums/index.ts";
 
 import { directionLabels, exitFields, toExitKey } from "./exit-data.tsx";
-import { FormField } from "./form-field.tsx";
 
 type ExitFieldUpdate = (field: keyof RoomExit, value: number | string) => void;
 
