@@ -1,7 +1,6 @@
-import { useCodeMirror } from "@/hooks/use-codemirror.ts";
-
 import { mobResponseLanguage } from "./mob-response-lang.ts";
 import { zincDarkHighlighting, zincDarkTheme } from "./theme.ts";
+import { useCodeMirror } from "./use-codemirror.ts";
 
 interface CodeEditorProps {
   onChange: (value: string) => void;
