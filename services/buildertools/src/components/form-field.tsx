@@ -16,8 +16,8 @@ import { BitfieldEditor } from "./bitfield-editor.tsx";
 import { EnumSelect } from "./enum-select.tsx";
 import { FieldTooltip } from "./info-tooltip.tsx";
 import { NumberInput } from "./number-input.tsx";
-import { ObjectPicker } from "./object-picker.tsx";
-import { RoomPicker } from "./room-picker.tsx";
+import { ObjectPicker } from "./pickers/object-picker.tsx";
+import { RoomPicker } from "./pickers/room-picker.tsx";
 
 export function FormField({
   field,

@@ -1,8 +1,9 @@
 import { z } from "zod";
 
-import { EntityPicker } from "@/components/entity-picker.tsx";
 import { apiFetch } from "@/shared/api-client.ts";
 import { roomKeys } from "@/shared/query-keys.ts";
+
+import { EntityPicker } from "./entity-picker.tsx";
 
 const roomSearchSchema = z.array(
   z.object({
