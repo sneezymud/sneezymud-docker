@@ -76,22 +76,14 @@ export function SubTable<T extends Record<string, number | string>>({
     onChange(rows.filter((_, i) => i !== index));
   };
 
-  const updateTextRow = (index: number, key: keyof T & string, raw: string) => {
-    const updated = rows.map((row, i) =>
-      i === index ? { ...row, [key]: raw } : row,
-    );
-    onChange(updated);
-  };
-
-  const updateNumberRow = (
+  const updateCell = (
     index: number,
     key: keyof T & string,
-    value: number,
+    value: number | string,
   ) => {
-    const updated = rows.map((row, i) =>
-      i === index ? { ...row, [key]: value } : row,
+    onChange(
+      rows.map((row, i) => (i === index ? { ...row, [key]: value } : row)),
     );
-    onChange(updated);
   };
 
   const updateRow = (index: number, updates: Partial<T>) => {
@@ -153,11 +145,7 @@ export function SubTable<T extends Record<string, number | string>>({
                       col.renderCell(
                         row,
                         (v) => {
-                          if (typeof v === "number") {
-                            updateNumberRow(index, col.key, v);
-                          } else {
-                            updateTextRow(index, col.key, v);
-                          }
+                          updateCell(index, col.key, v);
                         },
                         {
                           id: cellId,
@@ -170,11 +158,8 @@ export function SubTable<T extends Record<string, number | string>>({
                       <CellInput
                         entries={col.type === "enum" ? col.entries : undefined}
                         id={cellId}
-                        onNumberChange={(v) => {
-                          updateNumberRow(index, col.key, v);
-                        }}
-                        onTextChange={(v) => {
-                          updateTextRow(index, col.key, v);
+                        onChange={(v) => {
+                          updateCell(index, col.key, v);
                         }}
                         type={col.type}
                         value={row[col.key] ?? ""}
@@ -208,15 +193,13 @@ export function SubTable<T extends Record<string, number | string>>({
 function CellInput({
   entries,
   id,
-  onNumberChange,
-  onTextChange,
+  onChange,
   type,
   value,
 }: {
   entries?: EnumEntry[] | undefined;
   id: string;
-  onNumberChange: (v: number) => void;
-  onTextChange: (v: string) => void;
+  onChange: (v: number | string) => void;
   type: "enum" | "number" | "tags" | "text" | "textarea";
   value: number | string;
 }) {
@@ -225,7 +208,7 @@ function CellInput({
       <EnumSelect
         entries={entries}
         id={id}
-        onChange={onNumberChange}
+        onChange={onChange}
         value={
           typeof value === "number"
             ? value
@@ -241,7 +224,7 @@ function CellInput({
     return (
       <TagInput
         id={id}
-        onChange={onTextChange}
+        onChange={onChange}
         value={String(value)}
       />
     );
@@ -253,7 +236,7 @@ function CellInput({
         className="min-h-10 px-2 py-1"
         id={id}
         onChange={(e) => {
-          onTextChange(e.target.value);
+          onChange(e.target.value);
         }}
         value={String(value)}
       />
@@ -265,7 +248,7 @@ function CellInput({
       <NumberInput
         className="px-2 py-1"
         id={id}
-        onValueChange={onNumberChange}
+        onValueChange={onChange}
         value={
           typeof value === "number"
             ? value
@@ -282,7 +265,7 @@ function CellInput({
       className="px-2 py-1"
       id={id}
       onChange={(e) => {
-        onTextChange(e.target.value);
+        onChange(e.target.value);
       }}
       type="text"
       value={String(value)}

@@ -33,8 +33,7 @@ export const Route = createFileRoute("/_authenticated/mobs/")({
 function MobListPage() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
-  const powers = user?.powers ?? [];
-  const expandedAccess = hasPower(powers, POWER.LOW);
+  const expandedAccess = hasPower(user?.powers ?? [], POWER.LOW);
   const blocks = expandedAccess ? [] : (user?.blocks ?? []);
   const { from, to } = Route.useSearch();
 

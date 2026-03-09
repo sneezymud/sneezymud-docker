@@ -30,18 +30,7 @@ export function FormField({
   onChange: (key: string, value: number | string) => void;
   value: number | string | undefined;
 }) {
-  const {
-    addable,
-    detailedTooltip,
-    fullWidth,
-    help,
-    key,
-    label,
-    readOnly,
-    required,
-    tooltip,
-    type,
-  } = field;
+  const { addable, fullWidth, key, readOnly, type } = field;
 
   const hasValue =
     typeof value === "string" ? value.trim() !== "" : value !== undefined;
@@ -53,32 +42,8 @@ export function FormField({
         onChange(key, v);
       };
 
-  const tooltipElement =
-    tooltip || help || detailedTooltip ? (
-      <FieldTooltip
-        detailedTooltip={detailedTooltip}
-        label={label}
-      >
-        {help ? <p className="font-medium">{help}</p> : null}
-        {help && tooltip ? <Separator className="my-1.5" /> : null}
-        {tooltip}
-      </FieldTooltip>
-    ) : null;
-
-  const labelContent = label ? (
-    <span>
-      {label}
-
-      {required ? (
-        <span
-          aria-label="required"
-          className="text-amber-400"
-        >
-          *
-        </span>
-      ) : null}
-    </span>
-  ) : null;
+  const tooltipElement = renderFieldTooltip(field);
+  const labelContent = renderLabelContent(field);
 
   if (addable && !expanded) {
     return (
@@ -337,4 +302,35 @@ function FieldInput({
       value={value ?? ""}
     />
   );
+}
+
+function renderFieldTooltip(field: FieldDef) {
+  const { detailedTooltip, help, label, tooltip } = field;
+  return tooltip || help || detailedTooltip ? (
+    <FieldTooltip
+      detailedTooltip={detailedTooltip}
+      label={label}
+    >
+      {help ? <p className="font-medium">{help}</p> : null}
+      {help && tooltip ? <Separator className="my-1.5" /> : null}
+      {tooltip}
+    </FieldTooltip>
+  ) : null;
+}
+
+function renderLabelContent(field: FieldDef) {
+  return field.label ? (
+    <span>
+      {field.label}
+
+      {field.required ? (
+        <span
+          aria-label="required"
+          className="text-amber-400"
+        >
+          *
+        </span>
+      ) : null}
+    </span>
+  ) : null;
 }

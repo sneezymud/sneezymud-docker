@@ -22,6 +22,12 @@ import { SortableTableHeader } from "./sortable-table-header.tsx";
 import { TablePagination } from "./table-pagination.tsx";
 import { VnumPicker } from "./vnum-picker.tsx";
 
+const COLUMN_WIDTHS: Record<string, string> = {
+  secondary: "hidden",
+  select: "w-10",
+  vnum: "w-24",
+};
+
 interface EntityListItem {
   name: string;
   secondary?: string;
@@ -76,14 +82,7 @@ export function EntityList({
     columns,
     data: entities,
     defaultSort: { desc: false, id: "vnum" },
-    filterFn: (item, search) => {
-      const searchLower = search.toLowerCase();
-      return (
-        item.name.toLowerCase().includes(searchLower) ||
-        String(item.vnum).includes(search) ||
-        (item.secondary?.toLowerCase().includes(searchLower) ?? false)
-      );
-    },
+    filterFn: matchEntity,
     getRowId: (row) => String(row.vnum),
   });
 
@@ -110,11 +109,10 @@ export function EntityList({
       <EntityListToolbar
         deletePending={deletePending}
         onDelete={
-          onDeleteSelected
-            ? () => {
-                onDeleteSelected(selectedVnums);
-              }
-            : undefined
+          onDeleteSelected &&
+          (() => {
+            onDeleteSelected(selectedVnums);
+          })
         }
         search={search}
         selectedCount={selectedVnums.length}
@@ -123,33 +121,16 @@ export function EntityList({
 
       <Table>
         <SortableTableHeader
-          columnClassName={(id) =>
-            id === "select"
-              ? "w-10"
-              : id === "vnum"
-                ? "w-24"
-                : id === "secondary"
-                  ? "hidden"
-                  : undefined
-          }
+          columnClassName={(id) => COLUMN_WIDTHS[id]}
           columns={columns}
           headerOverrides={
             selectable
               ? {
                   select: (
-                    <Checkbox
-                      aria-label="Select all on this page"
-                      checked={
-                        rows.length > 0 &&
-                        rows.every((r) => selectedIds[String(r.vnum)])
-                          ? true
-                          : rows.some((r) => selectedIds[String(r.vnum)])
-                            ? "indeterminate"
-                            : false
-                      }
-                      onCheckedChange={(checked) => {
-                        toggleAllPageSelected(checked === true);
-                      }}
+                    <SelectAllCheckbox
+                      rows={rows}
+                      selectedIds={selectedIds}
+                      toggleAllPageSelected={toggleAllPageSelected}
                     />
                   ),
                 }
@@ -407,5 +388,40 @@ function EmptyMessage({
       <FolderOpen className="h-8 w-8 opacity-40" />
       No {label.toLowerCase()} yet
     </div>
+  );
+}
+
+function matchEntity(item: EntityListItem, search: string): boolean {
+  const s = search.toLowerCase();
+  return (
+    item.name.toLowerCase().includes(s) ||
+    String(item.vnum).includes(search) ||
+    (item.secondary?.toLowerCase().includes(s) ?? false)
+  );
+}
+
+function SelectAllCheckbox({
+  rows,
+  selectedIds,
+  toggleAllPageSelected,
+}: {
+  rows: EntityListItem[];
+  selectedIds: Record<string, boolean>;
+  toggleAllPageSelected: (checked: boolean) => void;
+}) {
+  const checked =
+    rows.length > 0 && rows.every((r) => selectedIds[String(r.vnum)])
+      ? true
+      : rows.some((r) => selectedIds[String(r.vnum)])
+        ? "indeterminate"
+        : false;
+  return (
+    <Checkbox
+      aria-label="Select all on this page"
+      checked={checked}
+      onCheckedChange={(c) => {
+        toggleAllPageSelected(c === true);
+      }}
+    />
   );
 }
