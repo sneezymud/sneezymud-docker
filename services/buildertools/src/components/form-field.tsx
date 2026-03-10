@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import type { FieldDef } from "@/shared/types/entity-form.ts";
@@ -8,16 +7,13 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
-import { useObjectName } from "@/hooks/use-object-name.ts";
-import { useRoomName } from "@/hooks/use-room-name.ts";
 import { cn } from "@/lib/utils.ts";
 
 import { BitfieldEditor } from "./bitfield-editor.tsx";
 import { EnumSelect } from "./enum-select.tsx";
 import { FieldTooltip } from "./info-tooltip.tsx";
 import { NumberInput } from "./number-input.tsx";
-import { ObjectPicker } from "./pickers/object-picker.tsx";
-import { RoomPicker } from "./pickers/room-picker.tsx";
+import { EntityPicker } from "./pickers/entity-picker.tsx";
 
 export function FormField({
   field,
@@ -142,53 +138,6 @@ function toNumericValue(value: number | string | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-const routesByType = {
-  object: "/objects/$vnum",
-  room: "/rooms/$vnum",
-} as const;
-
-function EntityPreview({
-  name,
-  type,
-  vnum,
-}: {
-  name: null | string | undefined;
-  type: "object" | "room";
-  vnum: number;
-}) {
-  return name ? (
-    <Link
-      className="text-muted-foreground hover:text-foreground mt-0.5 block truncate text-xs"
-      params={{ vnum: String(vnum) }}
-      to={routesByType[type]}
-    >
-      {name}
-    </Link>
-  ) : null;
-}
-
-function ObjectPreview({ vnum }: { vnum: number }) {
-  const { data } = useObjectName(vnum);
-  return (
-    <EntityPreview
-      name={data?.name}
-      type="object"
-      vnum={vnum}
-    />
-  );
-}
-
-function RoomPreview({ vnum }: { vnum: number }) {
-  const { data } = useRoomName(vnum);
-  return (
-    <EntityPreview
-      name={data?.name}
-      type="room"
-      vnum={vnum}
-    />
-  );
-}
-
 function FieldInput({
   field,
   onChange,
@@ -255,39 +204,18 @@ function FieldInput({
     );
   }
 
-  if (field.type === "object") {
-    const vnum = toNumericValue(value);
+  if (field.type === "object" || field.type === "room") {
     return (
-      <>
-        <ObjectPicker
-          id={field.key}
-          max={field.max}
-          min={field.min}
-          onChange={(v) => {
-            onChange?.(field.key, v);
-          }}
-          value={vnum}
-        />
-
-        <ObjectPreview vnum={vnum} />
-      </>
-    );
-  }
-
-  if (field.type === "room") {
-    const vnum = toNumericValue(value);
-    return (
-      <>
-        <RoomPicker
-          id={field.key}
-          onChange={(v) => {
-            onChange?.(field.key, v);
-          }}
-          value={vnum}
-        />
-
-        <RoomPreview vnum={vnum} />
-      </>
+      <EntityPicker
+        id={field.key}
+        max={field.max}
+        min={field.min}
+        onChange={(v) => {
+          onChange?.(field.key, v);
+        }}
+        type={field.type}
+        value={toNumericValue(value)}
+      />
     );
   }
 

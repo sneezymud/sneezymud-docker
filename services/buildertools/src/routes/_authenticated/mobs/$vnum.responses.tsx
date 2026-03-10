@@ -69,7 +69,7 @@ if quest ...;         - Quest conditionals`,
   },
 ];
 
-function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
+function useMobResponseEditor(vnumParam: string) {
   const vnum = Number(vnumParam);
 
   const { data, error, isError, isLoading } = useQuery({
@@ -82,8 +82,10 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
     queryKey: mobKeys.detail(vnum),
   });
 
-  const desc = mob?.short_desc;
-  const mobName = desc !== undefined && desc !== "" ? desc : `Mob ${vnum}`;
+  const mobName =
+    mob?.short_desc !== undefined && mob.short_desc !== ""
+      ? mob.short_desc
+      : `Mob ${vnum}`;
 
   // null = no edits yet (show server data), string = user has edited
   const [draft, setDraft] = useState<null | string>(null);
@@ -111,6 +113,40 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
         method: "PUT",
       }),
   });
+
+  return {
+    currentText,
+    dirty,
+    error,
+    handleSave,
+    isError,
+    isLoading,
+    mobName,
+    saving,
+    setDraft,
+    unsavedNavProceed,
+    unsavedNavReset,
+    unsavedNavStatus,
+    vnum,
+  };
+}
+
+function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
+  const {
+    currentText,
+    dirty,
+    error,
+    handleSave,
+    isError,
+    isLoading,
+    mobName,
+    saving,
+    setDraft,
+    unsavedNavProceed,
+    unsavedNavReset,
+    unsavedNavStatus,
+    vnum,
+  } = useMobResponseEditor(vnumParam);
 
   if (isLoading || isError) {
     return (

@@ -60,5 +60,7 @@ interface ObjectFieldDef extends FieldDefBase {
 }
 
 interface RoomFieldDef extends FieldDefBase {
+  max?: number;
+  min?: number;
   type: "room";
 }

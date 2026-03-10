@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
-import { Input } from "@/components/ui/input.tsx";
 import {
   Table,
   TableBody,
@@ -18,6 +17,7 @@ import {
   useSearchableTable,
 } from "@/hooks/use-searchable-table.ts";
 
+import { SearchInput } from "./search-input.tsx";
 import { SortableTableHeader } from "./sortable-table-header.tsx";
 import { TablePagination } from "./table-pagination.tsx";
 import { VnumPicker } from "./vnum-picker.tsx";
@@ -90,8 +90,15 @@ export function EntityList({
 
   return (
     <>
+      <h2 className="text-foreground mb-4 text-2xl font-bold">{label}</h2>
+
       <div className="mb-4 flex items-center gap-3">
-        <h2 className="text-foreground text-2xl font-bold">{label}</h2>
+        <SearchInput
+          className="min-w-0 flex-1"
+          onChange={setSearch}
+          placeholder="Search by vnum or name..."
+          value={search}
+        />
 
         {onCreateVnum && vnumBlocks ? (
           <VnumPicker
@@ -106,18 +113,15 @@ export function EntityList({
         ) : null}
       </div>
 
-      <EntityListToolbar
-        deletePending={deletePending}
-        onDelete={
-          onDeleteSelected &&
-          (() => {
+      {onDeleteSelected ? (
+        <DeleteSelectionBar
+          count={selectedVnums.length}
+          deletePending={deletePending}
+          onDelete={() => {
             onDeleteSelected(selectedVnums);
-          })
-        }
-        search={search}
-        selectedCount={selectedVnums.length}
-        setSearch={setSearch}
-      />
+          }}
+        />
+      ) : null}
 
       <Table>
         <SortableTableHeader
@@ -215,59 +219,27 @@ function buildColumns(
   return columns;
 }
 
-function EntityListToolbar({
+function DeleteSelectionBar({
+  count,
   deletePending,
   onDelete,
-  search,
-  selectedCount,
-  setSearch,
 }: {
+  count: number;
   deletePending?: boolean | undefined;
-  onDelete?: (() => void) | undefined;
-  search: string;
-  selectedCount: number;
-  setSearch: (value: string) => void;
+  onDelete: () => void;
 }) {
+  if (count === 0) return null;
   return (
-    <div className="mb-4 flex items-center gap-3">
-      <div className="relative max-w-lg flex-1">
-        <Input
-          aria-label="Search by vnum or name"
-          className="pr-8"
-          onChange={(e) => {
-            setSearch(e.target.value);
-          }}
-          placeholder="Search by vnum or name..."
-          type="text"
-          value={search}
-        />
-
-        {search ? (
-          <Button
-            aria-label="Clear search"
-            className="absolute top-1/2 right-1 -translate-y-1/2"
-            onClick={() => {
-              setSearch("");
-            }}
-            size="icon-xs"
-            variant="ghost"
-          >
-            {"\u2715"}
-          </Button>
-        ) : null}
-      </div>
-
-      {onDelete && selectedCount > 0 ? (
-        <Button
-          disabled={deletePending}
-          onClick={onDelete}
-          size="sm"
-          variant="destructive"
-        >
-          <Trash2 className="mr-1.5 h-4 w-4" />
-          Delete {selectedCount}
-        </Button>
-      ) : null}
+    <div className="mb-4">
+      <Button
+        disabled={deletePending}
+        onClick={onDelete}
+        size="sm"
+        variant="destructive"
+      >
+        <Trash2 className="mr-1.5 h-4 w-4" />
+        Delete {count}
+      </Button>
     </div>
   );
 }
