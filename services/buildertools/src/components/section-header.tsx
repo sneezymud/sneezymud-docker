@@ -13,7 +13,7 @@ export function SectionHeader({
     <>
       <legend className="sr-only">{title}</legend>
 
-      <div className="text-foreground mb-3 flex items-center gap-2 text-lg font-semibold">
+      <div className="text-muted-foreground sm:text-foreground mb-3 flex items-center gap-2 text-xs font-medium tracking-wider uppercase sm:text-lg sm:font-semibold sm:tracking-normal sm:normal-case">
         <span>{title}</span>
         {tooltip ? <FieldTooltip label={title}>{tooltip}</FieldTooltip> : null}
         {action}
