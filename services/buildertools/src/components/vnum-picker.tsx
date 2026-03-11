@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import {
   Popover,
-  PopoverClose,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover.tsx";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet.tsx";
+import { useIsMobile } from "@/hooks/use-is-mobile.ts";
 
 interface VnumPickerProps {
   createPending?: boolean | undefined;
@@ -28,7 +29,7 @@ export function VnumPicker({
   triggerLabel,
   vnumBlocks,
 }: VnumPickerProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
 
   // Find next available vnum
   let suggestedVnum: null | number = null;
@@ -43,6 +44,90 @@ export function VnumPicker({
       break;
     }
   }
+
+  const handleOpenChange = (isOpen: boolean) => {
+    onOpenChange(isOpen);
+  };
+
+  if (isMobile) {
+    return (
+      <>
+        <Button
+          onClick={() => {
+            onOpenChange(true);
+          }}
+          size="sm"
+        >
+          {triggerLabel}
+        </Button>
+
+        <Sheet
+          onOpenChange={handleOpenChange}
+          open={open}
+        >
+          <SheetContent
+            className="px-4 pt-4 pb-6"
+            showCloseButton={false}
+            side="bottom"
+          >
+            <SheetTitle className="sr-only">Create at vnum</SheetTitle>
+
+            <VnumPickerForm
+              createPending={createPending}
+              existingVnums={existingVnums}
+              onCreate={onCreate}
+              onOpenChange={onOpenChange}
+              suggestedVnum={suggestedVnum}
+              vnumBlocks={vnumBlocks}
+            />
+          </SheetContent>
+        </Sheet>
+      </>
+    );
+  }
+
+  return (
+    <Popover
+      onOpenChange={handleOpenChange}
+      open={open}
+    >
+      <PopoverTrigger asChild>
+        <Button size="sm">{triggerLabel}</Button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        align="end"
+        className="w-80"
+      >
+        <VnumPickerForm
+          createPending={createPending}
+          existingVnums={existingVnums}
+          onCreate={onCreate}
+          onOpenChange={onOpenChange}
+          suggestedVnum={suggestedVnum}
+          vnumBlocks={vnumBlocks}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function VnumPickerForm({
+  createPending,
+  existingVnums,
+  onCreate,
+  onOpenChange,
+  suggestedVnum,
+  vnumBlocks,
+}: {
+  createPending?: boolean | undefined;
+  existingVnums: Set<number>;
+  onCreate: (vnum: number) => void;
+  onOpenChange: (open: boolean) => void;
+  suggestedVnum: null | number;
+  vnumBlocks: Array<{ end: number; start: number }>;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const [vnumInput, setVnumInput] = useState(
     suggestedVnum === null ? "" : String(suggestedVnum),
@@ -68,81 +153,65 @@ export function VnumPicker({
   };
 
   return (
-    <Popover
-      onOpenChange={(isOpen) => {
-        if (isOpen) {
-          setVnumInput(suggestedVnum === null ? "" : String(suggestedVnum));
-        }
-        onOpenChange(isOpen);
-      }}
-      open={open}
-    >
-      <PopoverTrigger asChild>
-        <Button size="sm">{triggerLabel}</Button>
-      </PopoverTrigger>
+    <>
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-medium">Create at vnum</h3>
 
-      <PopoverContent
-        align="end"
-        className="w-80"
-        onOpenAutoFocus={(e) => {
-          e.preventDefault();
-          inputRef.current?.focus();
-        }}
+        <button
+          className="text-muted-foreground hover:text-foreground text-xs"
+          onClick={() => {
+            onOpenChange(false);
+          }}
+          type="button"
+        >
+          Cancel
+        </button>
+      </div>
+
+      <form
+        className="flex items-end gap-3"
+        onSubmit={handleSubmit}
       >
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-medium">Create at vnum</h3>
+        <div className="flex-1">
+          <Input
+            onChange={(e) => {
+              setVnumInput(e.target.value);
+            }}
+            placeholder={
+              suggestedVnum === null
+                ? "Enter vnum"
+                : `Next available: ${suggestedVnum}`
+            }
+            ref={inputRef}
+            type="number"
+            value={vnumInput}
+          />
 
-          <PopoverClose className="text-muted-foreground hover:text-foreground text-xs">
-            Cancel
-          </PopoverClose>
+          {vnumBlocks.length > 0 && (
+            <p className="text-muted-foreground mt-1 text-xs">
+              Ranges: {vnumBlocks.map((b) => `${b.start}-${b.end}`).join(", ")}
+            </p>
+          )}
         </div>
 
-        <form
-          className="flex items-end gap-3"
-          onSubmit={handleSubmit}
+        <Button
+          disabled={!isValid || createPending}
+          type="submit"
+          variant="secondary"
         >
-          <div className="flex-1">
-            <Input
-              onChange={(e) => {
-                setVnumInput(e.target.value);
-              }}
-              placeholder={
-                suggestedVnum === null
-                  ? "Enter vnum"
-                  : `Next available: ${suggestedVnum}`
-              }
-              ref={inputRef}
-              type="number"
-              value={vnumInput}
-            />
+          {createPending ? "Creating..." : "Create"}
+        </Button>
+      </form>
 
-            {vnumBlocks.length > 0 && (
-              <p className="text-muted-foreground mt-1 text-xs">
-                Ranges:{" "}
-                {vnumBlocks.map((b) => `${b.start}-${b.end}`).join(", ")}
-              </p>
-            )}
-          </div>
-
-          <Button
-            disabled={!isValid || createPending}
-            type="submit"
-            variant="secondary"
-          >
-            {createPending ? "Creating..." : "Create"}
-          </Button>
-        </form>
-
-        {vnumInput !== "" && !isValid ? (
-          <p className="text-destructive mt-2 text-xs">
-            {existingVnums.has(vnumNumber)
-              ? "Already exists"
-              : !Number.isInteger(vnumNumber) || vnumNumber < 0
-                ? "Must be a non-negative whole number"
-                : "Outside your assigned blocks"}
-          </p>
-        ) : null}
-      </PopoverContent>
-    </Popover>
+      {vnumInput !== "" && !isValid ? (
+        <p className="text-destructive mt-2 text-xs">
+          {existingVnums.has(vnumNumber)
+            ? "Already exists"
+            : !Number.isInteger(vnumNumber) || vnumNumber < 0
+              ? "Must be a non-negative whole number"
+              : "Outside your assigned blocks"}
+        </p>
+      ) : null}
+    </>
   );
 }

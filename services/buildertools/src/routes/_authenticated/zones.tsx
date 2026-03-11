@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import type { Zone } from "@/shared/schemas/zone.ts";
 
+import { MobileMenuButton } from "@/components/mobile-menu-button.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { TablePagination } from "@/components/table-pagination.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
@@ -205,7 +206,13 @@ function ZonesPage() {
 
   return (
     <>
-      <h2 className="text-foreground mb-4 text-2xl font-bold">Zones</h2>
+      <div className="mb-4 flex items-center">
+        <h2 className="text-foreground text-2xl font-bold">Zones</h2>
+
+        <div className="ml-auto">
+          <MobileMenuButton />
+        </div>
+      </div>
 
       <Alert className="border-l-accent mb-4 border-l-4">
         <AlertDescription>
@@ -225,7 +232,7 @@ function ZonesPage() {
         value={search}
       />
 
-      <div className="divide-border divide-y">
+      <div className="divide-border/70 divide-y">
         {rows.map((zone) => (
           <ZoneRow
             expanded={expandedZone === zone.zone_nr}

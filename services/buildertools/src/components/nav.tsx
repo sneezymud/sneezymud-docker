@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Box, DoorOpen, Map, User } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/lib/utils.ts";
@@ -28,20 +29,27 @@ export function Nav({ className, onNavClick }: NavProps) {
   }
 
   const doLogout = () => {
-    void (async () => {
+    (async () => {
       try {
         await fetch("/api/auth/logout", {
           headers: { "X-Requested-With": "XMLHttpRequest" },
           method: "POST",
           signal: AbortSignal.timeout(5000),
         });
-      } catch {
+      } catch (error: unknown) {
         // Proceed with client-side logout even if the server call fails
+        console.error("Logout failed:", error);
+        toast.error("Logout failed. Please try again.", {
+          id: "logout-failed",
+        });
       }
       queryClient.clear();
       clearUser();
       await navigate({ to: "/login" });
-    })();
+    })().catch((error: unknown) => {
+      console.error("Logout failed:", error);
+      toast.error("Logout failed. Please try again.", { id: "logout-failed" });
+    });
   };
 
   const handleLogout = () => {
@@ -53,35 +61,15 @@ export function Nav({ className, onNavClick }: NavProps) {
   };
 
   return (
-    <nav
-      className={cn("border-border bg-card flex w-56 flex-col p-4", className)}
-    >
-      <div className="mb-6 flex items-start justify-between">
-        <div className="flex flex-col">
-          <p className="text-foreground font-mono text-lg font-bold tracking-tight">
-            SneezyMUD
-          </p>
+    <nav className={cn("border-border bg-card flex flex-col p-4", className)}>
+      <div className="mb-6 flex flex-col">
+        <p className="text-foreground font-mono text-lg font-bold tracking-tight">
+          SneezyMUD
+        </p>
 
-          <p className="text-muted-foreground text-xs tracking-wide uppercase">
-            Builder Tools
-          </p>
-        </div>
-
-        <div className="text-right">
-          <p className="text-muted-foreground text-xs">{user.playerName}</p>
-
-          {user.username === user.playerName ? null : (
-            <p className="text-muted-foreground text-xs">({user.username})</p>
-          )}
-
-          <Button
-            className="h-auto p-0 text-xs"
-            onClick={handleLogout}
-            variant="link"
-          >
-            Log out
-          </Button>
-        </div>
+        <p className="text-muted-foreground text-xs tracking-wide uppercase">
+          Builder Tools
+        </p>
       </div>
 
       <div className="flex flex-1 flex-col gap-1.5">
@@ -124,6 +112,28 @@ export function Nav({ className, onNavClick }: NavProps) {
         </NavLink>
       </div>
 
+      <div className="border-border mt-auto flex justify-between border-t pt-3">
+        <div className="flex flex-col text-xs">
+          <span className="grid grid-cols-2 gap-x-2">
+            <span className="text-muted-foreground text-right">Character:</span>
+            <span className="text-accent-foreground">{user.playerName}</span>
+          </span>
+
+          <span className="grid grid-cols-2 gap-x-2">
+            <span className="text-muted-foreground text-right">Account:</span>
+            <span className="text-accent-foreground">{user.username}</span>
+          </span>
+        </div>
+
+        <Button
+          className="h-auto p-0 text-xs"
+          onClick={handleLogout}
+          variant="link"
+        >
+          Log out
+        </Button>
+      </div>
+
       <ConfirmDialog
         confirmLabel="Log out"
         message="You have unsaved changes that will be lost if you log out."
@@ -157,7 +167,7 @@ function NavLink({
     <Link
       activeProps={{
         "aria-current": "page" as const,
-        className: "bg-muted text-foreground",
+        className: "bg-accent/15 text-accent font-medium",
       }}
       className="focus-visible:ring-accent text-muted-foreground hover:bg-muted/50 hover:text-foreground focus-visible:ring-offset-background flex items-center gap-2 rounded px-3 py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-1"
       onClick={onClick}

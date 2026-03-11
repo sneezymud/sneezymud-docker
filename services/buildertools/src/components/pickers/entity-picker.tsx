@@ -73,6 +73,7 @@ const entityConfigs = {
 const EMPTY_ITEMS: Array<{ label: string; vnum: number }> = [];
 
 export function EntityPicker({
+  className,
   id,
   max,
   min,
@@ -80,6 +81,7 @@ export function EntityPicker({
   type,
   value,
 }: {
+  className?: string | undefined;
   id?: string | undefined;
   max?: number | undefined;
   min?: number | undefined;
@@ -104,6 +106,7 @@ export function EntityPicker({
     <>
       <Popover open={focused && inputText.length >= 2}>
         <PickerInput
+          className={className}
           id={id}
           inputRef={inputRef}
           inputText={inputText}
@@ -236,6 +239,7 @@ function useEntityPicker({
 }
 
 function PickerInput({
+  className,
   id,
   inputRef,
   inputText,
@@ -245,6 +249,7 @@ function PickerInput({
   onInputChange,
   onReset,
 }: {
+  className?: string | undefined;
   id?: string | undefined;
   inputRef: React.RefObject<HTMLInputElement | null>;
   inputText: string;
@@ -261,7 +266,7 @@ function PickerInput({
     <PopoverAnchor asChild>
       <div className="relative">
         <Input
-          className="px-2 py-1 pr-7"
+          className={cn("px-2 py-1 pr-7", className)}
           id={inputId}
           onBlur={onBlur}
           onChange={onInputChange}

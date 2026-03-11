@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { FolderOpen, SearchX, Trash2 } from "lucide-react";
 import { useState } from "react";
 
+import { MobileMenuButton } from "@/components/mobile-menu-button.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import {
@@ -87,10 +88,18 @@ export function EntityList({
   });
 
   const selectedVnums = Object.keys(selectedIds).map(Number);
+  const canCreate = Boolean(onCreateVnum && vnumBlocks);
+  const searching = search !== "";
 
   return (
     <>
-      <h2 className="text-foreground mb-4 text-2xl font-bold">{label}</h2>
+      <div className="mb-4 flex items-center">
+        <h2 className="text-foreground text-2xl font-bold">{label}</h2>
+
+        <div className="ml-auto">
+          <MobileMenuButton />
+        </div>
+      </div>
 
       <div className="mb-4 flex items-center gap-3">
         <SearchInput
@@ -123,61 +132,35 @@ export function EntityList({
         />
       ) : null}
 
-      <Table>
-        <SortableTableHeader
-          columnClassName={(id) => COLUMN_WIDTHS[id]}
-          columns={columns}
-          headerOverrides={
-            selectable
-              ? {
-                  select: (
-                    <SelectAllCheckbox
-                      rows={rows}
-                      selectedIds={selectedIds}
-                      toggleAllPageSelected={toggleAllPageSelected}
-                    />
-                  ),
-                }
-              : undefined
-          }
-          onToggleSort={toggleSort}
-          sorting={sorting}
-        />
+      <DesktopTable
+        basePath={basePath}
+        canCreate={canCreate}
+        columns={columns}
+        label={label}
+        rows={rows}
+        searching={searching}
+        secondaryLabel={secondaryLabel}
+        selectable={selectable}
+        selectedIds={selectedIds}
+        setShowCreate={setShowCreate}
+        sorting={sorting}
+        toggleAllPageSelected={toggleAllPageSelected}
+        toggleSelected={toggleSelected}
+        toggleSort={toggleSort}
+      />
 
-        <TableBody>
-          {rows.map((entity) => (
-            <EntityRow
-              basePath={basePath}
-              entity={entity}
-              isSelected={selectedIds[String(entity.vnum)] === true}
-              key={entity.vnum}
-              onToggleSelected={(checked) => {
-                toggleSelected(String(entity.vnum), checked);
-              }}
-              secondaryLabel={secondaryLabel}
-              selectable={selectable}
-            />
-          ))}
-
-          {rows.length === 0 ? (
-            <TableRow>
-              <TableCell
-                className="py-8 text-center"
-                colSpan={columns.length}
-              >
-                <EmptyMessage
-                  canCreate={Boolean(onCreateVnum && vnumBlocks)}
-                  label={label}
-                  onShowCreate={() => {
-                    setShowCreate(true);
-                  }}
-                  searching={search !== ""}
-                />
-              </TableCell>
-            </TableRow>
-          ) : null}
-        </TableBody>
-      </Table>
+      <MobileCardList
+        basePath={basePath}
+        canCreate={canCreate}
+        label={label}
+        rows={rows}
+        searching={searching}
+        selectable={selectable}
+        selectedIds={selectedIds}
+        setShowCreate={setShowCreate}
+        toggleAllPageSelected={toggleAllPageSelected}
+        toggleSelected={toggleSelected}
+      />
 
       <TablePagination
         canNextPage={canNextPage}
@@ -194,53 +177,6 @@ export function EntityList({
           : `${entities.length} ${label.toLowerCase()}`}
       </p>
     </>
-  );
-}
-
-function buildColumns(
-  selectable: boolean,
-  secondaryLabel?: string,
-): Array<Column<EntityListItem>> {
-  const columns: Array<Column<EntityListItem>> = [];
-
-  if (selectable) {
-    columns.push({ header: "", id: "select" });
-  }
-
-  columns.push(
-    { compare: numericSort("vnum"), header: "Vnum", id: "vnum" },
-    { compare: textSort("name"), header: "Name", id: "name" },
-  );
-
-  if (secondaryLabel) {
-    columns.push({ header: secondaryLabel, id: "secondary" });
-  }
-
-  return columns;
-}
-
-function DeleteSelectionBar({
-  count,
-  deletePending,
-  onDelete,
-}: {
-  count: number;
-  deletePending?: boolean | undefined;
-  onDelete: () => void;
-}) {
-  if (count === 0) return null;
-  return (
-    <div className="mb-4">
-      <Button
-        disabled={deletePending}
-        onClick={onDelete}
-        size="sm"
-        variant="destructive"
-      >
-        <Trash2 className="mr-1.5 h-4 w-4" />
-        Delete {count}
-      </Button>
-    </div>
   );
 }
 
@@ -316,6 +252,32 @@ function EntityRow({
   );
 }
 
+function SelectAllCheckbox({
+  rows,
+  selectedIds,
+  toggleAllPageSelected,
+}: {
+  rows: EntityListItem[];
+  selectedIds: Record<string, boolean>;
+  toggleAllPageSelected: (checked: boolean) => void;
+}) {
+  const checked =
+    rows.length > 0 && rows.every((r) => selectedIds[String(r.vnum)])
+      ? true
+      : rows.some((r) => selectedIds[String(r.vnum)])
+        ? "indeterminate"
+        : false;
+  return (
+    <Checkbox
+      aria-label="Select all on this page"
+      checked={checked}
+      onCheckedChange={(c) => {
+        toggleAllPageSelected(c === true);
+      }}
+    />
+  );
+}
+
 function EmptyMessage({
   canCreate,
   label,
@@ -363,37 +325,256 @@ function EmptyMessage({
   );
 }
 
+function DesktopTable({
+  basePath,
+  canCreate,
+  columns,
+  label,
+  rows,
+  searching,
+  secondaryLabel,
+  selectable,
+  selectedIds,
+  setShowCreate,
+  sorting,
+  toggleAllPageSelected,
+  toggleSelected,
+  toggleSort,
+}: {
+  basePath: string;
+  canCreate: boolean;
+  columns: Array<Column<EntityListItem>>;
+  label: string;
+  rows: EntityListItem[];
+  searching: boolean;
+  secondaryLabel?: string | undefined;
+  selectable: boolean;
+  selectedIds: Record<string, boolean>;
+  setShowCreate: (open: boolean) => void;
+  sorting: { desc: boolean; id: string };
+  toggleAllPageSelected: (checked: boolean) => void;
+  toggleSelected: (id: string, checked: boolean) => void;
+  toggleSort: (id: string) => void;
+}) {
+  return (
+    <div className="hidden sm:block">
+      <Table>
+        <SortableTableHeader
+          columnClassName={(id) => COLUMN_WIDTHS[id]}
+          columns={columns}
+          headerOverrides={
+            selectable
+              ? {
+                  select: (
+                    <SelectAllCheckbox
+                      rows={rows}
+                      selectedIds={selectedIds}
+                      toggleAllPageSelected={toggleAllPageSelected}
+                    />
+                  ),
+                }
+              : undefined
+          }
+          onToggleSort={toggleSort}
+          sorting={sorting}
+        />
+
+        <TableBody>
+          {rows.map((entity) => (
+            <EntityRow
+              basePath={basePath}
+              entity={entity}
+              isSelected={selectedIds[String(entity.vnum)] === true}
+              key={entity.vnum}
+              onToggleSelected={(checked) => {
+                toggleSelected(String(entity.vnum), checked);
+              }}
+              secondaryLabel={secondaryLabel}
+              selectable={selectable}
+            />
+          ))}
+
+          {rows.length === 0 ? (
+            <TableRow>
+              <TableCell
+                className="py-8 text-center"
+                colSpan={columns.length}
+              >
+                <EmptyMessage
+                  canCreate={canCreate}
+                  label={label}
+                  onShowCreate={() => {
+                    setShowCreate(true);
+                  }}
+                  searching={searching}
+                />
+              </TableCell>
+            </TableRow>
+          ) : null}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function EntityCardRow({
+  basePath,
+  entity,
+  isSelected,
+  onToggleSelected,
+  selectable,
+}: {
+  basePath: string;
+  entity: EntityListItem;
+  isSelected: boolean;
+  onToggleSelected: (selected: boolean) => void;
+  selectable: boolean;
+}) {
+  const to = `${basePath}/${entity.vnum}`;
+  return (
+    <div className="flex items-center gap-3 py-2.5">
+      {selectable ? (
+        <Checkbox
+          aria-label={`Select ${entity.name || entity.vnum}`}
+          checked={isSelected}
+          onCheckedChange={(checked) => {
+            onToggleSelected(checked === true);
+          }}
+        />
+      ) : null}
+
+      <Link
+        className="min-w-0 flex-1"
+        to={to}
+      >
+        <span className="text-accent font-mono text-xs">{entity.vnum}</span>
+
+        <span className="text-foreground block text-sm">
+          {entity.name || "(unnamed)"}
+        </span>
+      </Link>
+    </div>
+  );
+}
+
+function MobileCardList({
+  basePath,
+  canCreate,
+  label,
+  rows,
+  searching,
+  selectable,
+  selectedIds,
+  setShowCreate,
+  toggleAllPageSelected,
+  toggleSelected,
+}: {
+  basePath: string;
+  canCreate: boolean;
+  label: string;
+  rows: EntityListItem[];
+  searching: boolean;
+  selectable: boolean;
+  selectedIds: Record<string, boolean>;
+  setShowCreate: (open: boolean) => void;
+  toggleAllPageSelected: (checked: boolean) => void;
+  toggleSelected: (id: string, checked: boolean) => void;
+}) {
+  return (
+    <div className="sm:hidden">
+      {selectable ? (
+        <div className="flex items-center gap-2 py-2">
+          <SelectAllCheckbox
+            rows={rows}
+            selectedIds={selectedIds}
+            toggleAllPageSelected={toggleAllPageSelected}
+          />
+
+          <span className="text-muted-foreground text-xs">Select all</span>
+        </div>
+      ) : null}
+
+      <div className="divide-border divide-y">
+        {rows.map((entity) => (
+          <EntityCardRow
+            basePath={basePath}
+            entity={entity}
+            isSelected={selectedIds[String(entity.vnum)] === true}
+            key={entity.vnum}
+            onToggleSelected={(checked) => {
+              toggleSelected(String(entity.vnum), checked);
+            }}
+            selectable={selectable}
+          />
+        ))}
+      </div>
+
+      {rows.length === 0 ? (
+        <EmptyMessage
+          canCreate={canCreate}
+          label={label}
+          onShowCreate={() => {
+            setShowCreate(true);
+          }}
+          searching={searching}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function buildColumns(
+  selectable: boolean,
+  secondaryLabel?: string,
+): Array<Column<EntityListItem>> {
+  const columns: Array<Column<EntityListItem>> = [];
+
+  if (selectable) {
+    columns.push({ header: "", id: "select" });
+  }
+
+  columns.push(
+    { compare: numericSort("vnum"), header: "Vnum", id: "vnum" },
+    { compare: textSort("name"), header: "Name", id: "name" },
+  );
+
+  if (secondaryLabel) {
+    columns.push({ header: secondaryLabel, id: "secondary" });
+  }
+
+  return columns;
+}
+
+function DeleteSelectionBar({
+  count,
+  deletePending,
+  onDelete,
+}: {
+  count: number;
+  deletePending?: boolean | undefined;
+  onDelete: () => void;
+}) {
+  if (count === 0) return null;
+  return (
+    <div className="mb-4">
+      <Button
+        disabled={deletePending}
+        onClick={onDelete}
+        size="sm"
+        variant="destructive"
+      >
+        <Trash2 className="mr-1.5 h-4 w-4" />
+        Delete {count}
+      </Button>
+    </div>
+  );
+}
+
 function matchEntity(item: EntityListItem, search: string): boolean {
   const s = search.toLowerCase();
   return (
     item.name.toLowerCase().includes(s) ||
     String(item.vnum).includes(search) ||
     (item.secondary?.toLowerCase().includes(s) ?? false)
-  );
-}
-
-function SelectAllCheckbox({
-  rows,
-  selectedIds,
-  toggleAllPageSelected,
-}: {
-  rows: EntityListItem[];
-  selectedIds: Record<string, boolean>;
-  toggleAllPageSelected: (checked: boolean) => void;
-}) {
-  const checked =
-    rows.length > 0 && rows.every((r) => selectedIds[String(r.vnum)])
-      ? true
-      : rows.some((r) => selectedIds[String(r.vnum)])
-        ? "indeterminate"
-        : false;
-  return (
-    <Checkbox
-      aria-label="Select all on this page"
-      checked={checked}
-      onCheckedChange={(c) => {
-        toggleAllPageSelected(c === true);
-      }}
-    />
   );
 }

@@ -43,7 +43,7 @@ export function FormField({
 
   if (addable && !expanded) {
     return (
-      <div className="col-span-full border-l-2 border-l-transparent pl-2">
+      <div className="col-span-full">
         <Label>
           {labelContent}
           {tooltipElement}
@@ -62,26 +62,20 @@ export function FormField({
     );
   }
 
+  const dirtyClass = isDirty ? "border-amber-400/50" : undefined;
+
   const inputElement = (
     <FieldInput
+      className={dirtyClass}
       field={field}
       onChange={handleChange}
       value={value}
     />
   );
 
-  const dirtyClass = isDirty ? "border-l-amber-400/50" : "border-l-transparent";
-
   if (fullWidth ?? (type === "textarea" || type === "bitfield")) {
     return (
-      <div
-        className={cn(
-          "col-span-full pb-1",
-          "border-l-2 pl-2",
-          dirtyClass,
-          readOnly && "opacity-60",
-        )}
-      >
+      <div className={cn("col-span-full pb-1", readOnly && "opacity-60")}>
         {labelContent || tooltipElement ? (
           <Label htmlFor={key}>
             {labelContent}
@@ -110,24 +104,28 @@ export function FormField({
   return (
     <div
       className={cn(
-        "col-span-3 grid grid-cols-subgrid items-baseline border-l-2 pl-2",
-        dirtyClass,
+        "col-span-full",
+        "sm:col-span-3 sm:grid sm:grid-cols-subgrid sm:items-baseline",
         readOnly && "opacity-60",
       )}
     >
       {labelContent ? (
         <Label
-          className="mb-0 justify-end"
+          className="mb-0.5 sm:mb-0 sm:justify-end"
           htmlFor={key}
         >
           {labelContent}
+          <span className="sm:hidden">{tooltipElement}</span>
         </Label>
       ) : (
         <div />
       )}
 
       <div className="min-w-0">{inputElement}</div>
-      <div className="justify-self-center">{tooltipElement}</div>
+
+      <div className="hidden justify-self-center sm:block">
+        {tooltipElement}
+      </div>
     </div>
   );
 }
@@ -139,10 +137,12 @@ function toNumericValue(value: number | string | undefined): number {
 }
 
 function FieldInput({
+  className,
   field,
   onChange,
   value,
 }: {
+  className?: string | undefined;
   field: FieldDef;
   onChange: ((key: string, value: number | string) => void) | undefined;
   value: number | string | undefined;
@@ -150,7 +150,7 @@ function FieldInput({
   if (field.type === "textarea") {
     return (
       <Textarea
-        className="min-h-27 text-base"
+        className={cn("min-h-27 text-base", className)}
         disabled={field.readOnly}
         id={field.key}
         onChange={(e) => {
@@ -164,6 +164,7 @@ function FieldInput({
   if (field.type === "enum") {
     return (
       <EnumSelect
+        className={className}
         disabled={field.readOnly}
         entries={field.enumEntries}
         id={field.key}
@@ -178,6 +179,7 @@ function FieldInput({
   if (field.type === "bitfield") {
     return (
       <BitfieldEditor
+        className={className}
         entries={field.bitfieldEntries}
         id={field.key}
         onChange={(v) => {
@@ -191,6 +193,7 @@ function FieldInput({
   if (field.type === "number") {
     return (
       <NumberInput
+        className={className}
         disabled={field.readOnly}
         id={field.key}
         max={field.max}
@@ -207,6 +210,7 @@ function FieldInput({
   if (field.type === "object" || field.type === "room") {
     return (
       <EntityPicker
+        className={className}
         id={field.key}
         max={field.max}
         min={field.min}
@@ -221,6 +225,7 @@ function FieldInput({
 
   return (
     <Input
+      className={className}
       disabled={field.readOnly}
       id={field.key}
       onChange={(e) => {

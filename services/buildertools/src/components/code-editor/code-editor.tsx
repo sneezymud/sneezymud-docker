@@ -21,7 +21,7 @@ export function CodeEditor({ onChange, onSave, value }: CodeEditorProps) {
   return (
     <div
       aria-label="Response script editor"
-      className="border-border min-h-100 flex-1 overflow-hidden rounded border"
+      className="border-border min-h-[40vh] flex-1 overflow-hidden rounded border sm:min-h-100"
       ref={containerRef}
     />
   );

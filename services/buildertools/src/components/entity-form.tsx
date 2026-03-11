@@ -68,7 +68,7 @@ function FieldGroup({
   return (
     <fieldset
       className={cn(
-        "bg-card border-border/50 rounded-lg border p-5",
+        "bg-card border-border/50 rounded-lg border p-3 sm:p-5",
         colSpan === "full" && "col-span-full",
       )}
     >
@@ -87,7 +87,7 @@ function FieldGroup({
 
       {header}
 
-      <div className="grid grid-cols-[auto_auto_1.5rem] gap-x-3 gap-y-2">
+      <div className="grid grid-cols-1 gap-y-2 sm:grid-cols-[auto_auto_1.5rem] sm:gap-x-3">
         {fields.map((field, i) => {
           const fieldDirty =
             originalValues !== undefined &&

@@ -15,8 +15,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
+import { cn } from "@/lib/utils.ts";
 
 interface EnumSelectProps {
+  className?: string | undefined;
   disabled?: boolean | undefined;
   entries: EnumEntry[];
   id?: string | undefined;
@@ -27,6 +29,7 @@ interface EnumSelectProps {
 const SEARCHABLE_THRESHOLD = 15;
 
 export function EnumSelect({
+  className,
   disabled,
   entries,
   id,
@@ -36,6 +39,7 @@ export function EnumSelect({
   if (entries.length > SEARCHABLE_THRESHOLD) {
     return (
       <SearchableEnumSelect
+        className={className}
         disabled={disabled}
         entries={entries}
         id={id}
@@ -47,6 +51,7 @@ export function EnumSelect({
 
   return (
     <NativeEnumSelect
+      className={className}
       disabled={disabled}
       entries={entries}
       id={id}
@@ -57,6 +62,7 @@ export function EnumSelect({
 }
 
 function NativeEnumSelect({
+  className,
   disabled,
   entries,
   id,
@@ -80,7 +86,7 @@ function NativeEnumSelect({
       value={String(value)}
     >
       <SelectTrigger
-        className="w-full"
+        className={cn("w-full", className)}
         id={id}
       >
         <SelectValue />
@@ -109,6 +115,7 @@ function NativeEnumSelect({
 }
 
 function SearchableEnumSelect({
+  className,
   disabled,
   entries,
   id,
@@ -132,7 +139,7 @@ function SearchableEnumSelect({
       value={currentSelectable}
     >
       <ComboboxInput
-        className="w-full"
+        className={cn("w-full", className)}
         disabled={disabled === true}
         id={id}
         placeholder={

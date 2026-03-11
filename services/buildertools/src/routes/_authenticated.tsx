@@ -5,7 +5,6 @@ import {
   redirect,
   useRouterState,
 } from "@tanstack/react-router";
-import { Menu } from "lucide-react";
 import { useEffect } from "react";
 
 import { Nav } from "@/components/nav.tsx";
@@ -62,7 +61,6 @@ export const Route = createFileRoute("/_authenticated")({
 
 function AuthenticatedLayout() {
   const sidebarOpen = useSidebarStore((s) => s.open);
-  const toggleSidebar = useSidebarStore((s) => s.toggle);
   const closeSidebar = useSidebarStore((s) => s.close);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -104,21 +102,10 @@ function AuthenticatedLayout() {
       </Sheet>
 
       <main
-        className="min-w-0 flex-1 overflow-y-auto px-6 pb-6"
+        className="min-w-0 flex-1 overflow-y-auto px-4 pb-6 sm:px-6"
         id="main-content"
       >
-        <div className="mb-4 pt-6 lg:hidden">
-          <Button
-            aria-label="Open navigation"
-            onClick={toggleSidebar}
-            size="icon"
-            variant="outline"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        </div>
-
-        <div className="max-w-90 pt-6 transition-opacity duration-100">
+        <div className="max-w-90 pt-3 transition-opacity duration-100 sm:pt-6">
           <Outlet />
         </div>
       </main>
