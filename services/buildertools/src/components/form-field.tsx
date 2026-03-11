@@ -150,7 +150,7 @@ function FieldInput({
   if (field.type === "textarea") {
     return (
       <Textarea
-        className={cn("min-h-27 text-base", className)}
+        className={cn("min-h-16 text-base sm:min-h-27", className)}
         disabled={field.readOnly}
         id={field.key}
         onChange={(e) => {
