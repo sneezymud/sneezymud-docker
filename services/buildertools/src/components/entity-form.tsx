@@ -27,7 +27,7 @@ export function EntityForm({
   return (
     <TooltipProvider delayDuration={300}>
       <div className="space-y-6">
-        <div className="grid gap-6">
+        <div className="grid gap-8 sm:gap-6">
           {groups.map((group) => (
             <FieldGroup
               group={group}
@@ -68,11 +68,11 @@ function FieldGroup({
   return (
     <fieldset
       className={cn(
-        "bg-card border-border/50 rounded-lg border p-3 sm:p-5",
+        "bg-card border-border/50 p-3 sm:rounded-lg sm:border sm:p-5",
         colSpan === "full" && "col-span-full",
       )}
     >
-      <legend className="text-foreground text-lg font-semibold">
+      <legend className="text-muted-foreground sm:text-foreground text-xs font-medium tracking-wider uppercase sm:text-lg sm:font-semibold sm:tracking-normal sm:normal-case">
         {title}
 
         {tooltip || detailedTooltip ? (

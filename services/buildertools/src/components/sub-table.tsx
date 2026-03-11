@@ -95,7 +95,7 @@ export function SubTable<T extends Record<string, number | string>>({
 
   return (
     <fieldset
-      className="bg-card border-border/50 rounded-lg border p-5"
+      className="bg-card border-border/50 p-3 sm:rounded-lg sm:border sm:p-5"
       disabled={readOnly}
     >
       <SectionHeader
