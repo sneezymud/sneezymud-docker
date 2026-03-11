@@ -44,19 +44,31 @@ export function BitfieldEditor({
         id={id}
         role="group"
       >
-        <Button
-          className="text-muted-foreground h-auto gap-1.5 px-0 py-1 text-sm"
-          onClick={() => {
-            setCollapsed(false);
-          }}
-          variant="ghost"
-        >
-          <ChevronDown className="size-4" />
+        <div className="flex flex-wrap items-center gap-1">
+          {setEntries.length === 0 ? (
+            <span className="text-muted-foreground text-sm">None set</span>
+          ) : (
+            setEntries.map((e) => (
+              <span
+                className="bg-secondary text-foreground rounded px-1.5 py-0.5 text-xs"
+                key={e.bit}
+              >
+                {e.label}
+              </span>
+            ))
+          )}
 
-          {setEntries.length === 0
-            ? "None set"
-            : `${setEntries.length} set: ${setEntries.map((e) => e.label).join(", ")}`}
-        </Button>
+          <Button
+            className="text-muted-foreground size-6 shrink-0"
+            onClick={() => {
+              setCollapsed(false);
+            }}
+            size="icon"
+            variant="ghost"
+          >
+            <ChevronDown className="size-4" />
+          </Button>
+        </div>
       </div>
     );
   }
