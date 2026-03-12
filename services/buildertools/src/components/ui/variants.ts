@@ -60,17 +60,21 @@ export const buttonVariants = cva(
         "icon-lg": "size-10",
         "icon-sm": "size-8",
         "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
+        inline: "h-auto px-1 py-0",
         lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
         sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
         xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
       },
       variant: {
         default:
-          "bg-primary text-primary-foreground hover:bg-primary/80 hover:shadow-md hover:shadow-primary/20 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none",
+          "bg-gradient-to-b from-primary to-primary/85 text-primary-foreground hover:from-primary/90 hover:to-primary/75 hover:shadow-md hover:shadow-primary/20 active:scale-[0.98] active:duration-200 disabled:bg-muted disabled:from-muted disabled:to-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+          "bg-gradient-to-b from-destructive to-destructive/85 text-destructive-foreground hover:from-destructive/90 hover:to-destructive/75 active:scale-[0.98] active:duration-200 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:from-destructive/60 dark:to-destructive/50",
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
+        inline: "text-primary hover:text-accent transition-colors duration-150",
+        "inline-destructive":
+          "text-destructive/80 hover:text-destructive transition-colors duration-150",
         link: "text-primary underline-offset-4 hover:underline",
         outline:
           "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
