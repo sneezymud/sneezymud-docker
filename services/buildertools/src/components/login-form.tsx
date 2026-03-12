@@ -50,10 +50,10 @@ export function LoginForm() {
 
   return (
     <form
-      className="space-y-4"
+      className="flex flex-col gap-5"
       onSubmit={handleSubmit}
     >
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         <Label htmlFor="username">Username</Label>
 
         <Input
@@ -69,7 +69,7 @@ export function LoginForm() {
         />
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         <Label htmlFor="password">Password</Label>
 
         <Input

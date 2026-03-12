@@ -23,9 +23,9 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_center,oklch(0.22_0.015_240)_0%,oklch(0.15_0.01_250)_70%)] p-4">
-      <Card className="border-t-primary/40 w-full max-w-sm border-t-2 shadow-lg">
+      <Card className="border-t-primary/60 w-full max-w-sm border-t-2 shadow-lg shadow-black/25">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">
+          <CardTitle className="text-2xl font-bold tracking-tight">
             <span className="font-mono">SneezyMUD</span> Builder Tools
           </CardTitle>
 
