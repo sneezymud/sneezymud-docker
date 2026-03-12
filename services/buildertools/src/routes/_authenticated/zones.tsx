@@ -112,8 +112,9 @@ function ZoneRow({
             <div className="flex gap-3">
               <Button
                 asChild
-                className="text-accent h-auto p-0 text-xs"
-                variant="link"
+                className="text-xs"
+                size="inline"
+                variant="inline"
               >
                 <Link
                   search={{ from: zone.bottom, to: zone.top }}
@@ -125,8 +126,9 @@ function ZoneRow({
 
               <Button
                 asChild
-                className="text-accent h-auto p-0 text-xs"
-                variant="link"
+                className="text-xs"
+                size="inline"
+                variant="inline"
               >
                 <Link
                   search={{ from: zone.bottom, to: zone.top }}
@@ -138,8 +140,9 @@ function ZoneRow({
 
               <Button
                 asChild
-                className="text-accent h-auto p-0 text-xs"
-                variant="link"
+                className="text-xs"
+                size="inline"
+                variant="inline"
               >
                 <Link
                   search={{ from: zone.bottom, to: zone.top }}
