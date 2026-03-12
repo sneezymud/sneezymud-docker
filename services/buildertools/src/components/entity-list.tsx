@@ -310,9 +310,9 @@ function EmptyMessage({
         <span>
           No {label.toLowerCase()} yet.{" "}
           <Button
-            className="h-auto p-0"
             onClick={onShowCreate}
-            variant="link"
+            size="inline"
+            variant="inline"
           >
             Create your first {label.slice(0, -1).toLowerCase()}
           </Button>

@@ -92,7 +92,7 @@ function ObjectListPage() {
                 void navigate({ search: {}, to: "/objects" });
               }}
               size="xs"
-              variant="link"
+              variant="inline"
             >
               Clear filter
             </Button>

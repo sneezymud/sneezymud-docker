@@ -48,11 +48,11 @@ export function FormField({
           <span {...helpLabelProps}>{labelContent}</span>
 
           <Button
-            className="h-auto px-1 py-0"
             onClick={() => {
               setExpanded(true);
             }}
-            variant="link"
+            size="inline"
+            variant="inline"
           >
             Add
           </Button>
@@ -84,12 +84,12 @@ export function FormField({
 
             {field.addable === true && (
               <Button
-                className="h-auto px-1 py-0"
                 onClick={() => {
                   handleChange?.(key, "");
                   setExpanded(false);
                 }}
-                variant="link"
+                size="inline"
+                variant="inline-destructive"
               >
                 Remove
               </Button>

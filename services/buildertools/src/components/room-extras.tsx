@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
 import type { RoomExtra } from "@/shared/schemas/room.ts";
 import type { FieldDef } from "@/shared/types/entity-form.ts";
@@ -110,7 +110,7 @@ export function RoomExtras({ extras, onChange, vnum }: RoomExtrasProps) {
             >
               <Button
                 aria-label={`Remove extra description ${index + 1}`}
-                className="text-destructive/80 hover:text-destructive absolute top-0 right-0 -mt-1.5 shrink-0 hover:cursor-pointer hover:no-underline"
+                className="absolute top-0 right-0 -mt-1.5 shrink-0"
                 onClick={() => {
                   if (hasExtraData(extra)) {
                     setPendingRemove(index);
@@ -119,7 +119,7 @@ export function RoomExtras({ extras, onChange, vnum }: RoomExtrasProps) {
                   }
                 }}
                 size="xs"
-                variant="link"
+                variant="inline-destructive"
               >
                 Remove
               </Button>

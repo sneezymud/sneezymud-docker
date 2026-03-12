@@ -133,10 +133,10 @@ function ExitHeader({
 
       <Button
         aria-label={`Remove ${directionLabels.get(direction) ?? ""} exit`}
-        className="text-destructive/80 hover:text-destructive shrink-0 hover:cursor-pointer hover:no-underline"
+        className="shrink-0"
         onClick={onRequestRemove}
         size="xs"
-        variant="link"
+        variant="inline-destructive"
       >
         Remove
       </Button>

@@ -90,7 +90,7 @@ function RoomListPage() {
                     void navigate({ search: {}, to: "/rooms" });
                   }}
                   size="xs"
-                  variant="link"
+                  variant="inline"
                 >
                   Clear filter
                 </Button>

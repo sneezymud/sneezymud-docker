@@ -122,12 +122,12 @@ export function SubTable<T extends Record<string, number | string>>({
             {readOnly ? null : (
               <Button
                 aria-label={`Remove row ${index + 1}`}
-                className="text-destructive absolute top-0 right-0 -mt-1"
+                className="absolute top-0 right-0 -mt-1"
                 onClick={() => {
                   removeRow(index);
                 }}
                 size="xs"
-                variant="link"
+                variant="inline-destructive"
               >
                 Remove
               </Button>

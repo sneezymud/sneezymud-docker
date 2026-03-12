@@ -92,7 +92,7 @@ function MobListPage() {
                 void navigate({ search: {}, to: "/mobs" });
               }}
               size="xs"
-              variant="link"
+              variant="inline"
             >
               Clear filter
             </Button>

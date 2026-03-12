@@ -6,7 +6,7 @@ export function AddButton(
   return (
     <Button
       size="icon"
-      variant="link"
+      variant="inline"
       {...props}
     >
       Add

@@ -126,9 +126,10 @@ export function Nav({ className, onNavClick }: NavProps) {
         </div>
 
         <Button
-          className="h-auto p-0 text-xs"
+          className="text-xs"
           onClick={handleLogout}
-          variant="link"
+          size="inline"
+          variant="inline"
         >
           Log out
         </Button>
