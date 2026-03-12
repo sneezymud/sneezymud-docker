@@ -96,7 +96,7 @@ export function EntityList({
   return (
     <>
       <div className="mb-4 flex items-center">
-        <h2 className="text-foreground text-2xl font-bold">{label}</h2>
+        <h2 className="text-foreground text-2xl font-bold tracking-tight">{label}</h2>
 
         <div className="ml-auto">
           <MobileMenuButton />
