@@ -36,6 +36,7 @@ interface EntityListItem {
 }
 
 interface EntityListProps {
+  banner?: React.ReactNode;
   basePath: string;
   createPending?: boolean;
   deletePending?: boolean;
@@ -48,6 +49,7 @@ interface EntityListProps {
 }
 
 export function EntityList({
+  banner,
   basePath,
   createPending,
   deletePending,
@@ -101,6 +103,8 @@ export function EntityList({
         </div>
       </div>
 
+      {banner}
+
       <div className="mb-4 flex items-center gap-3">
         <SearchInput
           className="min-w-0 flex-1"
@@ -149,7 +153,7 @@ export function EntityList({
         toggleSort={toggleSort}
       />
 
-      <MobileCardList
+      {/* <MobileCardList
         basePath={basePath}
         canCreate={canCreate}
         label={label}
@@ -160,7 +164,7 @@ export function EntityList({
         setShowCreate={setShowCreate}
         toggleAllPageSelected={toggleAllPageSelected}
         toggleSelected={toggleSelected}
-      />
+      /> */}
 
       <TablePagination
         canNextPage={canNextPage}
@@ -357,67 +361,65 @@ function DesktopTable({
   toggleSort: (id: string) => void;
 }) {
   return (
-    <div className="hidden sm:block">
-      <Table>
-        <SortableTableHeader
-          columnClassName={(id) => COLUMN_WIDTHS[id]}
-          columns={columns}
-          headerOverrides={
-            selectable
-              ? {
-                  select: (
-                    <SelectAllCheckbox
-                      rows={rows}
-                      selectedIds={selectedIds}
-                      toggleAllPageSelected={toggleAllPageSelected}
-                    />
-                  ),
-                }
-              : undefined
-          }
-          onToggleSort={toggleSort}
-          sorting={sorting}
-        />
+    <Table>
+      <SortableTableHeader
+        columnClassName={(id) => COLUMN_WIDTHS[id]}
+        columns={columns}
+        headerOverrides={
+          selectable
+            ? {
+                select: (
+                  <SelectAllCheckbox
+                    rows={rows}
+                    selectedIds={selectedIds}
+                    toggleAllPageSelected={toggleAllPageSelected}
+                  />
+                ),
+              }
+            : undefined
+        }
+        onToggleSort={toggleSort}
+        sorting={sorting}
+      />
 
-        <TableBody>
-          {rows.map((entity) => (
-            <EntityRow
-              basePath={basePath}
-              entity={entity}
-              isSelected={selectedIds[String(entity.vnum)] === true}
-              key={entity.vnum}
-              onToggleSelected={(checked) => {
-                toggleSelected(String(entity.vnum), checked);
-              }}
-              secondaryLabel={secondaryLabel}
-              selectable={selectable}
-            />
-          ))}
+      <TableBody>
+        {rows.map((entity) => (
+          <EntityRow
+            basePath={basePath}
+            entity={entity}
+            isSelected={selectedIds[String(entity.vnum)] === true}
+            key={entity.vnum}
+            onToggleSelected={(checked) => {
+              toggleSelected(String(entity.vnum), checked);
+            }}
+            secondaryLabel={secondaryLabel}
+            selectable={selectable}
+          />
+        ))}
 
-          {rows.length === 0 ? (
-            <TableRow>
-              <TableCell
-                className="py-8 text-center"
-                colSpan={columns.length}
-              >
-                <EmptyMessage
-                  canCreate={canCreate}
-                  label={label}
-                  onShowCreate={() => {
-                    setShowCreate(true);
-                  }}
-                  searching={searching}
-                />
-              </TableCell>
-            </TableRow>
-          ) : null}
-        </TableBody>
-      </Table>
-    </div>
+        {rows.length === 0 ? (
+          <TableRow>
+            <TableCell
+              className="py-8 text-center"
+              colSpan={columns.length}
+            >
+              <EmptyMessage
+                canCreate={canCreate}
+                label={label}
+                onShowCreate={() => {
+                  setShowCreate(true);
+                }}
+                searching={searching}
+              />
+            </TableCell>
+          </TableRow>
+        ) : null}
+      </TableBody>
+    </Table>
   );
 }
 
-function EntityCardRow({
+/* function EntityCardRow({
   basePath,
   entity,
   isSelected,
@@ -455,9 +457,9 @@ function EntityCardRow({
       </Link>
     </div>
   );
-}
+} */
 
-function MobileCardList({
+/* function MobileCardList({
   basePath,
   canCreate,
   label,
@@ -521,7 +523,7 @@ function MobileCardList({
       ) : null}
     </div>
   );
-}
+} */
 
 function buildColumns(
   selectable: boolean,

@@ -52,12 +52,6 @@ export function getObjFieldGroups(
     enumEntries: ITEM_TYPES,
     key: "type",
     label: "Item Type",
-    tooltip: (
-      <p>
-        Changing the item type changes the meaning of the type-specific values
-        in this section.
-      </p>
-    ),
     type: "enum",
   };
 
@@ -238,12 +232,6 @@ export function getObjFieldGroups(
         },
       ],
       title: "Physical",
-      tooltip: (
-        <p>
-          Physical properties affecting how the item interacts with carrying
-          capacity, containers, shops, and crafting.
-        </p>
-      ),
     },
     {
       fields: [
@@ -530,14 +518,11 @@ export function getObjFieldGroups(
             ? OBJ_SPEC_PROCS
             : gateSpecProcs(OBJ_SPEC_PROCS, isUnassignableObjSpecProc),
           key: "spec_proc",
-          label: "Special Proc",
+          label: "Spec Proc",
           type: "enum",
         },
       ],
       title: "Limits & Behavior",
-      tooltip: (
-        <p>Durability, lifespan, visibility, and special behavior controls.</p>
-      ),
     },
     {
       fields: [
@@ -553,12 +538,6 @@ export function getObjFieldGroups(
         },
       ],
       title: "Extra Flags",
-      tooltip: (
-        <p>
-          Special properties like glow, hum, invisible, anti-class restrictions,
-          and no-drop/no-rent behavior.
-        </p>
-      ),
     },
     {
       fields: [

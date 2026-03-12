@@ -142,22 +142,20 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
         originalValues={originalValues}
         values={currentValues}
       >
-        <div className="grid gap-6">
-          <MobStringsEditor
-            onChange={setExtraEdits}
-            rows={extraEdits ?? mob.extras}
-            vnum={vnum}
-          />
+        <MobStringsEditor
+          onChange={setExtraEdits}
+          rows={extraEdits ?? mob.extras}
+          vnum={vnum}
+        />
 
-          <SubTable
-            columns={immColumns}
-            emptyRow={{ amt: 0, type: 0, vnum }}
-            help="Percentage modifier: positive = resistance (100 = immune), negative = vulnerability (-100 = double damage)."
-            label="Immunities"
-            onChange={setImmEdits}
-            rows={immEdits ?? mob.immunities}
-          />
-        </div>
+        <SubTable
+          columns={immColumns}
+          emptyRow={{ amt: 0, type: 0, vnum }}
+          help="Percentage modifier: positive = resistance (100 = immune), negative = vulnerability (-100 = double damage)."
+          label="Immunities"
+          onChange={setImmEdits}
+          rows={immEdits ?? mob.immunities}
+        />
       </EntityForm>
 
       <UnsavedChangesDialog

@@ -77,6 +77,10 @@ export async function createRoom(
     .orderBy(zone.zone_nr)
     .limit(1);
 
+  // Derive coordinates from any existing room that has an exit pointing here,
+  // matching the C++ make_room_coords() behavior when redit creates a new room
+  const coords = await deriveCoords(vnum, scopeOwner(scope));
+
   await immortalDb.insert(room).values({
     block,
     capacity: 0,
@@ -93,9 +97,7 @@ export async function createRoom(
     teletarg: 0,
     teletime: 0,
     vnum,
-    x: 0,
-    y: 0,
-    z: 0,
+    ...coords,
     zone: matchingZone?.zone_nr ?? 1,
   });
 }
@@ -288,4 +290,56 @@ function vnumBlockFilter(blocks: VnumBlock[]) {
   return or(
     ...blocks.map((b) => and(gte(room.vnum, b.start), lte(room.vnum, b.end))),
   );
+}
+
+// Direction offsets matching C++ make_room_coords() in create_rooms.cc
+const DIRECTION_OFFSETS: Record<number, { x: number; y: number; z: number }> = {
+  0: { x: 0, y: 1, z: 0 }, // North
+  1: { x: 1, y: 0, z: 0 }, // East
+  2: { x: 0, y: -1, z: 0 }, // South
+  3: { x: -1, y: 0, z: 0 }, // West
+  4: { x: 0, y: 0, z: 1 }, // Up
+  5: { x: 0, y: 0, z: -1 }, // Down
+  6: { x: 1, y: 1, z: 0 }, // NE
+  7: { x: -1, y: 1, z: 0 }, // NW
+  8: { x: 1, y: -1, z: 0 }, // SE
+  9: { x: -1, y: -1, z: 0 }, // SW
+} as const;
+
+// When creating a new room, check if any existing room has an exit pointing to
+// it. If so, derive coordinates from that source room + direction offset. This
+// matches the C++ make_room_coords() behavior when redit auto-creates a room.
+async function deriveCoords(
+  vnum: number,
+  owner: string,
+): Promise<{ x: number; y: number; z: number }> {
+  const defaultCoords = { x: 0, y: 0, z: 0 };
+
+  const [incomingExit] = await immortalDb
+    .select({
+      direction: roomexit.direction,
+      sourceVnum: roomexit.vnum,
+    })
+    .from(roomexit)
+    .where(and(eq(roomexit.destination, vnum), eq(roomexit.owner, owner)))
+    .limit(1);
+
+  if (!incomingExit) return defaultCoords;
+
+  const [sourceRoom] = await immortalDb
+    .select({ x: room.x, y: room.y, z: room.z })
+    .from(room)
+    .where(and(eq(room.vnum, incomingExit.sourceVnum), eq(room.owner, owner)))
+    .limit(1);
+
+  if (!sourceRoom) return defaultCoords;
+
+  const offset = DIRECTION_OFFSETS[incomingExit.direction];
+  if (!offset) return defaultCoords;
+
+  return {
+    x: sourceRoom.x + offset.x,
+    y: sourceRoom.y + offset.y,
+    z: sourceRoom.z + offset.z,
+  };
 }

@@ -22,14 +22,14 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_center,oklch(0.17_0.01_50)_0%,oklch(0.13_0.005_250)_70%)] p-4">
+    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_center,oklch(0.22_0.015_240)_0%,oklch(0.15_0.01_250)_70%)] p-4">
       <Card className="border-t-primary/40 w-full max-w-sm border-t-2 shadow-lg">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">
             <span className="font-mono">SneezyMUD</span> Builder Tools
           </CardTitle>
 
-          <CardDescription>Log in with your game account</CardDescription>
+          <CardDescription>Log in with your game account*</CardDescription>
         </CardHeader>
 
         <CardContent>

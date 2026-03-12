@@ -88,26 +88,24 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
         originalValues={expandedOriginal}
         values={expandedValues}
       >
-        <div className="grid gap-6">
-          <SubTable
-            columns={affectColumns}
-            emptyRow={{ mod1: 0, mod2: 0, type: 0, vnum }}
-            helpParagraph="Each apply modifies a character stat when the object is equipped. The in-game engine loads at most 5 applies - extra applies are stored in the database but ignored at runtime."
-            label="Applies"
-            onChange={setAffectEdits}
-            readOnly={!hasPower(powers, POWER.OEDIT_APPLYS)}
-            rows={affectEdits ?? obj.affects}
-          />
+        <SubTable
+          columns={affectColumns}
+          emptyRow={{ mod1: 0, mod2: 0, type: 0, vnum }}
+          helpParagraph="Each apply modifies a character stat when the object is equipped. The in-game engine loads at most 5 applies - extra applies are stored in the database but ignored at runtime."
+          label="Applies"
+          onChange={setAffectEdits}
+          readOnly={!hasPower(powers, POWER.OEDIT_APPLYS)}
+          rows={affectEdits ?? obj.affects}
+        />
 
-          <SubTable
-            columns={extraColumns}
-            emptyRow={{ description: "", name: "", vnum }}
-            helpParagraph="Space-separated keywords players can 'look' at to see the description. Substring matching applies."
-            label="Extra Descriptions"
-            onChange={setExtraEdits}
-            rows={extraEdits ?? obj.extras}
-          />
-        </div>
+        <SubTable
+          columns={extraColumns}
+          emptyRow={{ description: "", name: "", vnum }}
+          helpParagraph="Space-separated keywords players can 'look' at to see the description. Substring matching applies."
+          label="Extra Descriptions"
+          onChange={setExtraEdits}
+          rows={extraEdits ?? obj.extras}
+        />
       </EntityForm>
 
       <UnsavedChangesDialog

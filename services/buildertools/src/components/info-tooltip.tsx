@@ -1,4 +1,3 @@
-import { Info } from "lucide-react";
 import { useState } from "react";
 
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
@@ -9,71 +8,48 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet.tsx";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip.tsx";
 import { cn } from "@/lib/utils.ts";
 
 export const richTextDescendants =
   "[&_li]:mb-0.5 [&_p+p]:mt-1.5 [&_strong]:font-semibold [&_ul]:ml-3 [&_ul]:list-disc";
 
-export function FieldTooltip({
+export function FieldHelp({
   children,
   detailedTooltip,
   label,
+  open,
 }: {
   children: React.ReactNode;
   detailedTooltip?: React.ReactNode;
   label?: string;
+  open: boolean;
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
 
+  if (!open) return null;
+
   return (
     <>
-      <Tooltip>
-        <TooltipTrigger asChild>
+      <div
+        className={cn(
+          "text-muted-foreground animate-in fade-in slide-in-from-top-1 bg-muted/50 mb-3 rounded-md px-2.5 py-2 text-sm duration-150",
+          richTextDescendants,
+        )}
+      >
+        {children}
+
+        {detailedTooltip ? (
           <button
-            className={cn(
-              "text-muted-foreground hover:text-foreground ml-1 inline-flex",
-              detailedTooltip ? "cursor-pointer" : "cursor-help",
-            )}
-            onClick={
-              detailedTooltip
-                ? () => {
-                    setSheetOpen(true);
-                  }
-                : undefined
-            }
+            className="text-primary hover:text-primary/80 mt-1.5 block text-xs underline"
+            onClick={() => {
+              setSheetOpen(true);
+            }}
             type="button"
           >
-            <Info
-              aria-hidden="true"
-              className="h-3.5 w-3.5"
-            />
+            Full details
           </button>
-        </TooltipTrigger>
-
-        <TooltipContent
-          className={cn("max-w-sm text-sm text-wrap", richTextDescendants)}
-          sideOffset={5}
-        >
-          {children}
-
-          {detailedTooltip ? (
-            <button
-              className="text-muted-foreground hover:text-foreground mt-2 block text-xs italic underline"
-              onClick={() => {
-                setSheetOpen(true);
-              }}
-              type="button"
-            >
-              Click for full details
-            </button>
-          ) : null}
-        </TooltipContent>
-      </Tooltip>
+        ) : null}
+      </div>
 
       {detailedTooltip ? (
         <Sheet

@@ -68,7 +68,9 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
         }
         breadcrumbs={[
           { label: "Rooms", to: "/rooms" },
-          { label: `Room ${vnum}: ${room.name || "(unnamed)"}` },
+          {
+            label: `Room ${vnum} (${room.x},${room.y},${room.z}): ${room.name || "(unnamed)"}`,
+          },
         ]}
         deleteMessage={`Are you sure you want to delete room ${vnum}? This also removes all exits.`}
         deletePending={deletePending}
@@ -85,19 +87,17 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
         originalValues={originalValues}
         values={currentValues}
       >
-        <div className="grid grid-cols-1 items-start gap-6">
-          <RoomExits
-            exits={exitEdits ?? room.exits}
-            onChange={setExitEdits}
-            vnum={vnum}
-          />
+        <RoomExits
+          exits={exitEdits ?? room.exits}
+          onChange={setExitEdits}
+          vnum={vnum}
+        />
 
-          <RoomExtras
-            extras={extraEdits ?? room.extras}
-            onChange={setExtraEdits}
-            vnum={vnum}
-          />
-        </div>
+        <RoomExtras
+          extras={extraEdits ?? room.extras}
+          onChange={setExtraEdits}
+          vnum={vnum}
+        />
       </EntityForm>
 
       <UnsavedChangesDialog

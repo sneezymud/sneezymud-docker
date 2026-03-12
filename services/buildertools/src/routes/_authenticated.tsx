@@ -102,10 +102,10 @@ function AuthenticatedLayout() {
       </Sheet>
 
       <main
-        className="min-w-0 flex-1 overflow-y-auto px-3 pb-6 sm:px-6"
+        className="min-w-0 flex-1 overflow-y-auto px-3 pb-6"
         id="main-content"
       >
-        <div className="max-w-90 pt-3 transition-opacity duration-100 sm:pt-6">
+        <div className="max-w-90 pt-3 transition-opacity duration-100">
           <Outlet />
         </div>
       </main>

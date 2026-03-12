@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 
 import type { RoomExtra } from "@/shared/schemas/room.ts";
 import type { FieldDef } from "@/shared/types/entity-form.ts";
@@ -80,11 +80,12 @@ export function RoomExtras({ extras, onChange, vnum }: RoomExtrasProps) {
   };
 
   return (
-    <fieldset className="bg-card border-border/50 rounded-lg border p-5">
+    <fieldset className="p-1">
       <SectionHeader
         action={
           <AddButton
             aria-label="Add extra description"
+            className="max-h-min"
             onClick={addExtra}
           />
         }
@@ -92,7 +93,7 @@ export function RoomExtras({ extras, onChange, vnum }: RoomExtrasProps) {
         tooltip="Extra descriptions for 'look <keyword>' in-game. Keywords are space-separated."
       />
 
-      <div className="space-y-3">
+      <div className="space-y-10">
         {extras.map((extra, index) => {
           const prefix = rowKeys[index] ?? "";
           const fields = extraFields(prefix);
@@ -104,40 +105,36 @@ export function RoomExtras({ extras, onChange, vnum }: RoomExtrasProps) {
 
           return (
             <div
-              className="border-border/30 bg-muted/20 space-y-2 rounded border p-3"
+              className="relative space-y-3"
               key={prefix}
             >
-              <div className="flex justify-end">
-                <Button
-                  aria-label={`Remove extra description ${index + 1}`}
-                  className="text-destructive/80 hover:text-destructive shrink-0 hover:cursor-pointer hover:no-underline"
-                  onClick={() => {
-                    if (hasExtraData(extra)) {
-                      setPendingRemove(index);
-                    } else {
-                      removeExtra(index);
-                    }
-                  }}
-                  size="xs"
-                  variant="link"
-                >
-                  Remove
-                </Button>
-              </div>
+              <Button
+                aria-label={`Remove extra description ${index + 1}`}
+                className="text-destructive/80 hover:text-destructive absolute top-0 right-0 -mt-1.5 shrink-0 hover:cursor-pointer hover:no-underline"
+                onClick={() => {
+                  if (hasExtraData(extra)) {
+                    setPendingRemove(index);
+                  } else {
+                    removeExtra(index);
+                  }
+                }}
+                size="xs"
+                variant="link"
+              >
+                Remove
+              </Button>
 
-              <div className="grid grid-cols-[auto_auto_1.5rem] gap-x-3 gap-y-2">
-                {fields.map((field) => (
-                  <FormField
-                    field={field}
-                    isDirty={false}
-                    key={field.key}
-                    onChange={(key, value) => {
-                      update(index, toExtraKey(key, prefix), value);
-                    }}
-                    value={values[field.key]}
-                  />
-                ))}
-              </div>
+              {fields.map((field) => (
+                <FormField
+                  field={field}
+                  isDirty={false}
+                  key={field.key}
+                  onChange={(key, value) => {
+                    update(index, toExtraKey(key, prefix), value);
+                  }}
+                  value={values[field.key]}
+                />
+              ))}
             </div>
           );
         })}

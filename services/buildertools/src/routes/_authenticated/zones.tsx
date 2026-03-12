@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronDown } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 import type { Zone } from "@/shared/schemas/zone.ts";
@@ -82,10 +82,10 @@ function ZoneRow({
           <div className="text-foreground text-sm">{displayName}</div>
         </div>
 
-        <ChevronDown
+        <ChevronRight
           className={cn(
             "text-muted-foreground mt-1 size-4 shrink-0 transition-transform",
-            expanded && "rotate-180",
+            expanded && "rotate-90",
           )}
         />
       </button>

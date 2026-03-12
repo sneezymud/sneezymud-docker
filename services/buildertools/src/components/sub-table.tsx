@@ -95,7 +95,7 @@ export function SubTable<T extends Record<string, number | string>>({
 
   return (
     <fieldset
-      className="bg-card border-border/50 p-3 sm:rounded-lg sm:border sm:p-5"
+      className="space-y-4 p-1"
       disabled={readOnly}
     >
       <SectionHeader
@@ -103,89 +103,75 @@ export function SubTable<T extends Record<string, number | string>>({
           readOnly ? undefined : (
             <AddButton
               aria-label={`Add ${label.toLowerCase()}`}
+              className="max-h-min"
               disabled={maxRows !== undefined && rows.length >= maxRows}
               onClick={addRow}
             />
           )
         }
         title={label}
-        tooltip={help}
+        tooltip={helpParagraph ?? help}
       />
 
-      {helpParagraph ? (
-        <p className="text-muted-foreground mt-1 mb-3 text-sm">
-          {helpParagraph}
-        </p>
-      ) : null}
-
-      <div className="space-y-2">
-        {rows.map((row, index) => (
-          <div
-            className="border-border/30 bg-muted/20 flex items-start gap-2 rounded border p-2 transition-shadow hover:shadow-md hover:shadow-black/20"
-            key={rowKeys[index]}
-          >
-            <div
-              className="grid gap-2"
-              style={{
-                gridTemplateColumns: columns
-                  .map((c) => c.width ?? "1fr")
-                  .join(" "),
-              }}
-            >
-              {columns.map((col) => {
-                const cellId = `${label}-${index}-${col.key}`;
-                return (
-                  <div
-                    className="flex flex-col gap-1"
-                    key={col.key}
-                  >
-                    <Label htmlFor={cellId}>{col.label}</Label>
-
-                    {col.type === "custom" ? (
-                      col.renderCell(
-                        row,
-                        (v) => {
-                          updateCell(index, col.key, v);
-                        },
-                        {
-                          id: cellId,
-                          onRowChange: (updates) => {
-                            updateRow(index, updates);
-                          },
-                        },
-                      )
-                    ) : (
-                      <CellInput
-                        entries={col.type === "enum" ? col.entries : undefined}
-                        id={cellId}
-                        onChange={(v) => {
-                          updateCell(index, col.key, v);
-                        }}
-                        type={col.type}
-                        value={row[col.key] ?? ""}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
+      {rows.map((row, index) => (
+        <div
+          className="border-border/30 bg-muted/20 rounded border p-2 transition-shadow hover:shadow-md hover:shadow-black/20"
+          key={rowKeys[index]}
+        >
+          <div className="relative flex flex-col gap-y-4">
             {readOnly ? null : (
               <Button
                 aria-label={`Remove row ${index + 1}`}
-                className="text-muted-foreground hover:text-destructive dark:hover:bg-destructive/10 mt-5.5 shrink-0"
+                className="text-destructive absolute top-0 right-0 -mt-1"
                 onClick={() => {
                   removeRow(index);
                 }}
                 size="xs"
-                variant="ghost"
+                variant="link"
               >
                 Remove
               </Button>
             )}
+
+            {columns.map((col) => {
+              const cellId = `${label}-${index}-${col.key}`;
+              return (
+                <div
+                  className="flex flex-col gap-1"
+                  key={col.key}
+                >
+                  <Label htmlFor={cellId}>{col.label}</Label>
+
+                  {col.type === "custom" ? (
+                    col.renderCell(
+                      row,
+                      (v) => {
+                        updateCell(index, col.key, v);
+                      },
+                      {
+                        id: cellId,
+                        onRowChange: (updates) => {
+                          updateRow(index, updates);
+                        },
+                      },
+                    )
+                  ) : (
+                    <CellInput
+                      entries={col.type === "enum" ? col.entries : undefined}
+                      id={cellId}
+                      onChange={(v) => {
+                        updateCell(index, col.key, v);
+                      }}
+                      type={col.type}
+                      value={row[col.key] ?? ""}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </fieldset>
   );
 }

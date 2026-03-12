@@ -11,6 +11,10 @@ export const alertVariants = cva(
         default: "bg-card text-card-foreground",
         destructive:
           "text-destructive bg-card [&>svg]:text-current *:data-[slot=alert-description]:text-destructive/90",
+        success:
+          "text-success bg-card [&>svg]:text-current *:data-[slot=alert-description]:text-success/90",
+        warning:
+          "text-warning bg-card [&>svg]:text-current *:data-[slot=alert-description]:text-warning/90",
       },
     },
   },
@@ -26,13 +30,17 @@ export const badgeVariants = cva(
       variant: {
         default: "bg-primary text-primary-foreground [a&]:hover:bg-primary/90",
         destructive:
-          "bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+          "bg-destructive text-destructive-foreground [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         link: "text-primary underline-offset-4 [a&]:hover:underline",
         outline:
           "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         secondary:
           "bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
+        success:
+          "bg-success text-success-foreground [a&]:hover:bg-success/90 focus-visible:ring-success/20 dark:focus-visible:ring-success/40",
+        warning:
+          "bg-warning text-warning-foreground [a&]:hover:bg-warning/90 focus-visible:ring-warning/20 dark:focus-visible:ring-warning/40",
       },
     },
   },
@@ -60,7 +68,7 @@ export const buttonVariants = cva(
         default:
           "bg-primary text-primary-foreground hover:bg-primary/80 hover:shadow-md hover:shadow-primary/20 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none",
         destructive:
-          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",
@@ -68,6 +76,10 @@ export const buttonVariants = cva(
           "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        success:
+          "bg-success text-success-foreground hover:bg-success/90 focus-visible:ring-success/20 dark:focus-visible:ring-success/40",
+        warning:
+          "bg-warning text-warning-foreground hover:bg-warning/90 focus-visible:ring-warning/20 dark:focus-visible:ring-warning/40",
       },
     },
   },

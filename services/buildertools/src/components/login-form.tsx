@@ -109,7 +109,7 @@ export function LoginForm() {
       </Button>
 
       <p className="text-muted-foreground text-center text-xs">
-        Need an account? Contact a MUD admin.
+        *Account must contain a character with builder permissions.
       </p>
     </form>
   );

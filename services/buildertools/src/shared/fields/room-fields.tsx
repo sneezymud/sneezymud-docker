@@ -380,37 +380,5 @@ export function getRoomFieldGroups(
         </p>
       ),
     },
-    {
-      fields: [
-        { key: "x", label: "X", readOnly: true, type: "number" },
-        { key: "y", label: "Y", readOnly: true, type: "number" },
-        { key: "z", label: "Z", readOnly: true, type: "number" },
-      ],
-      title: "Coordinates",
-      tooltip: (
-        <>
-          <p>
-            Coordinates are auto-calculated from room exit topology and used by
-            the in-game map system. They are set when rooms are created via
-            exits and can be recalculated with the <strong>map recalc</strong>{" "}
-            in-game command.
-          </p>
-
-          <ul>
-            <li>
-              <strong>X:</strong> East-West position (increases going East)
-            </li>
-
-            <li>
-              <strong>Y:</strong> North-South position (increases going North)
-            </li>
-
-            <li>
-              <strong>Z:</strong> Vertical position (increases going Up)
-            </li>
-          </ul>
-        </>
-      ),
-    },
   ];
 }

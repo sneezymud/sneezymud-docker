@@ -12,7 +12,7 @@ export function MobileMenuButton() {
       className="lg:hidden"
       onClick={toggleSidebar}
       size="icon"
-      variant="outline"
+      variant="ghost"
     >
       <Menu className="h-5 w-5" />
     </Button>

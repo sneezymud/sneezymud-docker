@@ -10,63 +10,55 @@ export const WEAR_FLAGS: BitfieldEntry[] = [
   {
     bit: 1,
     label: "Fingers",
-    tooltip: "Can be worn on fingers. Players have two ring slots.",
+    tooltip: "Players have only two ring slots.",
   },
   {
     bit: 2,
     label: "Neck",
-    tooltip: "Can be worn around the neck. Players have two neck slots.",
   },
   {
     bit: 3,
     label: "Body",
-    tooltip: "Can be worn on the body (torso armor slot).",
   },
   {
     bit: 4,
     label: "Head",
-    tooltip: "Can be worn on the head (helmet/hat slot).",
   },
   {
     bit: 5,
     label: "Legs",
-    tooltip: "Can be worn on the legs (leggings slot).",
+    tooltip:
+      "Leg equipment with the 'Paired' extra flag occupies both leg slots with a single object. Otherwise the equipment will only occupy a single leg slot.",
   },
   {
     bit: 6,
     label: "Feet",
-    tooltip: "Can be worn on the feet (boots slot).",
   },
   {
     bit: 7,
     label: "Hands",
-    tooltip: "Can be worn on the hands (gloves slot).",
   },
   {
     bit: 8,
     label: "Arms",
-    tooltip: "Can be worn on the arms (bracers/sleeves slot).",
   },
   {
     bit: 10,
     label: "Back",
-    tooltip: "Can be worn on the back (cloak/backpack slot).",
   },
   {
     bit: 11,
     label: "Waist",
-    tooltip: "Can be worn around the waist (belt slot).",
   },
   {
     bit: 12,
     label: "Wrists",
-    tooltip: "Can be worn on the wrists. Players have two wrist slots.",
   },
   {
     bit: 14,
     label: "Hold",
     tooltip:
-      "Can be held in hand. Used for held items like orbs, shields, or tools.",
+      "Can be held in hand. Necessary for held items like orbs, shields, or tools.",
   },
   {
     bit: 15,

@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 
 import type { BreadcrumbEntry } from "@/components/breadcrumbs.tsx";
@@ -37,7 +38,7 @@ export function EntityHeader({
   const entityName = breadcrumbs.at(-1)?.label ?? "";
 
   return (
-    <div className="bg-background border-border/50 sticky top-0 z-10 mb-4 flex flex-col gap-1.5 border-b py-1.5 sm:gap-3 sm:py-2">
+    <div className="bg-background sticky top-0 z-10 mb-2 flex flex-col gap-1.5 py-1.5">
       {/* Mobile: back arrow + entity name + hamburger */}
 
       <div className="flex items-center gap-3 sm:hidden">
@@ -58,40 +59,37 @@ export function EntityHeader({
         {children}
       </div>
 
-      <div className="flex items-center">
+      <div className="grid grid-cols-3 items-center gap-x-2">
         <Button
-          className="text-primary/80 hover:text-primary hover:cursor-pointer hover:no-underline"
           disabled={!dirty || saving}
           onClick={onSave}
           size="sm"
-          variant="link"
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? <Loader2 className="animate-spin" /> : "Save"}
         </Button>
 
-        {dirty && onReset ? (
+        {onReset !== undefined && (
           <Button
-            className="text-muted-foreground hover:text-foreground hover:cursor-pointer hover:no-underline"
+            disabled={!dirty}
             onClick={onReset}
             size="sm"
-            variant="link"
+            variant="secondary"
           >
-            Discard changes
+            Discard
           </Button>
-        ) : null}
+        )}
 
-        {onDelete ? (
+        {onDelete !== undefined && (
           <>
             <Button
-              className="text-destructive/80 hover:text-destructive ml-auto hover:cursor-pointer hover:no-underline"
               disabled={deletePending}
               onClick={() => {
                 setShowDeleteConfirm(true);
               }}
               size="sm"
-              variant="link"
+              variant="destructive"
             >
-              {deletePending ? "Deleting..." : "Delete"}
+              {deletePending ? <Loader2 className="animate-spin" /> : "Delete"}
             </Button>
 
             <ConfirmDialog
@@ -110,7 +108,7 @@ export function EntityHeader({
               variant="danger"
             />
           </>
-        ) : null}
+        )}
       </div>
     </div>
   );

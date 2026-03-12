@@ -3,11 +3,10 @@ import { Fragment } from "react";
 import type { FieldGroupDef } from "@/shared/types/entity-form.ts";
 
 import { Separator } from "@/components/ui/separator.tsx";
-import { TooltipProvider } from "@/components/ui/tooltip.tsx";
 import { cn } from "@/lib/utils.ts";
 
 import { FormField } from "./form-field.tsx";
-import { FieldTooltip } from "./info-tooltip.tsx";
+import { SectionHeader } from "./section-header.tsx";
 
 interface EntityFormProps {
   children?: React.ReactNode;
@@ -25,23 +24,19 @@ export function EntityForm({
   values,
 }: EntityFormProps) {
   return (
-    <TooltipProvider delayDuration={300}>
-      <div className="space-y-6">
-        <div className="grid gap-8 sm:gap-6">
-          {groups.map((group) => (
-            <FieldGroup
-              group={group}
-              key={group.title}
-              onChange={onChange}
-              originalValues={originalValues}
-              values={values}
-            />
-          ))}
-        </div>
+    <div className="space-y-6">
+      {groups.map((group) => (
+        <FieldGroup
+          group={group}
+          key={group.title}
+          onChange={onChange}
+          originalValues={originalValues}
+          values={values}
+        />
+      ))}
 
-        {children}
-      </div>
-    </TooltipProvider>
+      {children}
+    </div>
   );
 }
 
@@ -65,29 +60,18 @@ function FieldGroup({
     title,
     tooltip,
   } = group;
-  return (
-    <fieldset
-      className={cn(
-        "bg-card border-border/50 p-3 sm:rounded-lg sm:border sm:p-5",
-        colSpan === "full" && "col-span-full",
-      )}
-    >
-      <legend className="text-muted-foreground sm:text-foreground text-xs font-medium tracking-wider uppercase sm:text-lg sm:font-semibold sm:tracking-normal sm:normal-case">
-        {title}
 
-        {tooltip || detailedTooltip ? (
-          <FieldTooltip
-            detailedTooltip={detailedTooltip}
-            label={title}
-          >
-            {tooltip}
-          </FieldTooltip>
-        ) : null}
-      </legend>
+  return (
+    <fieldset className={cn("p-1", colSpan === "full" && "col-span-full")}>
+      <SectionHeader
+        detailedTooltip={detailedTooltip}
+        title={title}
+        tooltip={tooltip}
+      />
 
       {header}
 
-      <div className="grid grid-cols-1 gap-y-2 sm:grid-cols-[auto_auto_1.5rem] sm:gap-x-3">
+      <div className="grid grid-cols-1 gap-y-4">
         {fields.map((field, i) => {
           const fieldDirty =
             originalValues !== undefined &&

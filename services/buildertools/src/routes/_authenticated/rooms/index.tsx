@@ -79,24 +79,25 @@ function RoomListPage() {
 
   return (
     <>
-      {from !== undefined && to !== undefined ? (
-        <Alert className="mb-4">
-          <AlertDescription className="flex items-center gap-2">
-            Filtered to zone range {from}&ndash;{to}
-            <Button
-              onClick={() => {
-                void navigate({ search: {}, to: "/rooms" });
-              }}
-              size="xs"
-              variant="link"
-            >
-              Clear filter
-            </Button>
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
       <EntityList
+        banner={
+          from !== undefined && to !== undefined ? (
+            <Alert className="mb-4">
+              <AlertDescription className="flex items-center gap-2">
+                Filtered to zone range {from}&ndash;{to}
+                <Button
+                  onClick={() => {
+                    void navigate({ search: {}, to: "/rooms" });
+                  }}
+                  size="xs"
+                  variant="link"
+                >
+                  Clear filter
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : undefined
+        }
         basePath="/rooms"
         createPending={createMutation.isPending}
         deletePending={deleteMutation.isPending}

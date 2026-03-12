@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils.ts";
 
 import { BitfieldEditor } from "./bitfield-editor.tsx";
 import { EnumSelect } from "./enum-select.tsx";
-import { FieldTooltip } from "./info-tooltip.tsx";
+import { FieldHelp } from "./info-tooltip.tsx";
 import { NumberInput } from "./number-input.tsx";
 import { EntityPicker } from "./pickers/entity-picker.tsx";
 
@@ -31,6 +31,7 @@ export function FormField({
   const hasValue =
     typeof value === "string" ? value.trim() !== "" : value !== undefined;
   const [expanded, setExpanded] = useState(!addable || hasValue);
+  const { helpElement, helpLabelProps } = useFieldHelp(field);
 
   const handleChange = readOnly
     ? undefined
@@ -38,15 +39,13 @@ export function FormField({
         onChange(key, v);
       };
 
-  const tooltipElement = renderFieldTooltip(field);
   const labelContent = renderLabelContent(field);
 
   if (addable && !expanded) {
     return (
       <div className="col-span-full">
         <Label>
-          {labelContent}
-          {tooltipElement}
+          <span {...helpLabelProps}>{labelContent}</span>
 
           <Button
             className="h-auto px-1 py-0"
@@ -58,15 +57,15 @@ export function FormField({
             Add
           </Button>
         </Label>
+
+        {helpElement}
       </div>
     );
   }
 
-  const dirtyClass = isDirty ? "border-amber-400/50" : undefined;
-
   const inputElement = (
     <FieldInput
-      className={dirtyClass}
+      className={isDirty ? "border-warning" : ""}
       field={field}
       onChange={handleChange}
       value={value}
@@ -75,13 +74,15 @@ export function FormField({
 
   if (fullWidth ?? (type === "textarea" || type === "bitfield")) {
     return (
-      <div className={cn("col-span-full pb-1", readOnly && "opacity-60")}>
-        {labelContent || tooltipElement ? (
-          <Label htmlFor={key}>
-            {labelContent}
-            {tooltipElement}
+      <div className={cn("col-span-full", readOnly && "opacity-60")}>
+        {labelContent !== null && (
+          <Label
+            className="mb-2 ml-0.5"
+            htmlFor={key}
+          >
+            <span {...helpLabelProps}>{labelContent}</span>
 
-            {field.addable ? (
+            {field.addable === true && (
               <Button
                 className="h-auto px-1 py-0"
                 onClick={() => {
@@ -92,42 +93,69 @@ export function FormField({
               >
                 Remove
               </Button>
-            ) : null}
+            )}
           </Label>
-        ) : null}
+        )}
 
+        {helpElement}
         {inputElement}
       </div>
     );
   }
 
   return (
-    <div
-      className={cn(
-        "col-span-full",
-        "sm:col-span-3 sm:grid sm:grid-cols-subgrid sm:items-baseline",
-        readOnly && "opacity-60",
-      )}
-    >
+    <div className={cn("col-span-full", readOnly && "opacity-60")}>
       {labelContent ? (
         <Label
-          className="mb-0.5 sm:mb-0 sm:justify-end"
+          className="mb-2 ml-0.5"
           htmlFor={key}
         >
-          {labelContent}
-          <span className="sm:hidden">{tooltipElement}</span>
+          <span {...helpLabelProps}>{labelContent}</span>
         </Label>
       ) : (
         <div />
       )}
 
-      <div className="min-w-0">{inputElement}</div>
-
-      <div className="hidden justify-self-center sm:block">
-        {tooltipElement}
+      <div className="min-w-0">
+        {helpElement}
+        {inputElement}
       </div>
+
+      <div />
     </div>
   );
+}
+
+function useFieldHelp(field: FieldDef) {
+  const [helpOpen, setHelpOpen] = useState(false);
+  const fieldHasHelp = !!(field.tooltip ?? field.help ?? field.detailedTooltip);
+
+  const helpLabelProps = fieldHasHelp
+    ? {
+        className: cn(
+          "inline-block cursor-help pb-0.5 decoration-muted-foreground/50 decoration-dotted underline underline-offset-4",
+          helpOpen && "text-foreground decoration-foreground/50",
+        ),
+        onClick: () => {
+          setHelpOpen((o) => !o);
+        },
+        role: "button" as const,
+      }
+    : {};
+
+  const helpElement = fieldHasHelp ? (
+    <FieldHelp
+      detailedTooltip={field.detailedTooltip}
+      label={field.label}
+      open={helpOpen}
+    >
+      {field.help ? <p className="font-medium">{field.help}</p> : null}
+      {field.help && field.tooltip ? <Separator className="my-1.5" /> : null}
+      {field.tooltip}
+    </FieldHelp>
+  ) : null;
+
+  return { helpElement, helpLabelProps };
 }
 
 function toNumericValue(value: number | string | undefined): number {
@@ -150,7 +178,7 @@ function FieldInput({
   if (field.type === "textarea") {
     return (
       <Textarea
-        className={cn("min-h-16 text-base sm:min-h-27", className)}
+        className={cn("min-h-16 text-base", className)}
         disabled={field.readOnly}
         id={field.key}
         onChange={(e) => {
@@ -237,20 +265,6 @@ function FieldInput({
   );
 }
 
-function renderFieldTooltip(field: FieldDef) {
-  const { detailedTooltip, help, label, tooltip } = field;
-  return tooltip || help || detailedTooltip ? (
-    <FieldTooltip
-      detailedTooltip={detailedTooltip}
-      label={label}
-    >
-      {help ? <p className="font-medium">{help}</p> : null}
-      {help && tooltip ? <Separator className="my-1.5" /> : null}
-      {tooltip}
-    </FieldTooltip>
-  ) : null;
-}
-
 function renderLabelContent(field: FieldDef) {
   return field.label ? (
     <span>
@@ -259,7 +273,7 @@ function renderLabelContent(field: FieldDef) {
       {field.required ? (
         <span
           aria-label="required"
-          className="text-amber-400"
+          className="text-warning"
         >
           *
         </span>
