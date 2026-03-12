@@ -115,7 +115,7 @@ export function SubTable<T extends Record<string, number | string>>({
 
       {rows.map((row, index) => (
         <div
-          className="border-border/30 bg-muted/20 rounded border p-2 transition-shadow hover:shadow-md hover:shadow-black/20"
+          className="border-border/30 bg-muted/20 rounded border p-2 transition-shadow duration-150 hover:shadow-md hover:shadow-black/20"
           key={rowKeys[index]}
         >
           <div className="relative flex flex-col gap-y-4">
@@ -137,7 +137,7 @@ export function SubTable<T extends Record<string, number | string>>({
               const cellId = `${label}-${index}-${col.key}`;
               return (
                 <div
-                  className="flex flex-col gap-1"
+                  className="flex flex-col gap-1.5"
                   key={col.key}
                 >
                   <Label htmlFor={cellId}>{col.label}</Label>

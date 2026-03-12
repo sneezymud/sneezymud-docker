@@ -203,7 +203,7 @@ function EntityRow({
   return (
     <TableRow
       aria-label={`${entity.name || "(unnamed)"} (vnum ${entity.vnum})`}
-      className="has-[a:focus-visible]:ring-accent group hover:bg-muted/50 has-[a:focus-visible]:bg-muted/30 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-inset"
+      className="has-[a:focus-visible]:ring-accent group hover:bg-muted/50 has-[a:focus-visible]:bg-muted/30 transition-colors duration-150 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-inset"
     >
       {selectable ? (
         <TableCell
