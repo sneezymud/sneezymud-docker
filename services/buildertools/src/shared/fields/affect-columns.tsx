@@ -82,7 +82,7 @@ export const affectColumns: Array<ColumnDef<ObjAffect>> = [
             <Popover>
               <PopoverTrigger
                 aria-label={`${spec.mod1.label}: ${count} selected`}
-                className="hover:bg-accent dark:bg-input/40 focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-2 py-1 text-left text-sm shadow-xs outline-none focus-visible:ring-[3px]"
+                className="hover:bg-accent dark:bg-background/60 focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-2 py-1 text-left text-sm shadow-xs outline-none focus-visible:ring-[3px]"
               >
                 {count > 0
                   ? `${count} effect${count === 1 ? "" : "s"}`
