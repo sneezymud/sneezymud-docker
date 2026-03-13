@@ -34,7 +34,7 @@ function MobListPage() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const expandedAccess = hasPower(user?.powers ?? [], POWER.LOW);
-  const blocks = expandedAccess ? [] : (user?.blocks ?? []);
+  const blocks = user?.blocks ?? [];
   const { from, to } = Route.useSearch();
 
   const {
@@ -101,6 +101,7 @@ function MobListPage() {
       ) : null}
 
       <EntityList
+        allowAnyVnum={expandedAccess}
         basePath="/mobs"
         createPending={createMutation.isPending}
         deletePending={deleteMutation.isPending}

@@ -35,7 +35,7 @@ function RoomListPage() {
   const powers = user?.powers ?? [];
   const expandedAccess =
     hasPower(powers, POWER.LOW) && hasPower(powers, POWER.NO_LIMITS);
-  const blocks = expandedAccess ? [] : (user?.blocks ?? []);
+  const blocks = user?.blocks ?? [];
   const navigate = useNavigate();
   const { from, to } = Route.useSearch();
 
@@ -80,6 +80,7 @@ function RoomListPage() {
   return (
     <>
       <EntityList
+        allowAnyVnum={expandedAccess}
         banner={
           from !== undefined && to !== undefined ? (
             <Alert className="mb-4">

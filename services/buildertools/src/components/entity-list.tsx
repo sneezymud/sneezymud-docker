@@ -36,6 +36,7 @@ interface EntityListItem {
 }
 
 interface EntityListProps {
+  allowAnyVnum?: boolean;
   banner?: React.ReactNode;
   basePath: string;
   createPending?: boolean;
@@ -49,6 +50,7 @@ interface EntityListProps {
 }
 
 export function EntityList({
+  allowAnyVnum,
   banner,
   basePath,
   createPending,
@@ -89,7 +91,9 @@ export function EntityList({
     getRowId: (row) => String(row.vnum),
   });
 
-  const selectedVnums = Object.keys(selectedIds).map(Number);
+  const selectedVnums = entities
+    .filter((e) => selectedIds[String(e.vnum)])
+    .map((e) => e.vnum);
   const canCreate = Boolean(onCreateVnum && vnumBlocks);
   const searching = search !== "";
 
@@ -117,6 +121,7 @@ export function EntityList({
 
         {onCreateVnum && vnumBlocks ? (
           <VnumPicker
+            allowAnyVnum={allowAnyVnum}
             createPending={createPending}
             existingVnums={new Set(entities.map((e) => e.vnum))}
             onCreate={onCreateVnum}
@@ -177,7 +182,7 @@ export function EntityList({
         totalPages={totalPages}
       />
 
-      <p className="text-muted-foreground mt-2 text-xs">
+      <p className="text-muted-foreground mt-3 text-xs">
         {search
           ? `${filteredCount} results (${entities.length} total)`
           : `${entities.length} ${label.toLowerCase()}`}

@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet.tsx";
 import { useIsMobile } from "@/hooks/use-is-mobile.ts";
 
 interface VnumPickerProps {
+  allowAnyVnum?: boolean | undefined;
   createPending?: boolean | undefined;
   existingVnums: Set<number>;
   onCreate: (vnum: number) => void;
@@ -21,6 +22,7 @@ interface VnumPickerProps {
 }
 
 export function VnumPicker({
+  allowAnyVnum,
   createPending,
   existingVnums,
   onCreate,
@@ -73,6 +75,7 @@ export function VnumPicker({
             <SheetTitle className="sr-only">Create at vnum</SheetTitle>
 
             <VnumPickerForm
+              allowAnyVnum={allowAnyVnum}
               createPending={createPending}
               existingVnums={existingVnums}
               onCreate={onCreate}
@@ -100,6 +103,7 @@ export function VnumPicker({
         className="w-80"
       >
         <VnumPickerForm
+          allowAnyVnum={allowAnyVnum}
           createPending={createPending}
           existingVnums={existingVnums}
           onCreate={onCreate}
@@ -113,6 +117,7 @@ export function VnumPicker({
 }
 
 function VnumPickerForm({
+  allowAnyVnum,
   createPending,
   existingVnums,
   onCreate,
@@ -120,6 +125,7 @@ function VnumPickerForm({
   suggestedVnum,
   vnumBlocks,
 }: {
+  allowAnyVnum?: boolean | undefined;
   createPending?: boolean | undefined;
   existingVnums: Set<number>;
   onCreate: (vnum: number) => void;
@@ -135,6 +141,7 @@ function VnumPickerForm({
 
   const vnumNumber = Number(vnumInput);
   const inBlocks =
+    allowAnyVnum === true ||
     vnumBlocks.length === 0 ||
     vnumBlocks.some((b) => vnumNumber >= b.start && vnumNumber <= b.end);
   const isValid =
@@ -154,22 +161,8 @@ function VnumPickerForm({
 
   return (
     <>
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-medium">Create at vnum</h3>
-
-        <button
-          className="text-muted-foreground hover:text-foreground text-xs"
-          onClick={() => {
-            onOpenChange(false);
-          }}
-          type="button"
-        >
-          Cancel
-        </button>
-      </div>
-
       <form
-        className="flex items-end gap-3"
+        className="flex items-center gap-3"
         onSubmit={handleSubmit}
       >
         <div className="flex-1">
@@ -187,7 +180,7 @@ function VnumPickerForm({
             value={vnumInput}
           />
 
-          {vnumBlocks.length > 0 && (
+          {!allowAnyVnum && vnumBlocks.length > 0 && (
             <p className="text-muted-foreground mt-1 text-xs">
               Ranges: {vnumBlocks.map((b) => `${b.start}-${b.end}`).join(", ")}
             </p>
@@ -196,8 +189,9 @@ function VnumPickerForm({
 
         <Button
           disabled={!isValid || createPending}
+          size="inline"
           type="submit"
-          variant="secondary"
+          variant="inline"
         >
           {createPending ? "Creating..." : "Create"}
         </Button>
