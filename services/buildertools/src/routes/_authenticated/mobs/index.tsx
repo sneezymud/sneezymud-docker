@@ -83,25 +83,26 @@ function MobListPage() {
 
   return (
     <>
-      {from !== undefined && to !== undefined ? (
-        <Alert className="mb-4">
-          <AlertDescription className="flex items-center gap-2">
-            Filtered to zone range {from}&ndash;{to}
-            <Button
-              onClick={() => {
-                void navigate({ search: {}, to: "/mobs" });
-              }}
-              size="xs"
-              variant="inline"
-            >
-              Clear filter
-            </Button>
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
       <EntityList
         allowAnyVnum={expandedAccess}
+        banner={
+          from !== undefined && to !== undefined ? (
+            <Alert className="mb-4">
+              <AlertDescription className="flex items-center gap-2">
+                Filtered to zone range {from}&ndash;{to}
+                <Button
+                  onClick={() => {
+                    void navigate({ search: {}, to: "/mobs" });
+                  }}
+                  size="xs"
+                  variant="inline"
+                >
+                  Clear filter
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : undefined
+        }
         basePath="/mobs"
         createPending={createMutation.isPending}
         deletePending={deleteMutation.isPending}
