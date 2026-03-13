@@ -68,6 +68,10 @@ export function Nav({ className, onNavClick }: NavProps) {
         <p className="text-muted-foreground text-xs tracking-wide uppercase">
           Builder Tools
         </p>
+
+        {import.meta.env.DEV ? (
+          <p className="text-muted-foreground/50 text-[10px]">dev</p>
+        ) : null}
       </div>
 
       <div className="flex flex-1 flex-col gap-1.5">
@@ -174,7 +178,7 @@ function NavLink({
         className: "bg-accent/20 text-accent font-medium border-l-accent",
         style: accentColor ? { borderLeftColor: accentColor } : undefined,
       }}
-      className="text-muted-foreground hover:bg-muted/50 hover:text-foreground focus-visible:ring-ring/50 flex items-center gap-2 rounded-r border-l-2 border-l-transparent px-3 py-2 text-sm transition-colors outline-none focus-visible:ring-[3px]"
+      className="text-muted-foreground hover:bg-muted/50 hover:text-foreground focus-visible:ring-ring/50 flex items-center gap-2 rounded-r border-l-2 border-l-transparent px-4 py-2 text-sm transition-colors outline-none focus-visible:ring-[3px]"
       onClick={onClick}
       to={to}
     >
