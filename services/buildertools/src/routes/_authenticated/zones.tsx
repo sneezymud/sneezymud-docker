@@ -69,7 +69,7 @@ function ZoneRow({
   return (
     <div>
       <button
-        className="flex w-full items-start justify-between gap-2 px-3 py-2.5 text-left"
+        className="focus-visible:ring-ring/50 hover:bg-muted/50 flex w-full cursor-pointer items-start justify-between gap-2 rounded-md px-3 py-2.5 text-left transition-colors duration-150 outline-none focus-visible:ring-[3px]"
         onClick={onToggle}
         type="button"
       >
@@ -84,77 +84,84 @@ function ZoneRow({
 
         <ChevronRight
           className={cn(
-            "text-muted-foreground mt-1 size-4 shrink-0 transition-transform",
+            "text-muted-foreground/60 mt-1 size-4 shrink-0 transition-transform duration-200",
             expanded && "rotate-90",
           )}
         />
       </button>
 
-      {expanded && (
-        <div className="bg-muted/50 flex flex-col gap-2 px-3 pt-1 pb-3">
-          <div className="flex flex-wrap items-center gap-3 text-xs">
-            {author && (
-              <span className="text-muted-foreground">Author: {author}</span>
-            )}
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-200",
+          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+      >
+        <div className="overflow-hidden">
+          <div className="bg-muted/50 flex flex-col gap-2 px-3 pt-1 pb-3">
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              {author && (
+                <span className="text-muted-foreground">Author: {author}</span>
+              )}
 
-            <span className="text-muted-foreground">
-              Lifespan: {zone.lifespan ?? "\u2014"}
-            </span>
+              <span className="text-muted-foreground">
+                Lifespan: {zone.lifespan ?? "\u2014"}
+              </span>
 
-            {zone.zone_enabled === 1 ? (
-              <Badge variant="outline">Enabled</Badge>
-            ) : (
-              <Badge variant="secondary">Disabled</Badge>
+              {zone.zone_enabled === 1 ? (
+                <Badge variant="outline">Enabled</Badge>
+              ) : (
+                <Badge variant="secondary">Disabled</Badge>
+              )}
+            </div>
+
+            {zone.bottom != null && zone.top != null && (
+              <div className="flex gap-3">
+                <Button
+                  asChild
+                  className="text-xs"
+                  size="inline"
+                  variant="inline"
+                >
+                  <Link
+                    search={{ from: zone.bottom, to: zone.top }}
+                    to="/rooms"
+                  >
+                    Rooms
+                  </Link>
+                </Button>
+
+                <Button
+                  asChild
+                  className="text-xs"
+                  size="inline"
+                  variant="inline"
+                >
+                  <Link
+                    search={{ from: zone.bottom, to: zone.top }}
+                    to="/mobs"
+                  >
+                    Mobs
+                  </Link>
+                </Button>
+
+                <Button
+                  asChild
+                  className="text-xs"
+                  size="inline"
+                  variant="inline"
+                >
+                  <Link
+                    search={{ from: zone.bottom, to: zone.top }}
+                    to="/objects"
+                  >
+                    Objects
+                  </Link>
+                </Button>
+              </div>
             )}
           </div>
-
-          {zone.bottom != null && zone.top != null && (
-            <div className="flex gap-3">
-              <Button
-                asChild
-                className="text-xs"
-                size="inline"
-                variant="inline"
-              >
-                <Link
-                  search={{ from: zone.bottom, to: zone.top }}
-                  to="/rooms"
-                >
-                  Rooms
-                </Link>
-              </Button>
-
-              <Button
-                asChild
-                className="text-xs"
-                size="inline"
-                variant="inline"
-              >
-                <Link
-                  search={{ from: zone.bottom, to: zone.top }}
-                  to="/mobs"
-                >
-                  Mobs
-                </Link>
-              </Button>
-
-              <Button
-                asChild
-                className="text-xs"
-                size="inline"
-                variant="inline"
-              >
-                <Link
-                  search={{ from: zone.bottom, to: zone.top }}
-                  to="/objects"
-                >
-                  Objects
-                </Link>
-              </Button>
-            </div>
-          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
