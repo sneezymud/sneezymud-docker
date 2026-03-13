@@ -23,6 +23,7 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
     error,
     exitEdits,
     extraEdits,
+    fieldErrors,
     handleDelete,
     handleFieldChange,
     handleSave,
@@ -83,6 +84,7 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
       />
 
       <EntityForm
+        fieldErrors={fieldErrors}
         groups={getRoomFieldGroups(zoneEntries, zonesError, user?.powers ?? [])}
         onChange={handleFieldChange}
         originalValues={originalValues}

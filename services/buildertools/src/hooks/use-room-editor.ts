@@ -49,7 +49,9 @@ export function useRoomEditor(vnumParam: string) {
   };
 
   const {
+    clearFieldError,
     deletePending,
+    fieldErrors,
     handleDelete,
     handleSave,
     handleSaveAndProceed,
@@ -85,6 +87,7 @@ export function useRoomEditor(vnumParam: string) {
 
   const handleFieldChange = (key: string, value: number | string) => {
     if (!room) return;
+    clearFieldError(key);
     applyRoomFieldChange(key, value, room, setEdits);
   };
 
@@ -95,6 +98,7 @@ export function useRoomEditor(vnumParam: string) {
     error,
     exitEdits,
     extraEdits,
+    fieldErrors,
     handleDelete,
     handleFieldChange,
     handleSave,

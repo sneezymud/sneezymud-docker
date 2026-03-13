@@ -16,11 +16,13 @@ import { NumberInput } from "./number-input.tsx";
 import { EntityPicker } from "./pickers/entity-picker.tsx";
 
 export function FormField({
+  error,
   field,
   isDirty,
   onChange,
   value,
 }: {
+  error?: string;
   field: FieldDef;
   isDirty: boolean;
   onChange: (key: string, value: number | string) => void;
@@ -74,7 +76,10 @@ export function FormField({
 
   if (fullWidth ?? (type === "textarea" || type === "bitfield")) {
     return (
-      <div className={cn("col-span-full", readOnly && "opacity-60")}>
+      <div
+        className={cn("col-span-full", readOnly && "opacity-60")}
+        id={`field-${key}`}
+      >
         {labelContent !== null && (
           <Label
             className="mb-2 ml-0.5"
@@ -99,12 +104,19 @@ export function FormField({
 
         {helpElement}
         {inputElement}
+
+        {error ? (
+          <p className="text-destructive mt-1 text-xs">{error}</p>
+        ) : null}
       </div>
     );
   }
 
   return (
-    <div className={cn("col-span-full", readOnly && "opacity-60")}>
+    <div
+      className={cn("col-span-full", readOnly && "opacity-60")}
+      id={`field-${key}`}
+    >
       {labelContent ? (
         <Label
           className="mb-2 ml-0.5"
@@ -119,6 +131,10 @@ export function FormField({
       <div className="min-w-0">
         {helpElement}
         {inputElement}
+
+        {error ? (
+          <p className="text-destructive mt-1 text-xs">{error}</p>
+        ) : null}
       </div>
 
       <div />

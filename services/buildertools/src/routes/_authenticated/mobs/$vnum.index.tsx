@@ -76,6 +76,7 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
     dirty,
     error,
     extraEdits,
+    fieldErrors,
     handleDelete,
     handleFieldChange,
     handleSave,
@@ -134,6 +135,7 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
       />
 
       <EntityForm
+        fieldErrors={fieldErrors}
         groups={prepareMobFieldGroups(
           powers,
           vnumParam,

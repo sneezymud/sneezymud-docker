@@ -44,7 +44,9 @@ export function useObjectEditor(vnumParam: string) {
   };
 
   const {
+    clearFieldError,
     deletePending,
+    fieldErrors,
     handleDelete,
     handleSave,
     handleSaveAndProceed,
@@ -86,6 +88,7 @@ export function useObjectEditor(vnumParam: string) {
 
   const handleFieldChange = (key: string, value: number | string) => {
     if (!obj) return;
+    clearFieldError(key);
     applyObjFieldChange(key, value, obj, typeSpec, setEdits);
   };
 
@@ -98,6 +101,7 @@ export function useObjectEditor(vnumParam: string) {
     expandedOriginal,
     expandedValues,
     extraEdits,
+    fieldErrors,
     handleDelete,
     handleFieldChange,
     handleSave,

@@ -10,6 +10,7 @@ import { SectionHeader } from "./section-header.tsx";
 
 interface EntityFormProps {
   children?: React.ReactNode;
+  fieldErrors?: Record<string, string>;
   groups: FieldGroupDef[];
   onChange: (key: string, value: number | string) => void;
   originalValues?: Record<string, number | string> | undefined;
@@ -18,6 +19,7 @@ interface EntityFormProps {
 
 export function EntityForm({
   children,
+  fieldErrors,
   groups,
   onChange,
   originalValues,
@@ -32,6 +34,7 @@ export function EntityForm({
           onChange={onChange}
           originalValues={originalValues}
           values={values}
+          {...(fieldErrors && { fieldErrors })}
         />
       ))}
 
@@ -41,11 +44,13 @@ export function EntityForm({
 }
 
 function FieldGroup({
+  fieldErrors,
   group,
   onChange,
   originalValues,
   values,
 }: {
+  fieldErrors?: Record<string, string>;
   group: FieldGroupDef;
   onChange: (key: string, value: number | string) => void;
   originalValues?: Record<string, number | string> | undefined;
@@ -113,6 +118,9 @@ function FieldGroup({
                     isDirty={fieldDirty}
                     onChange={onChange}
                     value={values[field.key]}
+                    {...(fieldErrors?.[field.key] !== undefined && {
+                      error: fieldErrors[field.key],
+                    })}
                   />
                 </Fragment>
               );

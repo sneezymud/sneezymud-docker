@@ -44,7 +44,9 @@ export function useMobEditor(vnumParam: string) {
   };
 
   const {
+    clearFieldError,
     deletePending,
+    fieldErrors,
     handleDelete,
     handleSave,
     handleSaveAndProceed,
@@ -82,13 +84,10 @@ export function useMobEditor(vnumParam: string) {
         { key: "long_desc" as const, label: "Long Description" },
         { key: "description" as const, label: "Detailed Description" },
       ];
-      const missing = requiredFields
+      const errors = requiredFields
         .filter((f) => !merged[f.key].trim())
-        .map((f) => f.label);
-      if (missing.length > 0) {
-        return `Required fields cannot be empty: ${missing.join(", ")}`;
-      }
-      return null;
+        .map((f) => ({ field: f.key, message: `${f.label} is required` }));
+      return errors.length > 0 ? errors : null;
     },
   });
 
@@ -97,6 +96,7 @@ export function useMobEditor(vnumParam: string) {
 
   const handleFieldChange = (key: string, value: number | string) => {
     if (!mob) return;
+    clearFieldError(key);
     setEdits((prev) => diffEdits({ ...prev, [key]: value }, mob));
   };
 
@@ -106,6 +106,7 @@ export function useMobEditor(vnumParam: string) {
     dirty,
     error,
     extraEdits,
+    fieldErrors,
     handleDelete,
     handleFieldChange,
     handleSave,

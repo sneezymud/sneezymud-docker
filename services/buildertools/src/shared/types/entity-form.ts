@@ -1,5 +1,10 @@
 import type { BitfieldEntry, EnumEntry } from "@/shared/types/enums.ts";
 
+export interface FieldError {
+  field: string;
+  message: string;
+}
+
 export type FieldDef =
   | BitfieldFieldDef
   | EnumFieldDef

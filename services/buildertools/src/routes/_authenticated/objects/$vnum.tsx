@@ -29,6 +29,7 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
     expandedOriginal,
     expandedValues,
     extraEdits,
+    fieldErrors,
     handleDelete,
     handleFieldChange,
     handleSave,
@@ -84,6 +85,7 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
       />
 
       <EntityForm
+        fieldErrors={fieldErrors}
         groups={getObjFieldGroups(currentItemType, powers)}
         onChange={handleFieldChange}
         originalValues={expandedOriginal}

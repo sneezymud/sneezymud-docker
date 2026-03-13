@@ -1,8 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useBlocker, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
+
+import type { FieldError } from "@/shared/types/entity-form.ts";
 
 import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
 import { toastError } from "@/shared/toast.ts";
@@ -28,8 +30,8 @@ interface UseEntityEditorOptions<T> {
   onReset: () => void;
   /** Performs the save API call. Return saved entity for cache update, or null to skip. */
   saveFn: () => Promise<null | T>;
-  /** Pre-save validation. Return an error message to block save, or null to proceed. */
-  validate?: () => null | string;
+  /** Pre-save validation. Return field errors to block save, or null to proceed. */
+  validate?: () => FieldError[] | null;
 }
 
 export function useEntityEditor<T>({
@@ -45,6 +47,7 @@ export function useEntityEditor<T>({
 }: UseEntityEditorOptions<T>) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Side effects: useSyncDirty keeps the tab title's dirty indicator in sync,
   // useConcurrentEditWarning toasts if the server data changes while editing.
@@ -79,6 +82,7 @@ export function useEntityEditor<T>({
     },
     onSuccess: async (saved) => {
       toast.success("Saved");
+      setFieldErrors({});
       if (saved && detailKey) {
         queryClient.setQueryData(detailKey, saved);
       }
@@ -114,25 +118,37 @@ export function useEntityEditor<T>({
     },
   });
 
-  const handleSave = () => {
-    if (validate) {
-      const error = validate();
-      if (error) {
-        toastError(error);
-        return;
-      }
+  const applyValidation = (): boolean => {
+    if (!validate) return true;
+    const errors = validate();
+    if (!errors) {
+      setFieldErrors({});
+      return true;
     }
+    const errorMap: Record<string, string> = {};
+    for (const { field, message } of errors) {
+      errorMap[field] = message;
+    }
+    setFieldErrors(errorMap);
+    toastError("Required fields cannot be empty");
+
+    const firstError = errors[0];
+    const el = firstError
+      ? document.querySelector<HTMLElement>(`#field-${firstError.field}`)
+      : null;
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    return false;
+  };
+
+  const handleSave = () => {
+    if (!applyValidation()) return;
     saveMutation.mutate();
   };
 
   const handleSaveAndProceed = async () => {
-    if (validate) {
-      const error = validate();
-      if (error) {
-        toastError(error);
-        return;
-      }
-    }
+    if (!applyValidation()) return;
     try {
       await saveMutation.mutateAsync();
       proceed?.();
@@ -141,10 +157,21 @@ export function useEntityEditor<T>({
     }
   };
 
+  const clearFieldError = (key: string) => {
+    setFieldErrors((prev) => {
+      if (!(key in prev)) return prev;
+      return Object.fromEntries(
+        Object.entries(prev).filter(([k]) => k !== key),
+      );
+    });
+  };
+
   useKeyboardSave(handleSave, dirty && !saveMutation.isPending);
 
   return {
+    clearFieldError,
     deletePending: deleteMutation.isPending,
+    fieldErrors,
     handleDelete: () => {
       deleteMutation.mutate();
     },
