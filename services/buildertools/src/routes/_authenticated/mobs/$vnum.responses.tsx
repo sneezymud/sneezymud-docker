@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import { BackLink } from "@/components/back-link.tsx";
 import { CodeEditor } from "@/components/code-editor/code-editor.tsx";
-import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
 import { EntityHeader } from "@/components/entity-header.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import {
@@ -14,6 +13,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
+import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog.tsx";
 import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import { mobKeys } from "@/shared/query-keys.ts";
@@ -227,18 +227,10 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
         </ScrollArea>
       </div>
 
-      <ConfirmDialog
-        confirmLabel="Discard changes"
-        message="You have unsaved changes that will be lost."
-        onCancel={() => {
-          unsavedNavReset?.();
-        }}
-        onConfirm={() => {
-          unsavedNavProceed?.();
-        }}
-        open={unsavedNavStatus === "blocked"}
-        title="Unsaved Changes"
-        variant="danger"
+      <UnsavedChangesDialog
+        unsavedNavProceed={unsavedNavProceed}
+        unsavedNavReset={unsavedNavReset}
+        unsavedNavStatus={unsavedNavStatus}
       />
     </div>
   );
