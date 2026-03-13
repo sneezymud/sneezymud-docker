@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import type { BreadcrumbEntry } from "@/components/breadcrumbs.tsx";
@@ -38,7 +38,7 @@ export function EntityHeader({
   const entityName = breadcrumbs.at(-1)?.label ?? "";
 
   return (
-    <div className="bg-background/80 sticky top-0 z-10 mb-2 flex flex-col gap-2 py-2.5 backdrop-blur-sm">
+    <div className="bg-background/80 sticky top-0 z-10 mb-4 flex flex-col gap-2 py-2.5 backdrop-blur-md">
       {/* Mobile: back arrow + entity name + hamburger */}
 
       <div className="flex items-center gap-3 sm:hidden">
@@ -82,15 +82,20 @@ export function EntityHeader({
         {onDelete !== undefined && (
           <>
             <Button
-              className="ml-auto"
+              aria-label="Delete"
+              className="text-destructive/60 hover:text-destructive hover:bg-destructive/10 ml-auto"
               disabled={deletePending}
               onClick={() => {
                 setShowDeleteConfirm(true);
               }}
-              size="sm"
-              variant="inline-destructive"
+              size="icon-sm"
+              variant="ghost"
             >
-              {deletePending ? <Loader2 className="animate-spin" /> : "Delete"}
+              {deletePending ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
             </Button>
 
             <ConfirmDialog

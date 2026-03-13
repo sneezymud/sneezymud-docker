@@ -28,6 +28,7 @@ export function TablePagination({
       <PaginationContent>
         <PaginationItem>
           <PaginationPrevious
+            className="h-10 w-10"
             disabled={!canPreviousPage}
             onClick={onPreviousPage}
           />
@@ -41,6 +42,7 @@ export function TablePagination({
 
         <PaginationItem>
           <PaginationNext
+            className="h-10 w-10"
             disabled={!canNextPage}
             onClick={onNextPage}
           />

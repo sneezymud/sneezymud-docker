@@ -651,7 +651,7 @@ function DeleteSelectionBar({
 }) {
   if (count === 0) return null;
   return (
-    <div className="mb-4">
+    <div className="animate-in slide-in-from-top-2 mb-4 duration-200">
       <Button
         disabled={deletePending}
         onClick={onDelete}
