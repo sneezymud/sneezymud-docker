@@ -1,3 +1,4 @@
+@import "@fontsource-variable/crimson-pro";
 @import "@fontsource-variable/inter";
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -19,6 +20,7 @@ html {
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
   --font-sans: "Inter Variable", system-ui, sans-serif;
+  --font-brand: "Crimson Pro Variable", serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
