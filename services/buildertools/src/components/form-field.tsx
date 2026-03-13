@@ -224,6 +224,7 @@ function FieldInput({
         className={className}
         disabled={field.readOnly}
         id={field.key}
+        integer={field.integer}
         max={field.max}
         min={field.min}
         onValueChange={(v) => {

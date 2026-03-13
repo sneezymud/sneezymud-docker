@@ -38,6 +38,7 @@ interface TextFieldDef extends FieldDefBase {
 }
 
 interface NumberFieldDef extends FieldDefBase {
+  integer?: boolean;
   max?: number;
   min?: number;
   step?: number;

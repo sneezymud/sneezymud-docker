@@ -171,6 +171,7 @@ export function getRoomFieldGroups(
           type: "enum",
         },
         {
+          integer: true,
           key: "capacity",
           label: "Max Capacity",
           max: 100,
@@ -249,6 +250,7 @@ export function getRoomFieldGroups(
             </>
           ),
           help: "Ceiling height in inches. -1 = unlimited (outdoor). 1-1000 = indoor.",
+          integer: true,
           key: "height",
           label: "Room Height",
           max: 1000,
@@ -296,6 +298,7 @@ export function getRoomFieldGroups(
       fields: [
         {
           help: "Teleport period in game ticks (12 ticks \u2248 1.2 seconds). 0 = disabled.",
+          integer: true,
           key: "teletime",
           label: "Teleport Time",
           type: "number",
@@ -332,6 +335,7 @@ export function getRoomFieldGroups(
       fields: [
         {
           help: "Current strength (0 = still water). Only affects water/underwater sector rooms.",
+          integer: true,
           key: "river_speed",
           label: "River Speed",
           tooltip: (

@@ -203,6 +203,7 @@ export function getObjFieldGroups(
         },
         {
           help: "Item volume in cubic inches. Must fit within container's max volume to be placed inside.",
+          integer: true,
           key: "volume",
           label: "Volume",
           max: 50_000,
@@ -212,6 +213,7 @@ export function getObjFieldGroups(
         },
         {
           help: "Base sale value in talens. Actual shop prices vary based on charisma and shop markup.",
+          integer: true,
           key: "price",
           label: "Price",
           max: 1_000_000,
@@ -323,6 +325,7 @@ export function getObjFieldGroups(
             </>
           ),
           help: "Maximum structural integrity (0-32767). 0 = no durability system. Set both values equal for brand new items.",
+          integer: true,
           key: "max_struct",
           label: "Max Structure",
           max: 32_767,
@@ -332,6 +335,7 @@ export function getObjFieldGroups(
         },
         {
           help: "Current structural integrity (0-32767). When this reaches 0, the item is destroyed or reduced to scraps.",
+          integer: true,
           key: "cur_struct",
           label: "Current Structure",
           max: 32_767,
@@ -416,6 +420,7 @@ export function getObjFieldGroups(
             </>
           ),
           help: "MUD-hour ticks until item decays. -1 = never. Only decrements while on the ground.",
+          integer: true,
           key: "decay",
           label: "Decay Time",
           max: 10_000,
@@ -425,6 +430,7 @@ export function getObjFieldGroups(
         },
         {
           help: "Maximum concurrent instances in the world (0-9999). 9999 = unlimited.",
+          integer: true,
           key: "max_exist",
           label: "Max Exist",
           max: 9999,
@@ -510,6 +516,7 @@ export function getObjFieldGroups(
             </>
           ),
           help: "Visibility threshold (0-25). Higher = harder to spot on the ground. 0 = visible in any light.",
+          integer: true,
           key: "can_be_seen",
           label: "Can Be Seen",
           max: 25,
