@@ -2,13 +2,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Box, DoorOpen, Map, User } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/lib/utils.ts";
 import { hasPower, POWER } from "@/shared/powers.ts";
 import { useAuthStore } from "@/state/auth.ts";
 import { useDirtyStore } from "@/state/dirty.ts";
+import { useSidebarStore } from "@/state/sidebar.ts";
 
 import { ConfirmDialog } from "./confirm-dialog.tsx";
 
@@ -30,6 +30,7 @@ export function Nav({ className, onNavClick }: NavProps) {
 
   const doLogout = () => {
     (async () => {
+      useAuthStore.getState().setLoggingOut(true);
       try {
         await fetch("/api/auth/logout", {
           headers: { "X-Requested-With": "XMLHttpRequest" },
@@ -38,17 +39,14 @@ export function Nav({ className, onNavClick }: NavProps) {
         });
       } catch (error: unknown) {
         // Proceed with client-side logout even if the server call fails
-        console.error("Logout failed:", error);
-        toast.error("Logout failed. Please try again.", {
-          id: "logout-failed",
-        });
+        console.error("Logout API call failed:", error);
       }
+      useSidebarStore.getState().close();
       queryClient.clear();
       clearUser();
       await navigate({ to: "/login" });
     })().catch((error: unknown) => {
       console.error("Logout failed:", error);
-      toast.error("Logout failed. Please try again.", { id: "logout-failed" });
     });
   };
 
