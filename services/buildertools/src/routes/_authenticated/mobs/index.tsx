@@ -86,6 +86,7 @@ function MobListPage() {
   return (
     <>
       <EntityList
+        accentColor="#ebcb8b"
         allowAnyVnum={expandedAccess}
         banner={
           from !== undefined && to !== undefined ? (

@@ -91,6 +91,7 @@ function RoomListPage() {
   return (
     <>
       <EntityList
+        accentColor="var(--color-accent)"
         allowAnyVnum={expandedAccess}
         banner={
           from !== undefined && to !== undefined ? (

@@ -95,6 +95,7 @@ function ObjectListPage() {
   return (
     <>
       <EntityList
+        accentColor="#a3be8c"
         allowAnyVnum={expandedAccess}
         banner={
           from !== undefined && to !== undefined ? (
