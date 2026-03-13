@@ -62,8 +62,8 @@ export function Nav({ className, onNavClick }: NavProps) {
 
   return (
     <nav className={cn("border-border bg-card flex flex-col p-4", className)}>
-      <div className="mb-6 flex flex-col">
-        <p className="text-foreground font-mono text-lg font-bold tracking-tight">
+      <div className="border-accent/20 mb-6 flex flex-col border-b pb-6">
+        <p className="text-foreground font-mono text-xl font-bold tracking-tight">
           SneezyMUD
         </p>
 
@@ -168,9 +168,9 @@ function NavLink({
     <Link
       activeProps={{
         "aria-current": "page" as const,
-        className: "bg-accent/15 text-accent font-medium",
+        className: "bg-accent/20 text-accent font-medium border-l-accent",
       }}
-      className="focus-visible:ring-accent text-muted-foreground hover:bg-muted/50 hover:text-foreground focus-visible:ring-offset-background flex items-center gap-2 rounded px-3 py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-1"
+      className="text-muted-foreground hover:bg-muted/50 hover:text-foreground focus-visible:ring-ring/50 flex items-center gap-2 rounded-r border-l-2 border-l-transparent px-3 py-2 text-sm transition-colors outline-none focus-visible:ring-[3px]"
       onClick={onClick}
       to={to}
     >
