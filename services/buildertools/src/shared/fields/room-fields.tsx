@@ -52,6 +52,7 @@ export function getRoomFieldGroups(
 ): FieldGroupDef[] {
   return [
     {
+      defaultExpanded: true,
       fields: [
         {
           fullWidth: true,
@@ -84,6 +85,7 @@ export function getRoomFieldGroups(
       title: "Identity",
     },
     {
+      defaultExpanded: false,
       fields: [
         buildZoneField(zoneEntries, zonesError),
         {
@@ -271,6 +273,7 @@ export function getRoomFieldGroups(
       title: "Properties",
     },
     {
+      defaultExpanded: false,
       fields: [
         {
           bitfieldEntries: ROOM_FLAGS,
@@ -289,6 +292,7 @@ export function getRoomFieldGroups(
       ),
     },
     {
+      defaultExpanded: false,
       fields: [
         {
           help: "Teleport period in game ticks (12 ticks \u2248 1.2 seconds). 0 = disabled.",
@@ -324,6 +328,7 @@ export function getRoomFieldGroups(
       ),
     },
     {
+      defaultExpanded: false,
       fields: [
         {
           help: "Current strength (0 = still water). Only affects water/underwater sector rooms.",

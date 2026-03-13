@@ -14,6 +14,7 @@ import {
 
 export const mobFieldGroups: FieldGroupDef[] = [
   {
+    defaultExpanded: true,
     fields: [
       {
         fullWidth: true,
@@ -132,6 +133,7 @@ export const mobFieldGroups: FieldGroupDef[] = [
     title: "Identity",
   },
   {
+    defaultExpanded: true,
     fields: [
       {
         key: "level",
@@ -347,6 +349,7 @@ export const mobFieldGroups: FieldGroupDef[] = [
     title: "Combat",
   },
   {
+    defaultExpanded: false,
     fieldGroupSize: 3,
     fields: [
       { key: "str", label: "Strength", max: 25, min: -25, type: "number" },
@@ -412,6 +415,7 @@ export const mobFieldGroups: FieldGroupDef[] = [
     ),
   },
   {
+    defaultExpanded: false,
     fields: [
       {
         detailedTooltip: (
@@ -666,6 +670,7 @@ export const mobFieldGroups: FieldGroupDef[] = [
     title: "Physical",
   },
   {
+    defaultExpanded: false,
     fields: [
       {
         key: "gold",
@@ -803,6 +808,7 @@ export const mobFieldGroups: FieldGroupDef[] = [
     title: "Economy & Limits",
   },
   {
+    defaultExpanded: false,
     fields: [
       {
         enumEntries: CLASS_TYPES,
@@ -903,6 +909,7 @@ export const mobFieldGroups: FieldGroupDef[] = [
     title: "Behavior",
   },
   {
+    defaultExpanded: false,
     fields: [
       {
         bitfieldEntries: MOB_ACTIONS,
@@ -921,6 +928,7 @@ export const mobFieldGroups: FieldGroupDef[] = [
     ),
   },
   {
+    defaultExpanded: false,
     fields: [
       {
         bitfieldEntries: MOB_AFFECTS,

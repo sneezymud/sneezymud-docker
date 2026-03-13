@@ -10,6 +10,7 @@ export type FieldDef =
 
 export interface FieldGroupDef {
   colSpan?: "full";
+  defaultExpanded?: boolean;
   detailedTooltip?: React.ReactNode;
   fieldGroupSize?: number;
   fields: FieldDef[];

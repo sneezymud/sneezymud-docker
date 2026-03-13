@@ -104,6 +104,7 @@ export function getObjFieldGroups(
   );
   return [
     {
+      defaultExpanded: true,
       fields: [
         {
           fullWidth: true,
@@ -183,11 +184,13 @@ export function getObjFieldGroups(
       title: "Identity",
     },
     {
+      defaultExpanded: false,
       fields: [itemTypeField, ...typeSpecificFields],
       title: "Type-Specific Values",
       tooltip: typeSpecificTooltip,
     },
     {
+      defaultExpanded: false,
       fields: [
         {
           help: "Item weight in pounds. Affects carrying capacity and container limits. Decimal values allowed.",
@@ -234,6 +237,7 @@ export function getObjFieldGroups(
       title: "Physical",
     },
     {
+      defaultExpanded: false,
       fields: [
         {
           detailedTooltip: (
@@ -525,6 +529,7 @@ export function getObjFieldGroups(
       title: "Limits & Behavior",
     },
     {
+      defaultExpanded: false,
       fields: [
         {
           bitfieldEntries: hasPower(powers, POWER.OEDIT_NOPROTOS)
@@ -540,6 +545,7 @@ export function getObjFieldGroups(
       title: "Extra Flags",
     },
     {
+      defaultExpanded: false,
       fields: [
         {
           bitfieldEntries: WEAR_FLAGS,

@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 import { cn } from "@/lib/utils.ts";
@@ -7,11 +8,15 @@ import { FieldHelp } from "./info-tooltip.tsx";
 export function SectionHeader({
   action,
   detailedTooltip,
+  expanded,
+  onToggle,
   title,
   tooltip,
 }: {
   action?: React.ReactNode;
   detailedTooltip?: React.ReactNode;
+  expanded?: boolean;
+  onToggle?: () => void;
   title: string;
   tooltip?: React.ReactNode;
 }) {
@@ -22,14 +27,42 @@ export function SectionHeader({
     <>
       <legend className="sr-only">{title}</legend>
 
-      <div className="text-accent/70 border-border/40 mb-3 flex items-center gap-2 border-b pb-1.5 text-xs font-medium tracking-wider uppercase">
+      <div
+        className={cn(
+          "text-accent/70 border-border/60 mb-3 flex items-center gap-2 border-b pb-1.5 text-sm font-medium tracking-wider uppercase",
+          onToggle && "cursor-pointer select-none",
+        )}
+        onClick={onToggle}
+        onKeyDown={
+          onToggle
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onToggle();
+                }
+              }
+            : undefined
+        }
+        role={onToggle ? "button" : undefined}
+        tabIndex={onToggle ? 0 : undefined}
+      >
+        {onToggle !== undefined && (
+          <ChevronRight
+            className={cn(
+              "h-3.5 w-3.5 shrink-0 transition-transform duration-200",
+              expanded && "rotate-90",
+            )}
+          />
+        )}
+
         {hasHelp ? (
           <button
             className={cn(
               "decoration-muted-foreground/50 cursor-help uppercase underline decoration-dotted underline-offset-4",
               helpOpen && "decoration-current",
             )}
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               setHelpOpen((o) => !o);
             }}
             type="button"
