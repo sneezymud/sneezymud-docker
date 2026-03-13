@@ -24,7 +24,7 @@ export function EntityForm({
   values,
 }: EntityFormProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {groups.map((group) => (
         <FieldGroup
           group={group}

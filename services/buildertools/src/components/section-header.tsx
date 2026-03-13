@@ -22,7 +22,7 @@ export function SectionHeader({
     <>
       <legend className="sr-only">{title}</legend>
 
-      <div className="text-muted-foreground mb-3 flex items-center gap-2 text-xs font-medium tracking-wider uppercase">
+      <div className="text-accent/70 border-border/40 mb-3 flex items-center gap-2 border-b pb-1.5 text-xs font-medium tracking-wider uppercase">
         {hasHelp ? (
           <button
             className={cn(
