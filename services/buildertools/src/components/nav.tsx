@@ -3,6 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Box, DoorOpen, Map, User } from "lucide-react";
 import { useState } from "react";
 
+import { SneezyLogo } from "@/components/sneezy-logo.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/lib/utils.ts";
 import { hasPower, POWER } from "@/shared/powers.ts";
@@ -60,18 +61,22 @@ export function Nav({ className, onNavClick }: NavProps) {
 
   return (
     <nav className={cn("border-border bg-card flex flex-col p-4", className)}>
-      <div className="border-accent/20 mb-6 flex flex-col border-b pb-6">
-        <p className="text-foreground font-mono text-xl font-bold tracking-tight">
-          SneezyMUD
-        </p>
+      <div className="border-accent/20 mb-6 flex items-center gap-2 border-b pb-6">
+        <SneezyLogo className="text-accent/70 h-6 w-6" />
 
-        <p className="text-muted-foreground text-xs tracking-wide uppercase">
-          Builder Tools
-        </p>
+        <div className="flex flex-col">
+          <p className="text-foreground font-brand text-xl font-bold tracking-tight">
+            SneezyMUD
+          </p>
 
-        {import.meta.env.DEV ? (
-          <p className="text-muted-foreground/50 text-[10px]">dev</p>
-        ) : null}
+          <p className="text-muted-foreground text-xs tracking-wide uppercase">
+            Builder Tools
+          </p>
+
+          {import.meta.env.DEV ? (
+            <p className="text-muted-foreground/50 text-[10px]">dev</p>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex flex-1 flex-col gap-1.5">

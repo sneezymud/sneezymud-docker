@@ -94,8 +94,9 @@ export function LoginForm() {
       ) : null}
 
       <Button
-        className="w-full"
+        className="h-11 w-full"
         disabled={loading}
+        size="lg"
         type="submit"
       >
         {loading ? (
@@ -108,7 +109,7 @@ export function LoginForm() {
         )}
       </Button>
 
-      <p className="text-muted-foreground text-center text-xs">
+      <p className="text-muted-foreground bg-muted/40 border-muted-foreground/20 rounded border-l-2 px-3 py-2 text-xs">
         *Account must contain a character with builder permissions.
       </p>
     </form>
