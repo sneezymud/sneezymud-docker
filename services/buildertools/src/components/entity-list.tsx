@@ -62,6 +62,7 @@ const COLUMN_WIDTHS: Record<string, string> = {
 };
 
 interface EntityListItem {
+  metadata?: string;
   name: string;
   secondary?: string;
   vnum: number;
@@ -517,6 +518,12 @@ function EntityCardRow({
         <span className="text-foreground block text-sm">
           {entity.name || "(unnamed)"}
         </span>
+
+        {entity.metadata ? (
+          <span className="text-muted-foreground block text-xs">
+            {entity.metadata}
+          </span>
+        ) : null}
       </Link>
     </div>
   );
@@ -640,6 +647,7 @@ function matchEntity(item: EntityListItem, search: string): boolean {
   return (
     item.name.toLowerCase().includes(s) ||
     String(item.vnum).includes(search) ||
-    (item.secondary?.toLowerCase().includes(s) ?? false)
+    (item.secondary?.toLowerCase().includes(s) ?? false) ||
+    (item.metadata?.toLowerCase().includes(s) ?? false)
   );
 }

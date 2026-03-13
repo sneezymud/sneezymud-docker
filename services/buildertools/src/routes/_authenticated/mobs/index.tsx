@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { useEntityListMutations } from "@/hooks/use-entity-list-mutations.ts";
 import { apiFetch } from "@/shared/api-client.ts";
+import { RACE_TYPES } from "@/shared/enums/index.ts";
 import { hasPower, POWER } from "@/shared/powers.ts";
 import { mobKeys } from "@/shared/query-keys.ts";
 import { mobListSchema, mobSchema } from "@/shared/schemas/mob.ts";
@@ -71,6 +72,7 @@ function MobListPage() {
   }
 
   const entities = mobs.map((m) => ({
+    metadata: `Lvl ${m.level} / ${RACE_TYPES.find((r) => r.value === m.race)?.label ?? "Unknown"}`,
     name: m.short_desc || m.name,
     secondary: m.name,
     vnum: m.vnum,

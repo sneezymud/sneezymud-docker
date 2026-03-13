@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { useEntityListMutations } from "@/hooks/use-entity-list-mutations.ts";
 import { apiFetch } from "@/shared/api-client.ts";
+import { SECTOR_TYPES } from "@/shared/enums/index.ts";
 import { hasPower, POWER } from "@/shared/powers.ts";
 import { roomKeys } from "@/shared/query-keys.ts";
 import { roomListSchema, roomSchema } from "@/shared/schemas/room.ts";
@@ -72,10 +73,20 @@ function RoomListPage() {
     );
   }
 
+  const entities = rooms.map((r) => {
+    const item: { metadata?: string; name: string; vnum: number } = {
+      name: r.name,
+      vnum: r.vnum,
+    };
+    const sectorLabel = SECTOR_TYPES.find((s) => s.value === r.sector)?.label;
+    if (sectorLabel !== undefined) item.metadata = sectorLabel;
+    return item;
+  });
+
   const filtered =
     from !== undefined && to !== undefined
-      ? rooms.filter((r) => r.vnum >= from && r.vnum <= to)
-      : rooms;
+      ? entities.filter((e) => e.vnum >= from && e.vnum <= to)
+      : entities;
 
   return (
     <>

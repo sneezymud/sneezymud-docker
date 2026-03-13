@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { useEntityListMutations } from "@/hooks/use-entity-list-mutations.ts";
 import { apiFetch } from "@/shared/api-client.ts";
+import { ITEM_TYPES } from "@/shared/enums/index.ts";
 import { hasPower, POWER } from "@/shared/powers.ts";
 import { objectKeys } from "@/shared/query-keys.ts";
 import { objListSchema, objSchema } from "@/shared/schemas/obj.ts";
@@ -70,11 +71,21 @@ function ObjectListPage() {
     );
   }
 
-  const entities = objects.map((o) => ({
-    name: o.short_desc || o.name,
-    secondary: o.name,
-    vnum: o.vnum,
-  }));
+  const entities = objects.map((o) => {
+    const item: {
+      metadata?: string;
+      name: string;
+      secondary: string;
+      vnum: number;
+    } = {
+      name: o.short_desc || o.name,
+      secondary: o.name,
+      vnum: o.vnum,
+    };
+    const typeLabel = ITEM_TYPES.find((t) => t.value === o.type)?.label;
+    if (typeLabel !== undefined) item.metadata = typeLabel;
+    return item;
+  });
 
   const filtered =
     from !== undefined && to !== undefined
