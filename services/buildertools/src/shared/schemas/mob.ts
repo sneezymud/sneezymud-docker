@@ -125,7 +125,9 @@ export const mobInputSchema = mobSchema.extend({
 export type MobInput = z.infer<typeof mobInputSchema>;
 
 export const mobListItemSchema = z.object({
+  level: z.number(),
   name: z.string(),
+  race: z.number(),
   short_desc: z.string(),
   vnum: vnumSchema,
 });

@@ -27,7 +27,12 @@ export async function listObjects(
         );
 
   return immortalDb
-    .select({ name: obj.name, short_desc: obj.short_desc, vnum: obj.vnum })
+    .select({
+      name: obj.name,
+      short_desc: obj.short_desc,
+      type: obj.type,
+      vnum: obj.vnum,
+    })
     .from(obj)
     .where(and(ownerEq(obj.owner, scope), blockFilter))
     .orderBy(obj.vnum);

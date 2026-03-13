@@ -80,6 +80,7 @@ export type RoomInput = z.infer<typeof roomInputSchema>;
 
 export const roomListItemSchema = z.object({
   name: z.string(),
+  sector: z.number(),
   vnum: vnumSchema,
 });
 

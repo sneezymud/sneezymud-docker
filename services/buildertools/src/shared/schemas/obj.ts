@@ -76,6 +76,7 @@ export type ObjInput = z.infer<typeof objInputSchema>;
 export const objListItemSchema = z.object({
   name: z.string(),
   short_desc: z.string(),
+  type: z.number(),
   vnum: vnumSchema,
 });
 

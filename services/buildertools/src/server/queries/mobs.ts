@@ -27,7 +27,13 @@ export async function listMobs(
         );
 
   return immortalDb
-    .select({ name: mob.name, short_desc: mob.short_desc, vnum: mob.vnum })
+    .select({
+      level: mob.level,
+      name: mob.name,
+      race: mob.race,
+      short_desc: mob.short_desc,
+      vnum: mob.vnum,
+    })
     .from(mob)
     .where(and(ownerEq(mob.owner, scope), blockFilter))
     .orderBy(mob.vnum);

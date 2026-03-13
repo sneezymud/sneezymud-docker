@@ -18,7 +18,7 @@ export async function listRooms(
   }
 
   return immortalDb
-    .select({ name: room.name, vnum: room.vnum })
+    .select({ name: room.name, sector: room.sector, vnum: room.vnum })
     .from(room)
     .where(
       and(
