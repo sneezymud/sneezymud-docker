@@ -21,7 +21,7 @@ export const alertVariants = cva(
 );
 
 export const badgeVariants = cva(
-  "inline-flex items-center justify-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-primary/50 focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] duration-150 overflow-hidden",
+  "inline-flex items-center justify-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-primary/50 focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,border-color,box-shadow] duration-150 overflow-hidden",
   {
     defaultVariants: {
       variant: "default",
@@ -67,7 +67,7 @@ export const buttonVariants = cva(
       },
       variant: {
         default:
-          "bg-gradient-to-b from-primary to-primary/85 text-primary-foreground hover:from-primary/90 hover:to-primary/75 hover:shadow-md hover:shadow-primary/20 active:scale-[0.98] active:duration-200 disabled:bg-muted disabled:from-muted disabled:to-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none",
+          "bg-gradient-to-b from-primary to-primary/85 text-primary-foreground hover:from-primary/90 hover:to-primary/75 hover:shadow-md hover:shadow-primary/20 active:scale-[0.98] active:duration-200 disabled:shadow-none",
         destructive:
           "bg-gradient-to-b from-destructive to-destructive/85 text-destructive-foreground hover:from-destructive/90 hover:to-destructive/75 active:scale-[0.98] active:duration-200 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:from-destructive/60 dark:to-destructive/50",
         ghost:
@@ -75,6 +75,8 @@ export const buttonVariants = cva(
         inline: "text-primary hover:text-accent transition-colors duration-150",
         "inline-destructive":
           "text-destructive/80 hover:text-destructive transition-colors duration-150",
+        "inline-warning":
+          "text-warning/80 hover:text-warning transition-colors duration-150",
         link: "text-primary underline-offset-4 hover:underline",
         outline:
           "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
@@ -144,7 +146,7 @@ export const tabsListVariants = cva(
 );
 
 export const toggleVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium hover:bg-muted hover:text-muted-foreground disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 focus-visible:border-primary/50 focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none transition-[color,box-shadow] duration-150 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive whitespace-nowrap",
+  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium hover:bg-muted hover:text-muted-foreground disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 focus-visible:border-primary/50 focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none transition-[color,border-color,box-shadow] duration-150 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive whitespace-nowrap",
   {
     defaultVariants: {
       size: "default",
