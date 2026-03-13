@@ -1,5 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { FolderOpen, SearchX, Trash2 } from "lucide-react";
+import {
+  FolderOpen,
+  LayoutGrid,
+  LayoutList,
+  SearchX,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 
 import { MobileMenuButton } from "@/components/mobile-menu-button.tsx";
@@ -22,6 +28,32 @@ import { SearchInput } from "./search-input.tsx";
 import { SortableTableHeader } from "./sortable-table-header.tsx";
 import { TablePagination } from "./table-pagination.tsx";
 import { VnumPicker } from "./vnum-picker.tsx";
+
+type ListViewMode = "card" | "table";
+
+function isListViewMode(value: null | string): value is ListViewMode {
+  return value === "card" || value === "table";
+}
+
+function useListViewMode(): [ListViewMode, (mode: ListViewMode) => void] {
+  const [mode, setModeInternal] = useState<ListViewMode>(() => {
+    try {
+      const stored = localStorage.getItem("bt-list-view");
+      return isListViewMode(stored) ? stored : "table";
+    } catch {
+      return "table";
+    }
+  });
+  const setMode = (m: ListViewMode) => {
+    setModeInternal(m);
+    try {
+      localStorage.setItem("bt-list-view", m);
+    } catch {
+      // localStorage unavailable
+    }
+  };
+  return [mode, setMode];
+}
 
 const COLUMN_WIDTHS: Record<string, string> = {
   secondary: "hidden",
@@ -63,6 +95,7 @@ export function EntityList({
   vnumBlocks,
 }: EntityListProps) {
   const [showCreate, setShowCreate] = useState(false);
+  const [viewMode, setViewMode] = useListViewMode();
 
   const selectable = Boolean(onDeleteSelected);
   const columns = buildColumns(selectable, secondaryLabel);
@@ -119,6 +152,25 @@ export function EntityList({
           value={search}
         />
 
+        <Button
+          aria-label={
+            viewMode === "table"
+              ? "Switch to card view"
+              : "Switch to table view"
+          }
+          onClick={() => {
+            setViewMode(viewMode === "table" ? "card" : "table");
+          }}
+          size="icon-sm"
+          variant="ghost"
+        >
+          {viewMode === "table" ? (
+            <LayoutGrid className="h-4 w-4" />
+          ) : (
+            <LayoutList className="h-4 w-4" />
+          )}
+        </Button>
+
         {onCreateVnum && vnumBlocks ? (
           <VnumPicker
             allowAnyVnum={allowAnyVnum}
@@ -143,35 +195,39 @@ export function EntityList({
         />
       ) : null}
 
-      <DesktopTable
-        basePath={basePath}
-        canCreate={canCreate}
-        columns={columns}
-        label={label}
-        rows={rows}
-        searching={searching}
-        secondaryLabel={secondaryLabel}
-        selectable={selectable}
-        selectedIds={selectedIds}
-        setShowCreate={setShowCreate}
-        sorting={sorting}
-        toggleAllPageSelected={toggleAllPageSelected}
-        toggleSelected={toggleSelected}
-        toggleSort={toggleSort}
-      />
+      <div className={viewMode === "table" ? "block" : "hidden"}>
+        <DesktopTable
+          basePath={basePath}
+          canCreate={canCreate}
+          columns={columns}
+          label={label}
+          rows={rows}
+          searching={searching}
+          secondaryLabel={secondaryLabel}
+          selectable={selectable}
+          selectedIds={selectedIds}
+          setShowCreate={setShowCreate}
+          sorting={sorting}
+          toggleAllPageSelected={toggleAllPageSelected}
+          toggleSelected={toggleSelected}
+          toggleSort={toggleSort}
+        />
+      </div>
 
-      {/* <MobileCardList
-        basePath={basePath}
-        canCreate={canCreate}
-        label={label}
-        rows={rows}
-        searching={searching}
-        selectable={selectable}
-        selectedIds={selectedIds}
-        setShowCreate={setShowCreate}
-        toggleAllPageSelected={toggleAllPageSelected}
-        toggleSelected={toggleSelected}
-      /> */}
+      <div className={viewMode === "card" ? "block" : "hidden"}>
+        <MobileCardList
+          basePath={basePath}
+          canCreate={canCreate}
+          label={label}
+          rows={rows}
+          searching={searching}
+          selectable={selectable}
+          selectedIds={selectedIds}
+          setShowCreate={setShowCreate}
+          toggleAllPageSelected={toggleAllPageSelected}
+          toggleSelected={toggleSelected}
+        />
+      </div>
 
       <TablePagination
         canNextPage={canNextPage}
@@ -426,7 +482,7 @@ function DesktopTable({
   );
 }
 
-/* function EntityCardRow({
+function EntityCardRow({
   basePath,
   entity,
   isSelected,
@@ -464,9 +520,9 @@ function DesktopTable({
       </Link>
     </div>
   );
-} */
+}
 
-/* function MobileCardList({
+function MobileCardList({
   basePath,
   canCreate,
   label,
@@ -490,7 +546,7 @@ function DesktopTable({
   toggleSelected: (id: string, checked: boolean) => void;
 }) {
   return (
-    <div className="sm:hidden">
+    <div>
       {selectable ? (
         <div className="flex items-center gap-2 py-2">
           <SelectAllCheckbox
@@ -530,7 +586,7 @@ function DesktopTable({
       ) : null}
     </div>
   );
-} */
+}
 
 function buildColumns(
   selectable: boolean,
