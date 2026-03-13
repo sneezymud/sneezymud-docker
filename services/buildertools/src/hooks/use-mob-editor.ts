@@ -28,7 +28,7 @@ export function useMobEditor(vnumParam: string) {
 
   const { data: mobResponse } = useQuery({
     queryFn: () => apiFetch(`/api/mob-responses/${vnum}`, mobResponseSchema),
-    queryKey: ["mob-responses", vnum],
+    queryKey: mobKeys.response(vnum),
   });
 
   const [edits, setEdits] = useState<null | Partial<Mob>>(null);
