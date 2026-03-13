@@ -38,7 +38,7 @@ export function EntityHeader({
   const entityName = breadcrumbs.at(-1)?.label ?? "";
 
   return (
-    <div className="bg-background sticky top-0 z-10 mb-2 flex flex-col gap-1.5 py-1.5">
+    <div className="bg-background/80 sticky top-0 z-10 mb-2 flex flex-col gap-2 py-2.5 backdrop-blur-sm">
       {/* Mobile: back arrow + entity name + hamburger */}
 
       <div className="flex items-center gap-3 sm:hidden">
@@ -59,7 +59,7 @@ export function EntityHeader({
         {children}
       </div>
 
-      <div className="grid grid-cols-3 items-center gap-x-2">
+      <div className="flex items-center gap-2">
         <Button
           disabled={!dirty || saving}
           onClick={onSave}
@@ -68,26 +68,27 @@ export function EntityHeader({
           {saving ? <Loader2 className="animate-spin" /> : "Save"}
         </Button>
 
-        {onReset !== undefined && (
+        {onReset !== undefined && dirty && (
           <Button
-            disabled={!dirty}
+            className=""
             onClick={onReset}
             size="sm"
-            variant="secondary"
+            variant="inline-warning"
           >
-            Discard
+            Undo
           </Button>
         )}
 
         {onDelete !== undefined && (
           <>
             <Button
+              className="ml-auto"
               disabled={deletePending}
               onClick={() => {
                 setShowDeleteConfirm(true);
               }}
               size="sm"
-              variant="destructive"
+              variant="inline-destructive"
             >
               {deletePending ? <Loader2 className="animate-spin" /> : "Delete"}
             </Button>
