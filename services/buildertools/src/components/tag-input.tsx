@@ -49,8 +49,8 @@ export function TagInput({ id, onChange, value }: TagInputProps) {
   return (
     <label
       className={cn(
-        "border-input flex min-h-8.5 cursor-text flex-wrap items-center gap-1 rounded border bg-transparent px-2 py-1",
-        "focus-within:ring-ring focus-within:ring-offset-background focus-within:ring-2 focus-within:ring-offset-1",
+        "dark:bg-background/60 border-input flex min-h-8.5 cursor-text flex-wrap items-center gap-1 rounded-md border bg-transparent px-2 py-1 shadow-xs transition-[color,border-color,box-shadow] duration-150",
+        "focus-within:border-primary/50 focus-within:ring-ring/50 focus-within:ring-[3px]",
       )}
       htmlFor={id}
     >

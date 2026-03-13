@@ -104,7 +104,7 @@ export function BitfieldEditor({
                     <PopoverTrigger asChild>
                       <button
                         aria-label={`Info about ${entry.label}`}
-                        className="text-muted-foreground hover:text-foreground inline-flex cursor-help"
+                        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex cursor-help rounded-sm outline-none focus-visible:ring-[3px]"
                         type="button"
                       >
                         <Info
