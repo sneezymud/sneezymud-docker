@@ -32,6 +32,7 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
     handleDelete,
     handleFieldChange,
     handleSave,
+    handleSaveAndProceed,
     isError,
     isLoading,
     obj,
@@ -109,6 +110,8 @@ function ObjectEditorInner({ vnumParam }: { vnumParam: string }) {
       </EntityForm>
 
       <UnsavedChangesDialog
+        onSaveAndProceed={handleSaveAndProceed}
+        saving={saving}
         unsavedNavProceed={unsavedNavProceed}
         unsavedNavReset={unsavedNavReset}
         unsavedNavStatus={unsavedNavStatus}

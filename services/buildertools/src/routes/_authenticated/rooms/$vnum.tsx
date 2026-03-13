@@ -26,6 +26,7 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
     handleDelete,
     handleFieldChange,
     handleSave,
+    handleSaveAndProceed,
     isError,
     isLoading,
     originalValues,
@@ -101,6 +102,8 @@ function RoomEditorInner({ vnumParam }: { vnumParam: string }) {
       </EntityForm>
 
       <UnsavedChangesDialog
+        onSaveAndProceed={handleSaveAndProceed}
+        saving={saving}
         unsavedNavProceed={unsavedNavProceed}
         unsavedNavReset={unsavedNavReset}
         unsavedNavStatus={unsavedNavStatus}

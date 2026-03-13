@@ -95,6 +95,7 @@ function useMobResponseEditor(vnumParam: string) {
 
   const {
     handleSave,
+    handleSaveAndProceed,
     saving,
     unsavedNavProceed,
     unsavedNavReset,
@@ -119,6 +120,7 @@ function useMobResponseEditor(vnumParam: string) {
     dirty,
     error,
     handleSave,
+    handleSaveAndProceed,
     isError,
     isLoading,
     mobName,
@@ -137,6 +139,7 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
     dirty,
     error,
     handleSave,
+    handleSaveAndProceed,
     isError,
     isLoading,
     mobName,
@@ -228,6 +231,8 @@ function MobResponseEditorInner({ vnumParam }: { vnumParam: string }) {
       </div>
 
       <UnsavedChangesDialog
+        onSaveAndProceed={handleSaveAndProceed}
+        saving={saving}
         unsavedNavProceed={unsavedNavProceed}
         unsavedNavReset={unsavedNavReset}
         unsavedNavStatus={unsavedNavStatus}

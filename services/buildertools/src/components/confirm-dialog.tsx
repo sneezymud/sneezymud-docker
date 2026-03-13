@@ -10,7 +10,9 @@ import {
 } from "@/components/ui/alert-dialog.tsx";
 
 interface ConfirmDialogProps {
+  additionalActions?: React.ReactNode;
   confirmLabel?: string;
+  disabled?: boolean | undefined;
   message: string;
   onCancel: () => void;
   onConfirm: () => void;
@@ -20,7 +22,9 @@ interface ConfirmDialogProps {
 }
 
 export function ConfirmDialog({
+  additionalActions,
   confirmLabel = "Confirm",
+  disabled,
   message,
   onCancel,
   onConfirm,
@@ -45,9 +49,19 @@ export function ConfirmDialog({
         </AlertDialogHeader>
 
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
+          {additionalActions ? (
+            <div className="col-span-full">{additionalActions}</div>
+          ) : null}
+
+          <AlertDialogCancel
+            disabled={disabled}
+            onClick={onCancel}
+          >
+            Cancel
+          </AlertDialogCancel>
 
           <AlertDialogAction
+            disabled={disabled}
             onClick={onConfirm}
             variant={variant === "danger" ? "destructive" : "default"}
           >

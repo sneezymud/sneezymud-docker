@@ -79,6 +79,7 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
     handleDelete,
     handleFieldChange,
     handleSave,
+    handleSaveAndProceed,
     immEdits,
     isError,
     isLoading,
@@ -159,6 +160,8 @@ function MobEditorInner({ vnumParam }: { vnumParam: string }) {
       </EntityForm>
 
       <UnsavedChangesDialog
+        onSaveAndProceed={handleSaveAndProceed}
+        saving={saving}
         unsavedNavProceed={unsavedNavProceed}
         unsavedNavReset={unsavedNavReset}
         unsavedNavStatus={unsavedNavStatus}
