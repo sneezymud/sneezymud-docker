@@ -125,6 +125,22 @@ export function useEntityEditor<T>({
     saveMutation.mutate();
   };
 
+  const handleSaveAndProceed = async () => {
+    if (validate) {
+      const error = validate();
+      if (error) {
+        toastError(error);
+        return;
+      }
+    }
+    try {
+      await saveMutation.mutateAsync();
+      proceed?.();
+    } catch {
+      // onError handler in the mutation already shows the toast
+    }
+  };
+
   useKeyboardSave(handleSave, dirty && !saveMutation.isPending);
 
   return {
@@ -133,6 +149,7 @@ export function useEntityEditor<T>({
       deleteMutation.mutate();
     },
     handleSave,
+    handleSaveAndProceed,
     saving: saveMutation.isPending,
     unsavedNavProceed: proceed,
     unsavedNavReset: reset,
