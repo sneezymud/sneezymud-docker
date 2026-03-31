@@ -1,17 +1,17 @@
-import type { Extension } from "@codemirror/state";
-
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { useEffect, useRef } from "react";
 
-interface UseCodeMirrorOptions {
-  extensions: Extension[];
-  onChange: (value: string) => void;
-  onSave?: (() => void) | undefined;
-  value: string;
-}
+import { mobResponseLanguage } from "./mob-response-lang.ts";
+import { zincDarkHighlighting, zincDarkTheme } from "./theme.ts";
+
+const extensions = [
+  mobResponseLanguage,
+  zincDarkTheme,
+  zincDarkHighlighting,
+] as const;
 
 /**
  * Manages a CodeMirror EditorView lifecycle: creates on mount, syncs
@@ -19,11 +19,14 @@ interface UseCodeMirrorOptions {
  * Returns a ref to attach to the container div.
  */
 export function useCodeMirror({
-  extensions,
   onChange,
   onSave,
   value,
-}: UseCodeMirrorOptions) {
+}: {
+  onChange: (value: string) => void;
+  onSave?: (() => void) | undefined;
+  value: string;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -85,7 +88,7 @@ export function useCodeMirror({
       view.destroy();
       viewRef.current = null;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- extensions are stable on mount
+  }, []);
 
   // Sync external value changes into the editor
   useEffect(() => {

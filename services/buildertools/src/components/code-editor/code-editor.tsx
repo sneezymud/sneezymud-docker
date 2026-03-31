@@ -1,5 +1,3 @@
-import { mobResponseLanguage } from "./mob-response-lang.ts";
-import { zincDarkHighlighting, zincDarkTheme } from "./theme.ts";
 import { useCodeMirror } from "./use-codemirror.ts";
 
 interface CodeEditorProps {
@@ -8,11 +6,8 @@ interface CodeEditorProps {
   value: string;
 }
 
-const extensions = [mobResponseLanguage, zincDarkTheme, zincDarkHighlighting];
-
 export function CodeEditor({ onChange, onSave, value }: CodeEditorProps) {
   const containerRef = useCodeMirror({
-    extensions,
     onChange,
     onSave,
     value,
