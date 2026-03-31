@@ -15,12 +15,12 @@ export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
 }>()({
   component: () => (
-      <>
-        <Outlet />
-        <Toaster />
-        {/* {import.meta.env.DEV && <TanStackRouterDevtools />} */}
-      </>
-    ),
+    <>
+      <Outlet />
+      <Toaster />
+      {/* {import.meta.env.DEV && <TanStackRouterDevtools />} */}
+    </>
+  ),
   errorComponent: ({ error }) => (
     <div className="bg-background flex min-h-screen flex-col items-center justify-center gap-4">
       <Alert

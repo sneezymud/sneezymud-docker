@@ -25,7 +25,11 @@ import { maxComponentLines } from "./eslint-rules/max-component-lines";
 import { maxComponentSetup } from "./eslint-rules/max-component-setup";
 import { maxInlineData } from "./eslint-rules/max-inline-data";
 
-const e2eGlobs = ["**/{__tests__,tests}/e2e/**", "**/*.e2e?(.test).{ts,tsx}"];
+const e2eGlobs = [
+  "e2e/**",
+  "**/{__tests__,tests}/e2e/**",
+  "**/*.e2e?(.test).{ts,tsx}",
+];
 
 const config: Config = defineConfig([
   {
@@ -67,9 +71,9 @@ const config: Config = defineConfig([
     },
   },
 
-  // Certain config files require default exports
+  // Certain config files and Playwright setup/teardown require default exports
   {
-    files: ["**/*.config.ts"],
+    files: ["**/*.config.ts", "e2e/global-setup.ts", "e2e/global-teardown.ts"],
     rules: {
       "import-x/no-default-export": "off",
     },
@@ -216,8 +220,17 @@ const config: Config = defineConfig([
     ],
     ignores: e2eGlobs,
     rules: {
+      // jest-dom matchers (toBeInTheDocument, toBeDisabled, etc.) are not
+      // available in bun:test. Disable auto-fix rules that convert standard
+      // assertions to jest-dom equivalents.
+      "jest-dom/prefer-checked": "off",
+      "jest-dom/prefer-enabled-disabled": "off",
+      "jest-dom/prefer-in-document": "off",
+      "jest-dom/prefer-to-have-attribute": "off",
       // Currently broken when using ESLint 10
       "jest-dom/prefer-to-have-class": "off",
+      "jest-dom/prefer-to-have-text-content": "off",
+      "jest-dom/prefer-to-have-value": "off",
       // Not using Jest — this rule tries to detect the Jest package version
       "jest/no-deprecated-functions": "off",
     },
@@ -230,6 +243,11 @@ const config: Config = defineConfig([
   {
     extends: [playwright.configs["flat/recommended"]],
     files: e2eGlobs,
+    rules: {
+      // Playwright's `use` callback in fixtures triggers false positives
+      "@eslint-react/rules-of-hooks": "off",
+      "react-hooks/rules-of-hooks": "off",
+    },
   },
 
   regExp.recommended,

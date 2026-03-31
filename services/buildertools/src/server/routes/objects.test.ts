@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { sql } from "drizzle-orm";
 
+import { objSchema } from "@/shared/schemas/obj.ts";
+
 import { app } from "../app.ts";
 import { immortalDb, sneezyDb } from "../db.ts";
 import { authRequest, getAuthCookie } from "../test-helpers.ts";
@@ -13,13 +15,13 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 112, 113, 160, 161, 162, 165)`,
+    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 160, 161, 162, 165)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 112, 113, 160, 161, 162, 165)`,
+    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 160, 161, 162, 165)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM obj WHERE vnum IN (110, 111, 112, 113, 160, 161, 162, 165)`,
+    sql`DELETE FROM obj WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 160, 161, 162, 165)`,
   );
   await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum IN (5100, 5101)`);
 });
@@ -496,5 +498,77 @@ describe("delete cascades to child tables", () => {
     const body: unknown = await res.json();
     expect(body).toHaveProperty("affects", []);
     expect(body).toHaveProperty("extras", []);
+  });
+});
+
+// -- Update with change --
+
+describe("update preserves unchanged fields", () => {
+  test("changing type preserves affects and extras", async () => {
+    await authRequest(app, "/api/objects", cookie, {
+      body: JSON.stringify({ vnum: 114 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const sharedAffects = [{ mod1: 2, mod2: 0, type: 18, vnum: 114 }];
+    const sharedExtras = [
+      { description: "It glows faintly.", name: "glow light", vnum: 114 },
+    ];
+
+    // Save as weapon (type=5) with affects and extras
+    await authRequest(app, "/api/objects/114", cookie, {
+      body: JSON.stringify({
+        ...validObjUpdate,
+        affects: sharedAffects,
+        extras: sharedExtras,
+        name: "glowing blade",
+        short_desc: "a glowing blade",
+        type: 5,
+        vnum: 114,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    // Change to light (type=1), keep affects and extras
+    const putRes = await authRequest(app, "/api/objects/114", cookie, {
+      body: JSON.stringify({
+        ...validObjUpdate,
+        affects: sharedAffects,
+        extras: sharedExtras,
+        name: "glowing blade",
+        short_desc: "a glowing blade",
+        type: 1,
+        vnum: 114,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(putRes.status).toBe(200);
+
+    const res = await authRequest(app, "/api/objects/114", cookie);
+    const body: unknown = await res.json();
+    expect(body).toEqual(expect.objectContaining({ type: 1, vnum: 114 }));
+    expect(body).toHaveProperty(
+      "affects",
+      expect.arrayContaining([expect.objectContaining({ mod1: 2, type: 18 })]),
+    );
+    expect(body).toHaveProperty(
+      "extras",
+      expect.arrayContaining([expect.objectContaining({ name: "glow light" })]),
+    );
+  });
+});
+
+// -- Schema validation --
+
+describe("response schema validation", () => {
+  test("GET object response conforms to objSchema", async () => {
+    const res = await authRequest(app, "/api/objects/114", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    const parsed = objSchema.parse(body);
+    expect(parsed.vnum).toBe(114);
   });
 });

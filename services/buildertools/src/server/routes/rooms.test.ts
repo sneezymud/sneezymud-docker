@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { sql } from "drizzle-orm";
 
+import { roomSchema } from "@/shared/schemas/room.ts";
+
 import { app } from "../app.ts";
 import { immortalDb, sneezyDb } from "../db.ts";
 import { authRequest, getAuthCookie } from "../test-helpers.ts";
@@ -13,16 +15,37 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM roomextra WHERE vnum IN (100, 101, 102, 103, 150, 151, 152, 155)`,
+    sql`DELETE FROM roomextra WHERE vnum IN (100, 101, 102, 103, 104, 105, 106, 150, 151, 152, 155)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM roomexit WHERE vnum IN (100, 101, 102, 103, 150, 151, 152, 155)`,
+    sql`DELETE FROM roomexit WHERE vnum IN (100, 101, 102, 103, 104, 105, 106, 150, 151, 152, 155)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM room WHERE vnum IN (100, 101, 102, 103, 150, 151, 152, 155)`,
+    sql`DELETE FROM room WHERE vnum IN (100, 101, 102, 103, 104, 105, 106, 150, 151, 152, 155)`,
   );
   await sneezyDb.execute(sql`DELETE FROM room WHERE vnum IN (5000, 5001)`);
 });
+
+const validRoomUpdate = {
+  capacity: 0,
+  description: "",
+  exits: [],
+  extras: [],
+  height: -1,
+  name: "",
+  river_dir: 0,
+  river_speed: 0,
+  room_flag: 0,
+  sector: 0,
+  spec: 0,
+  telelook: 0,
+  teletarg: 0,
+  teletime: 0,
+  x: 0,
+  y: 0,
+  z: 0,
+  zone: 1,
+};
 
 // -- Auth enforcement --
 
@@ -637,5 +660,238 @@ describe("delete cascades to child tables", () => {
     const body: unknown = await res.json();
     expect(body).toHaveProperty("exits", []);
     expect(body).toHaveProperty("extras", []);
+  });
+});
+
+// -- Update with change --
+
+describe("update preserves unchanged fields", () => {
+  test("changing description preserves exits", async () => {
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: 104 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const twoExits = [
+      {
+        block: 0,
+        condition_flag: 0,
+        description: "A passage north.",
+        destination: 100,
+        direction: 0,
+        key_num: -1,
+        lock_difficulty: 0,
+        name: "",
+        type: 0,
+        vnum: 104,
+        weight: 0,
+      },
+      {
+        block: 0,
+        condition_flag: 0,
+        description: "A passage south.",
+        destination: 101,
+        direction: 2,
+        key_num: -1,
+        lock_difficulty: 0,
+        name: "",
+        type: 0,
+        vnum: 104,
+        weight: 0,
+      },
+    ];
+
+    // Save with description="old" and 2 exits
+    await authRequest(app, "/api/rooms/104", cookie, {
+      body: JSON.stringify({
+        ...validRoomUpdate,
+        description: "old",
+        exits: twoExits,
+        name: "Test Room",
+        vnum: 104,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    // Save with description="new" and same exits
+    const putRes = await authRequest(app, "/api/rooms/104", cookie, {
+      body: JSON.stringify({
+        ...validRoomUpdate,
+        description: "new",
+        exits: twoExits,
+        name: "Test Room",
+        vnum: 104,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(putRes.status).toBe(200);
+
+    const res = await authRequest(app, "/api/rooms/104", cookie);
+    const body: unknown = await res.json();
+    expect(body).toEqual(
+      expect.objectContaining({ description: "new", vnum: 104 }),
+    );
+    expect(body).toHaveProperty(
+      "exits",
+      expect.arrayContaining([
+        expect.objectContaining({ destination: 100, direction: 0 }),
+        expect.objectContaining({ destination: 101, direction: 2 }),
+      ]),
+    );
+  });
+});
+
+// -- Idempotency --
+
+describe("save idempotency", () => {
+  test("saving the same payload twice produces correct data", async () => {
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: 105 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const payload = {
+      ...validRoomUpdate,
+      exits: [
+        {
+          block: 0,
+          condition_flag: 0,
+          description: "",
+          destination: 100,
+          direction: 0,
+          key_num: -1,
+          lock_difficulty: 0,
+          name: "north door",
+          type: 1,
+          vnum: 105,
+          weight: 0,
+        },
+      ],
+      name: "Idempotent Room",
+      vnum: 105,
+    };
+
+    // Save twice
+    await authRequest(app, "/api/rooms/105", cookie, {
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    const secondPut = await authRequest(app, "/api/rooms/105", cookie, {
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(secondPut.status).toBe(200);
+
+    const res = await authRequest(app, "/api/rooms/105", cookie);
+    const body: unknown = await res.json();
+    expect(body).toEqual(
+      expect.objectContaining({ name: "Idempotent Room", vnum: 105 }),
+    );
+    expect(body).toHaveProperty("exits", [
+      expect.objectContaining({ name: "north door" }),
+    ]);
+  });
+});
+
+// -- Schema validation --
+
+describe("response schema validation", () => {
+  test("GET room response conforms to roomSchema", async () => {
+    const res = await authRequest(app, "/api/rooms/104", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    const parsed = roomSchema.parse(body);
+    expect(parsed.vnum).toBe(104);
+  });
+});
+
+// -- Coordinate derivation --
+
+describe("room coordinate derivation from exit source", () => {
+  test("new room derives coordinates from incoming exit", async () => {
+    // Set room 104's coordinates to a known value
+    await authRequest(app, "/api/rooms/104", cookie, {
+      body: JSON.stringify({
+        ...validRoomUpdate,
+        description: "source room",
+        exits: [
+          {
+            block: 1,
+            condition_flag: 0,
+            description: "",
+            destination: 106,
+            direction: 0, // North
+            key_num: -1,
+            lock_difficulty: 0,
+            name: "",
+            type: 0,
+            vnum: 104,
+            weight: 0,
+          },
+        ],
+        vnum: 104,
+        x: 10,
+        y: 20,
+        z: 5,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    // Create room 106 - should derive coords from room 104's north exit
+    // North = direction 0 = offset {x:0, y:1, z:0}
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: 106 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const res = await authRequest(app, "/api/rooms/106", cookie);
+    const body: unknown = await res.json();
+    expect(body).toEqual(
+      expect.objectContaining({
+        x: 10,
+        y: 21, // 20 + 1 (north offset)
+        z: 5,
+      }),
+    );
+  });
+});
+
+// -- Search pagination --
+
+describe("room search pagination", () => {
+  test("search returns at most 20 results", async () => {
+    // Insert 25 rooms in the sneezy database with matching names
+    // (sneezy rooms don't require block access for search)
+    for (let i = 0; i < 25; i++) {
+      const vnum = 6000 + i;
+      await sneezyDb.execute(sql`
+        INSERT IGNORE INTO room (vnum, name, x, y, z, description, zone, room_flag, sector, teletime, teletarg, telelook, river_speed, river_dir, capacity, height, spec)
+        VALUES (${vnum}, ${"PaginationTestRoom " + String(i)}, 0, 0, 0, '', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+      `);
+    }
+
+    const res = await authRequest(
+      app,
+      "/api/rooms/search?q=PaginationTestRoom",
+      cookie,
+    );
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(Array.isArray(body)).toBe(true);
+    if (!Array.isArray(body)) throw new Error("expected array");
+    expect(body.length).toBeLessThanOrEqual(20);
+
+    // Clean up
+    for (let i = 0; i < 25; i++) {
+      await sneezyDb.execute(sql`DELETE FROM room WHERE vnum = ${6000 + i}`);
+    }
   });
 });

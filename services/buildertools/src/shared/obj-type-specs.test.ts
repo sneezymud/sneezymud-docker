@@ -224,3 +224,102 @@ describe("expandTypeValues", () => {
     expect(result).toEqual({});
   });
 });
+
+// ---- Round-trip: expand and repack ----
+
+// Helper: repack expanded values back into raw val0-val3.
+// val is always 0-3 (validated by spec construction), so array accesses are safe.
+function repack(
+  spec: {
+    fields: Array<{
+      key: string;
+      source: { highBit?: number; numBits?: number; val: 0 | 1 | 2 | 3 };
+    }>;
+  },
+  expanded: Record<string, number>,
+): [number, number, number, number] {
+  const raw: [number, number, number, number] = [0, 0, 0, 0];
+  for (const field of spec.fields) {
+    const value = expanded[field.key] ?? 0;
+    raw[field.source.val] =
+      field.source.highBit !== undefined && field.source.numBits !== undefined
+        ? setBits(
+            raw[field.source.val],
+            field.source.highBit,
+            field.source.numBits,
+            value,
+          )
+        : value;
+  }
+  return raw;
+}
+
+describe("round-trip: expand and repack", () => {
+  test("weapon round-trip preserves all 10 sub-fields", () => {
+    const spec = requireSpec(5);
+    const val0 = 200 | (100 << 8); // curSharp=200, maxSharp=100
+    const val1 = 50 | (30 << 8); // damLvl=50, damDev=30
+    const val2 = 1 | (2 << 8) | (3 << 16) | (4 << 24);
+    const val3 = 5 | (6 << 8);
+    const original: [number, number, number, number] = [val0, val1, val2, val3];
+
+    const expanded = expandTypeValues(spec, original);
+    const repacked = repack(spec, expanded);
+
+    expect(repacked).toEqual(original);
+  });
+
+  test("container round-trip preserves 3-field bit-packed val1", () => {
+    const spec = requireSpec(15);
+    const val1 = 5 | (3 << 16) | (10 << 24); // flags=5, trapType=3, trapDam=10
+    const original: [number, number, number, number] = [500, val1, 1001, 3000];
+
+    const expanded = expandTypeValues(spec, original);
+    const repacked = repack(spec, expanded);
+
+    expect(repacked).toEqual(original);
+  });
+
+  test("egg round-trip preserves bit 31 (eggTouched)", () => {
+    const spec = requireSpec(65);
+    const val0 = 15 | (1 << 31); // fillHours=15, eggTouched=1
+    const original: [number, number, number, number] = [val0, 200, 1234, 0];
+
+    const expanded = expandTypeValues(spec, original);
+    const repacked = repack(spec, expanded);
+
+    expect(repacked).toEqual(original);
+  });
+
+  test("systematic all-types round-trip at max range", () => {
+    for (let type = 0; type <= 76; type++) {
+      const spec = getObjTypeSpec(type);
+      if (!spec || spec.fields.length === 0) continue;
+
+      // Build max-value raw vals: set each bit-packed field to its max
+      const raw: [number, number, number, number] = [0, 0, 0, 0];
+      for (const field of spec.fields) {
+        const maxVal =
+          field.source.highBit !== undefined &&
+          field.source.numBits !== undefined
+            ? (1 << field.source.numBits) - 1
+            : 255; // arbitrary for whole-val fields
+        raw[field.source.val] =
+          field.source.highBit !== undefined &&
+          field.source.numBits !== undefined
+            ? setBits(
+                raw[field.source.val],
+                field.source.highBit,
+                field.source.numBits,
+                maxVal,
+              )
+            : maxVal;
+      }
+
+      const expanded = expandTypeValues(spec, raw);
+      const repacked = repack(spec, expanded);
+
+      expect(repacked).toEqual(raw);
+    }
+  });
+});

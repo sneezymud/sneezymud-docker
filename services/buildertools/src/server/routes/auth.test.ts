@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 import { app } from "../app.ts";
-import { extractCookie, noBlocksUser, testUser } from "../test-helpers.ts";
+import {
+  extractCookie,
+  noBlocksUser,
+  nonBuilderUser,
+  testUser,
+} from "../test-helpers.ts";
 
 function loginRequest(body: Record<string, unknown>) {
   return app.request("/api/auth/login", {
@@ -75,6 +80,24 @@ describe("POST /api/auth/login", () => {
         blocks: [],
         playerName: noBlocksUser.playerName,
       }),
+    );
+  });
+
+  test("user without POWER_BUILDER gets 403 with player name in message", async () => {
+    const res = await loginRequest({
+      password: nonBuilderUser.password,
+      username: nonBuilderUser.username,
+    });
+
+    expect(res.status).toBe(403);
+    const body: unknown = await res.json();
+    expect(body).toHaveProperty(
+      "error",
+      expect.stringContaining(nonBuilderUser.playerName),
+    );
+    expect(body).toHaveProperty(
+      "error",
+      expect.stringContaining("does not have builder access"),
     );
   });
 });

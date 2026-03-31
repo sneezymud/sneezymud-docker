@@ -1,10 +1,16 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { eq, sql } from "drizzle-orm";
 
+import { mobSchema } from "@/shared/schemas/mob.ts";
+
 import { app } from "../app.ts";
 import { immortalDb } from "../db.ts";
 import { mob } from "../schema/immortal.ts";
-import { authRequest, getAuthCookie } from "../test-helpers.ts";
+import {
+  authRequest,
+  getAuthCookie,
+  getLowOnlyAuthCookie,
+} from "../test-helpers.ts";
 
 let cookie: string;
 
@@ -14,16 +20,16 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM mob_extra WHERE vnum IN (120, 121, 170, 171, 172, 175, 176, 177, 178)`,
+    sql`DELETE FROM mob_extra WHERE vnum IN (120, 121, 170, 171, 172, 175, 176, 177, 178, 180, 181, 300)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mob_imm WHERE vnum IN (120, 121, 170, 171, 172, 175, 176, 177, 178)`,
+    sql`DELETE FROM mob_imm WHERE vnum IN (120, 121, 170, 171, 172, 175, 176, 177, 178, 180, 181, 300)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mobresponses WHERE vnum IN (120, 121, 170, 171, 172, 175, 176, 177, 178)`,
+    sql`DELETE FROM mobresponses WHERE vnum IN (120, 121, 170, 171, 172, 175, 176, 177, 178, 180, 181, 300)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mob WHERE vnum IN (120, 121, 170, 171, 172, 175, 176, 177, 178)`,
+    sql`DELETE FROM mob WHERE vnum IN (120, 121, 170, 171, 172, 175, 176, 177, 178, 180, 181, 300)`,
   );
 });
 
@@ -497,5 +503,150 @@ describe("delete cascades to child tables", () => {
     const body: unknown = await res.json();
     expect(body).toHaveProperty("extras", []);
     expect(body).toHaveProperty("immunities", []);
+  });
+});
+
+// Valid mob payload that satisfies mobInputSchema (non-empty required strings)
+const validMobInput = {
+  ...validMobUpdate,
+  description: "A mob.",
+  long_desc: "A mob stands here.",
+  name: "mob",
+  short_desc: "a mob",
+};
+
+// -- Update with change --
+
+describe("update preserves unchanged fields", () => {
+  test("changing name preserves level", async () => {
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum: 180 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    // Set name="guard" and level=50
+    await authRequest(app, "/api/mobs/180", cookie, {
+      body: JSON.stringify({
+        ...validMobInput,
+        level: 50,
+        name: "guard",
+        vnum: 180,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    // Change name to "merchant", keep level=50
+    const putRes = await authRequest(app, "/api/mobs/180", cookie, {
+      body: JSON.stringify({
+        ...validMobInput,
+        level: 50,
+        name: "merchant",
+        vnum: 180,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(putRes.status).toBe(200);
+
+    const res = await authRequest(app, "/api/mobs/180", cookie);
+    const body: unknown = await res.json();
+    expect(body).toEqual(
+      expect.objectContaining({ level: 50, name: "merchant", vnum: 180 }),
+    );
+  });
+});
+
+// -- Idempotency --
+
+describe("save idempotency", () => {
+  test("saving the same payload twice produces correct data", async () => {
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum: 181 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const payload = {
+      ...validMobInput,
+      extras: [
+        { description: "A scarred face.", keyword: "bamfin", vnum: 181 },
+      ],
+      immunities: [{ amt: 75, type: 3, vnum: 181 }],
+      name: "scarred warrior",
+      vnum: 181,
+    };
+
+    // Save twice
+    await authRequest(app, "/api/mobs/181", cookie, {
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    const secondPut = await authRequest(app, "/api/mobs/181", cookie, {
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(secondPut.status).toBe(200);
+
+    const res = await authRequest(app, "/api/mobs/181", cookie);
+    const body: unknown = await res.json();
+    expect(body).toEqual(
+      expect.objectContaining({ name: "scarred warrior", vnum: 181 }),
+    );
+    expect(body).toHaveProperty("extras", [
+      expect.objectContaining({
+        description: "A scarred face.",
+        keyword: "bamfin",
+      }),
+    ]);
+    expect(body).toHaveProperty("immunities", [
+      expect.objectContaining({ amt: 75, type: 3 }),
+    ]);
+  });
+});
+
+// -- Schema validation --
+
+describe("response schema validation", () => {
+  test("GET mob response conforms to mobSchema", async () => {
+    const res = await authRequest(app, "/api/mobs/180", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    const parsed = mobSchema.parse(body);
+    expect(parsed.vnum).toBe(180);
+  });
+});
+
+// -- Empty state --
+
+describe("empty state for builder with no mobs", () => {
+  let lowCookie: string;
+
+  beforeAll(async () => {
+    lowCookie = await getLowOnlyAuthCookie(app);
+  });
+
+  test("listing mobs returns empty array when none exist", async () => {
+    const res = await authRequest(app, "/api/mobs", lowCookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual([]);
+  });
+
+  test("listing mobs returns empty array after create-then-delete", async () => {
+    await authRequest(app, "/api/mobs", lowCookie, {
+      body: JSON.stringify({ vnum: 300 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(app, "/api/mobs/300", lowCookie, { method: "DELETE" });
+
+    const res = await authRequest(app, "/api/mobs", lowCookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual([]);
   });
 });

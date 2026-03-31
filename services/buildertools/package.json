@@ -17,6 +17,7 @@
     "@eslint/js": "^10.0.1",
     "@fontsource-variable/crimson-pro": "^5.2.8",
     "@fontsource-variable/inter": "^5.2.8",
+    "@happy-dom/global-registrator": "^20.8.9",
     "@lezer/highlight": "^1.2.3",
     "@playwright/test": "^1.58.2",
     "@prettier/plugin-xml": "^3.4.2",
@@ -57,6 +58,7 @@
     "eslint-plugin-regexp": "^3.1.0",
     "eslint-plugin-testing-library": "^7.16.2",
     "eslint-plugin-unicorn": "^64.0.0",
+    "happy-dom": "^20.8.9",
     "immer": "^11.1.4",
     "lucide-react": "^1.7.0",
     "prettier": "^3.8.1",
@@ -92,7 +94,8 @@
     "lint": "bun --bun eslint .",
     "lint:fix": "bun --bun eslint . --fix",
     "start": "NODE_ENV=production bun src/server/index.ts",
-    "test": "bun test --preload ./src/server/test-preload.ts",
+    "test": "bun test --preload ./src/server/test-preload.ts src/server/ src/shared/ src/lib/ src/hooks/",
+    "test:components": "bun test --preload ./src/test-preload-dom.ts .test.tsx",
     "typecheck": "tsc"
   },
   "trustedDependencies": [

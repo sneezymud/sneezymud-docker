@@ -39,6 +39,11 @@ const OTHER_PASSWORD_HASH = "otICdK6ofe";
 const EXPANDED_PASSWORD_HASH = "exYn.2flu9";
 // crypt("testpass", "lowonlybuilder") truncated to 10 chars
 const LOW_ONLY_PASSWORD_HASH = "loY9DFizWb";
+// crypt("testpass", "nonbuilder") truncated to 10 chars
+// NOTE: DES crypt uses only the first 2 chars of the salt, so "nonbuilder" and
+// "noblocks" both resolve to salt "no" - the hashes are identical. This is fine:
+// login queries by username, so the two accounts remain distinct.
+const NONBUILDER_PASSWORD_HASH = "noA/WtpIgY";
 
 // Truncate all content tables in both databases
 await immortalDb.execute(sql`DELETE FROM roomextra`);
@@ -161,6 +166,23 @@ for (const power of [1, 3, 5, 7, 10, 29, 63]) {
     sql`INSERT INTO wizpower (player_id, wizpower) VALUES (99995, ${power})`,
   );
 }
+
+// Seed nonbuilder test user (account 99994 - valid credentials, wizdata row, but NO POWER_BUILDER)
+await sneezyDb.execute(sql`
+  INSERT INTO account (account_id, name, passwd)
+  VALUES (99994, 'nonbuilder', ${NONBUILDER_PASSWORD_HASH})
+`);
+await sneezyDb.execute(sql`
+  INSERT INTO player (id, account_id, name)
+  VALUES (99994, 99994, 'NonBuilder')
+`);
+await sneezyDb.execute(sql`
+  INSERT INTO wizdata (player_id, setsev, blockastart, blockaend, blockbstart, blockbend)
+  VALUES (99994, 0, 0, 0, 0, 0)
+`);
+// nonbuilder: NO powers at all (specifically no POWER_BUILDER=29)
+// The wizdata row is critical - authenticateBuilder does INNER JOIN wizdata,
+// so without it the query returns no rows and hits not_found instead of not_immortal.
 
 // Clean up connection pools when all test files finish
 process.on("beforeExit", () => {

@@ -7,3 +7,5 @@ output/
 .eslintcache
 *.tsbuildinfo
 .artifacts/
+test-results/
+playwright-report/

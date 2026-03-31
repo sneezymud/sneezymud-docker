@@ -86,6 +86,14 @@ export const noBlocksUser = {
   username: "noblocks",
 };
 
+// Non-builder user: has account + wizdata but NO POWER_BUILDER
+// Used to test the not_immortal auth rejection path
+export const nonBuilderUser = {
+  password: "testpass",
+  playerName: "NonBuilder",
+  username: "nonbuilder",
+};
+
 const TEST_PASSWORD = "testpass";
 
 /**
@@ -196,6 +204,25 @@ export async function getNoBlocksAuthCookie(app: Hono): Promise<string> {
     throw new Error(`Login failed (${res.status}): ${await res.text()}`);
   }
   return cookie;
+}
+
+/**
+ * Attempt login as the non-builder user. This user lacks POWER_BUILDER
+ * so login should return 403 - this helper returns the Response directly
+ * rather than extracting a cookie.
+ */
+export async function loginAsNonBuilder(app: Hono): Promise<Response> {
+  return app.request("/api/auth/login", {
+    body: JSON.stringify({
+      password: nonBuilderUser.password,
+      username: nonBuilderUser.username,
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      "X-Requested-With": "XMLHttpRequest",
+    },
+    method: "POST",
+  });
 }
 
 /**
