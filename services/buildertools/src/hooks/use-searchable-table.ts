@@ -36,7 +36,7 @@ export function useSearchableTable<T>({
   pageSize?: number | undefined;
 }) {
   const [search, setSearch] = useState("");
-  const [sorting, setSorting] = useState<SortState>(defaultSort);
+  const [sorting, setSorting] = useState(defaultSort);
   const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({});
   const [pageIndex, setPageIndex] = useState(0);
   const deferredSearch = useDeferredValue(search);

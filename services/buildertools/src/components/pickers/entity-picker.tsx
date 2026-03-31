@@ -333,12 +333,12 @@ function PickerResults({
 }
 
 function EntityPreview({ type, value }: { type: EntityType; value: number }) {
-  const { nameFn, nameKeyFn, route } = entityConfigs[type];
+  const config = entityConfigs[type];
 
   const { data } = useQuery({
     enabled: value > 0,
-    queryFn: () => nameFn(value),
-    queryKey: nameKeyFn(value),
+    queryFn: () => config.nameFn(value),
+    queryKey: config.nameKeyFn(value),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -348,7 +348,7 @@ function EntityPreview({ type, value }: { type: EntityType; value: number }) {
     <Link
       className="text-muted-foreground hover:text-foreground mt-0.5 block truncate text-xs"
       params={{ vnum: String(value) }}
-      to={route}
+      to={config.route}
     >
       {data.name}
     </Link>
