@@ -14,7 +14,13 @@ import { Toaster } from "@/components/ui/sonner.tsx";
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
 }>()({
-  component: RootLayout,
+  component: () => (
+      <>
+        <Outlet />
+        <Toaster />
+        {/* {import.meta.env.DEV && <TanStackRouterDevtools />} */}
+      </>
+    ),
   errorComponent: ({ error }) => (
     <div className="bg-background flex min-h-screen flex-col items-center justify-center gap-4">
       <Alert
@@ -53,13 +59,3 @@ export const Route = createRootRouteWithContext<{
     </div>
   ),
 });
-
-function RootLayout() {
-  return (
-    <>
-      <Outlet />
-      <Toaster />
-      {/* {import.meta.env.DEV && <TanStackRouterDevtools />} */}
-    </>
-  );
-}

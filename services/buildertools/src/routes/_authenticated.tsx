@@ -44,7 +44,61 @@ export const Route = createFileRoute("/_authenticated")({
       }
     }
   },
-  component: AuthenticatedLayout,
+
+  component: function AuthenticatedLayout() {
+    const sidebarOpen = useSidebarStore((s) => s.open);
+    const closeSidebar = useSidebarStore((s) => s.close);
+    const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+    useEffect(() => {
+      saveLastSection(pathname);
+    }, [pathname]);
+
+    return (
+      <div className="bg-background flex h-screen">
+        <a
+          className="focus:bg-accent sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded focus:px-4 focus:py-2 focus:text-sm focus:text-white"
+          href="#main-content"
+        >
+          Skip to content
+        </a>
+
+        {/* Desktop sidebar */}
+        <Nav className="sticky top-0 hidden h-screen overflow-y-auto border-r lg:flex" />
+        {/* Mobile sidebar */}
+
+        <Sheet
+          onOpenChange={(isOpen) => {
+            if (!isOpen) closeSidebar();
+          }}
+          open={sidebarOpen}
+        >
+          <SheetContent
+            className="w-56 p-0"
+            showCloseButton={false}
+            side="left"
+          >
+            <SheetTitle className="sr-only">Navigation</SheetTitle>
+
+            <Nav
+              className="flex h-full border-r-0"
+              onNavClick={closeSidebar}
+            />
+          </SheetContent>
+        </Sheet>
+
+        <main
+          className="min-w-0 flex-1 overflow-y-auto px-3 pb-6"
+          id="main-content"
+        >
+          <div className="max-w-90 pt-3 transition-opacity duration-100">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    );
+  },
+
   notFoundComponent: () => (
     <div className="text-muted-foreground flex flex-col items-center gap-4 py-16">
       <p>Page not found</p>
@@ -58,57 +112,3 @@ export const Route = createFileRoute("/_authenticated")({
     </div>
   ),
 });
-
-function AuthenticatedLayout() {
-  const sidebarOpen = useSidebarStore((s) => s.open);
-  const closeSidebar = useSidebarStore((s) => s.close);
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-
-  useEffect(() => {
-    saveLastSection(pathname);
-  }, [pathname]);
-
-  return (
-    <div className="bg-background flex h-screen">
-      <a
-        className="focus:bg-accent sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded focus:px-4 focus:py-2 focus:text-sm focus:text-white"
-        href="#main-content"
-      >
-        Skip to content
-      </a>
-
-      {/* Desktop sidebar */}
-      <Nav className="sticky top-0 hidden h-screen overflow-y-auto border-r lg:flex" />
-      {/* Mobile sidebar */}
-
-      <Sheet
-        onOpenChange={(isOpen) => {
-          if (!isOpen) closeSidebar();
-        }}
-        open={sidebarOpen}
-      >
-        <SheetContent
-          className="w-56 p-0"
-          showCloseButton={false}
-          side="left"
-        >
-          <SheetTitle className="sr-only">Navigation</SheetTitle>
-
-          <Nav
-            className="flex h-full border-r-0"
-            onNavClick={closeSidebar}
-          />
-        </SheetContent>
-      </Sheet>
-
-      <main
-        className="min-w-0 flex-1 overflow-y-auto px-3 pb-6"
-        id="main-content"
-      >
-        <div className="max-w-90 pt-3 transition-opacity duration-100">
-          <Outlet />
-        </div>
-      </main>
-    </div>
-  );
-}

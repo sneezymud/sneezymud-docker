@@ -12,28 +12,24 @@ export const Route = createFileRoute("/login")({
       throw redirect({ to: "/" });
     }
   },
-  component: LoginPage,
-});
+  component: () => (
+      <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_center,oklch(0.22_0.015_240)_0%,oklch(0.15_0.01_250)_70%)] p-4">
+        <div className="flex w-full max-w-sm flex-col items-center gap-6">
+          <div className="flex flex-col items-center gap-2">
+            <SneezyLogo className="h-12 w-12" />
+            <h1 className="font-brand text-3xl font-bold">SneezyMUD</h1>
 
-function LoginPage() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_center,oklch(0.22_0.015_240)_0%,oklch(0.15_0.01_250)_70%)] p-4">
-      <div className="flex w-full max-w-sm flex-col items-center gap-6">
-        <div className="flex flex-col items-center gap-2">
-          <SneezyLogo className="h-12 w-12" />
-          <h1 className="font-brand text-3xl font-bold">SneezyMUD</h1>
+            <p className="text-muted-foreground text-sm">
+              Content creation tools for builders
+            </p>
+          </div>
 
-          <p className="text-muted-foreground text-sm">
-            Content creation tools for builders
-          </p>
+          <Card className="border-t-primary/60 w-full border-t-2 px-8 py-10 shadow-lg shadow-black/25">
+            <CardContent>
+              <LoginForm />
+            </CardContent>
+          </Card>
         </div>
-
-        <Card className="border-t-primary/60 w-full border-t-2 px-8 py-10 shadow-lg shadow-black/25">
-          <CardContent>
-            <LoginForm />
-          </CardContent>
-        </Card>
       </div>
-    </div>
-  );
-}
+    ),
+});
