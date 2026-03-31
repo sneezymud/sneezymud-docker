@@ -1,4 +1,4 @@
-import eslintComments from "@eslint-community/eslint-plugin-eslint-comments/configs";
+import { recommended as eslintComments } from "@eslint-community/eslint-plugin-eslint-comments/configs";
 import eslintReact from "@eslint-react/eslint-plugin";
 import eslint from "@eslint/js";
 import tanstackQuery from "@tanstack/eslint-plugin-query";
@@ -32,26 +32,34 @@ const config: Config = defineConfig([
     ignores: [
       "**/node_modules/**",
       "output/**",
-      ".artifacts/**",
+      "**/.artifacts/**",
       "src/routeTree.gen.ts",
+      "**/.cache/**",
     ],
   },
 
   {
     extends: [eslint.configs.recommended],
     rules: {
+      // Keep arrow functions as concise as possible
       "arrow-body-style": "warn",
+
+      // Always use curely braces for safety/consistency
       curly: ["warn", "all"],
+
+      // Prefer arrow functions for callbacks only
       "prefer-arrow-callback": ["warn"],
     },
   },
 
   {
     plugins: {
-      // @ts-expect-error - https://github.com/un-ts/eslint-plugin-import-x/issues/203
       "import-x": importX,
     },
     rules: {
+      // Currently broken
+      //"import-x/no-cycle": "error",
+      // Prefer named exports in general
       "import-x/no-default-export": "error",
       "import-x/no-duplicates": "error",
       "import-x/no-named-as-default": "error",
@@ -59,6 +67,7 @@ const config: Config = defineConfig([
     },
   },
 
+  // Certain config files require default exports
   {
     files: ["**/*.config.ts"],
     rules: {
@@ -69,6 +78,8 @@ const config: Config = defineConfig([
   {
     extends: [perfectionist["recommended-natural"]],
     rules: {
+      // Sort modules in order of usage for better reasonability. Use natural
+      // sort order otherwise.
       "perfectionist/sort-modules": [
         "error",
         {
@@ -84,6 +95,7 @@ const config: Config = defineConfig([
       "unicorn/filename-case": "off",
       "unicorn/no-array-callback-reference": "off",
       "unicorn/no-array-reduce": "off",
+      // Some libraries use null intentionally
       "unicorn/no-null": "off",
       // Certain libraries like TanStack query/router use undefined intentionally
       "unicorn/no-useless-undefined": ["error", { checkArguments: false }],
@@ -190,23 +202,6 @@ const config: Config = defineConfig([
       tanstackRouter.configs["flat/recommended"],
     ],
     files: ["**/*.{jsx,tsx,ts,js}"],
-    rules: {
-      "react-refresh/only-export-components": [
-        "error",
-        {
-          allowConstantExport: true,
-        },
-      ],
-    },
-  },
-
-  {
-    files: ["src/routes/**/*.tsx"],
-    rules: {
-      // TanStack Router's Vite plugin handles HMR for route files via its own
-      // import.meta.hot.accept() handler — React Fast Refresh is not involved
-      "react-refresh/only-export-components": "off",
-    },
   },
 
   {
@@ -221,6 +216,8 @@ const config: Config = defineConfig([
     ],
     ignores: e2eGlobs,
     rules: {
+      // Currently broken when using ESLint 10
+      "jest-dom/prefer-to-have-class": "off",
       // Not using Jest — this rule tries to detect the Jest package version
       "jest/no-deprecated-functions": "off",
     },
@@ -237,7 +234,15 @@ const config: Config = defineConfig([
 
   regExp.recommended,
 
-  eslintComments.recommended,
+  {
+    extends: [eslintComments],
+    rules: {
+      "@eslint-community/eslint-comments/disable-enable-pair": [
+        "error",
+        { allowWholeFile: true },
+      ],
+    },
+  },
 
   prettier,
 ]);
