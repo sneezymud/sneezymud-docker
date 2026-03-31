@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useMatchRoute, useNavigate } from "@tanstack/react-router";
 import { Box, DoorOpen, Map, User } from "lucide-react";
 import { useState } from "react";
 
@@ -82,7 +82,6 @@ export function Nav({ className, onNavClick }: NavProps) {
       <div className="flex flex-1 flex-col gap-1.5">
         {hasPower(user.powers, POWER.REDIT) ? (
           <NavLink
-            accentColor="var(--color-accent)"
             icon={<DoorOpen className="h-4 w-4 shrink-0" />}
             onClick={onNavClick}
             to="/rooms"
@@ -93,7 +92,6 @@ export function Nav({ className, onNavClick }: NavProps) {
 
         {hasPower(user.powers, POWER.MEDIT) ? (
           <NavLink
-            accentColor="#ebcb8b"
             icon={<User className="h-4 w-4 shrink-0" />}
             onClick={onNavClick}
             to="/mobs"
@@ -104,7 +102,6 @@ export function Nav({ className, onNavClick }: NavProps) {
 
         {hasPower(user.powers, POWER.OEDIT) ? (
           <NavLink
-            accentColor="#a3be8c"
             icon={<Box className="h-4 w-4 shrink-0" />}
             onClick={onNavClick}
             to="/objects"
@@ -164,26 +161,28 @@ export function Nav({ className, onNavClick }: NavProps) {
 }
 
 function NavLink({
-  accentColor,
   children,
   icon,
   onClick,
   to,
 }: {
-  accentColor?: string | undefined;
   children: React.ReactNode;
   icon?: React.ReactNode | undefined;
   onClick?: (() => void) | undefined;
   to: string;
 }) {
+  const matchRoute = useMatchRoute();
+  const isActive = Boolean(matchRoute({ fuzzy: true, to }));
+
   return (
     <Link
-      activeProps={{
-        "aria-current": "page" as const,
-        className: "bg-accent/20 text-accent font-medium border-l-accent",
-        style: accentColor ? { borderLeftColor: accentColor } : undefined,
-      }}
-      className="text-muted-foreground hover:bg-muted/50 hover:text-foreground focus-visible:ring-ring/50 flex items-center gap-2 rounded-r border-l-2 border-l-transparent px-4 py-2 text-sm transition-colors outline-none focus-visible:ring-[3px]"
+      aria-current={isActive ? "page" : undefined}
+      className={cn(
+        "focus-visible:ring-ring/50 flex items-center gap-2 rounded-r border-l-2 px-4 py-2 text-sm transition-colors outline-none focus-visible:ring-[3px]",
+        isActive
+          ? "bg-accent/20 text-accent border-l-accent font-medium"
+          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border-l-transparent",
+      )}
       onClick={onClick}
       to={to}
     >

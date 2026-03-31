@@ -36,7 +36,7 @@ function isListViewMode(value: null | string): value is ListViewMode {
 }
 
 function useListViewMode(): [ListViewMode, (mode: ListViewMode) => void] {
-  const [mode, setModeInternal] = useState<ListViewMode>(() => {
+  const [mode, setMode] = useState<ListViewMode>(() => {
     try {
       const stored = localStorage.getItem("bt-list-view");
       return isListViewMode(stored) ? stored : "table";
@@ -44,15 +44,15 @@ function useListViewMode(): [ListViewMode, (mode: ListViewMode) => void] {
       return "table";
     }
   });
-  const setMode = (m: ListViewMode) => {
-    setModeInternal(m);
+  const setModeSafe = (m: ListViewMode) => {
+    setMode(m);
     try {
       localStorage.setItem("bt-list-view", m);
     } catch {
       // localStorage unavailable
     }
   };
-  return [mode, setMode];
+  return [mode, setModeSafe];
 }
 
 const COLUMN_WIDTHS: Record<string, string> = {
@@ -69,7 +69,6 @@ interface EntityListItem {
 }
 
 interface EntityListProps {
-  accentColor?: string;
   allowAnyVnum?: boolean;
   banner?: React.ReactNode;
   basePath: string;
@@ -84,7 +83,6 @@ interface EntityListProps {
 }
 
 export function EntityList({
-  accentColor,
   allowAnyVnum,
   banner,
   basePath,
@@ -200,7 +198,6 @@ export function EntityList({
 
       <div className={viewMode === "table" ? "block" : "hidden"}>
         <DesktopTable
-          accentColor={accentColor}
           basePath={basePath}
           canCreate={canCreate}
           columns={columns}
@@ -220,7 +217,6 @@ export function EntityList({
 
       <div className={viewMode === "card" ? "block" : "hidden"}>
         <MobileCardList
-          accentColor={accentColor}
           basePath={basePath}
           canCreate={canCreate}
           label={label}
@@ -252,13 +248,7 @@ export function EntityList({
   );
 }
 
-function accentStyle(color: string): React.CSSProperties {
-  const style: Record<string, string> = { "--entity-accent": color };
-  return style;
-}
-
 function EntityRow({
-  accentColor,
   basePath,
   entity,
   isSelected,
@@ -266,7 +256,6 @@ function EntityRow({
   secondaryLabel,
   selectable,
 }: {
-  accentColor?: string | undefined;
   basePath: string;
   entity: EntityListItem;
   isSelected: boolean;
@@ -278,8 +267,7 @@ function EntityRow({
   return (
     <TableRow
       aria-label={`${entity.name || "(unnamed)"} (vnum ${entity.vnum})`}
-      className="entity-row has-[a:focus-visible]:ring-accent group hover:bg-muted/50 has-[a:focus-visible]:bg-muted/30 transition-colors duration-150 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-inset"
-      style={accentColor ? accentStyle(accentColor) : undefined}
+      className="has-[a:focus-visible]:ring-accent group hover:bg-muted/50 has-[a:focus-visible]:bg-muted/30 transition-colors duration-150 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-inset"
     >
       {selectable ? (
         <TableCell
@@ -406,7 +394,6 @@ function EmptyMessage({
 }
 
 function DesktopTable({
-  accentColor,
   basePath,
   canCreate,
   columns,
@@ -422,7 +409,6 @@ function DesktopTable({
   toggleSelected,
   toggleSort,
 }: {
-  accentColor?: string | undefined;
   basePath: string;
   canCreate: boolean;
   columns: Array<Column<EntityListItem>>;
@@ -463,7 +449,6 @@ function DesktopTable({
       <TableBody>
         {rows.map((entity) => (
           <EntityRow
-            accentColor={accentColor}
             basePath={basePath}
             entity={entity}
             isSelected={selectedIds[String(entity.vnum)] === true}
@@ -499,14 +484,12 @@ function DesktopTable({
 }
 
 function EntityCardRow({
-  accentColor,
   basePath,
   entity,
   isSelected,
   onToggleSelected,
   selectable,
 }: {
-  accentColor?: string | undefined;
   basePath: string;
   entity: EntityListItem;
   isSelected: boolean;
@@ -515,10 +498,7 @@ function EntityCardRow({
 }) {
   const to = `${basePath}/${entity.vnum}`;
   return (
-    <div
-      className="entity-row flex items-center gap-3 py-2.5"
-      style={accentColor ? accentStyle(accentColor) : undefined}
-    >
+    <div className="flex items-center gap-3 py-2.5">
       {selectable ? (
         <Checkbox
           aria-label={`Select ${entity.name || entity.vnum}`}
@@ -550,7 +530,6 @@ function EntityCardRow({
 }
 
 function MobileCardList({
-  accentColor,
   basePath,
   canCreate,
   label,
@@ -562,7 +541,6 @@ function MobileCardList({
   toggleAllPageSelected,
   toggleSelected,
 }: {
-  accentColor?: string | undefined;
   basePath: string;
   canCreate: boolean;
   label: string;
@@ -591,7 +569,6 @@ function MobileCardList({
       <div className="divide-border divide-y">
         {rows.map((entity) => (
           <EntityCardRow
-            accentColor={accentColor}
             basePath={basePath}
             entity={entity}
             isSelected={selectedIds[String(entity.vnum)] === true}
