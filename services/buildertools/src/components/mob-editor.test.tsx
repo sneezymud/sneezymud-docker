@@ -76,6 +76,7 @@ function setAuth(powers: number[]) {
   useAuthStore.setState({
     user: {
       blocks: [{ end: 1099, start: 1000 }],
+      playerId: 99_999,
       playerName: "TestBuilder",
       powers,
       username: "testbuilder",
@@ -159,6 +160,54 @@ describe("MobEditor", () => {
       await waitFor(() => {
         expect(saveButton.hasAttribute("disabled")).toBe(true);
       });
+    });
+  });
+
+  describe("MEDIT_IMP_POWER gates spec_proc options", () => {
+    test("user without MEDIT_IMP_POWER cannot select unassignable spec procs", async () => {
+      setAuth(BASE_POWERS);
+      mockMobEndpoints();
+      renderWithProviders(<MobEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      // spec_proc combobox input (in collapsed section but still in DOM)
+      const specInput = screen.getByRole("combobox", {
+        name: /special proc/i,
+      });
+      await user.type(specInput, "dragon");
+
+      // "dragon breath" (value 3) is unassignable without MEDIT_IMP_POWER
+      await waitFor(() => {
+        expect(
+          screen.queryByRole("option", { name: /dragon breath/ }),
+        ).toBeNull();
+      });
+    });
+
+    test("user with MEDIT_IMP_POWER can select unassignable spec procs", async () => {
+      setAuth([...BASE_POWERS, POWER.MEDIT_IMP_POWER]);
+      mockMobEndpoints();
+      renderWithProviders(<MobEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      const specInput = screen.getByRole("combobox", {
+        name: /special proc/i,
+      });
+      await user.type(specInput, "dragon");
+
+      // "dragon breath" (value 3) should be available with MEDIT_IMP_POWER
+      const option = await screen.findByRole("option", {
+        name: /dragon breath/,
+      });
+      expect(option).toBeDefined();
     });
   });
 

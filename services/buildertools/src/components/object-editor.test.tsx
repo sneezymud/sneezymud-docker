@@ -1,4 +1,6 @@
-import { screen, waitFor } from "@testing-library/react";
+// eslint-disable-next-line testing-library/no-manual-cleanup -- Bun runs all test files in one process; explicit cleanup prevents cross-file DOM leaks
+import { cleanup, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import type { Obj } from "@/shared/schemas/obj.ts";
@@ -49,6 +51,7 @@ function setAuth(powers: number[]) {
   useAuthStore.setState({
     user: {
       blocks: [{ end: 1099, start: 1000 }],
+      playerId: 99_999,
       playerName: "TestBuilder",
       powers,
       username: "testbuilder",
@@ -61,6 +64,7 @@ const BASE_POWERS = [POWER.BUILDER, POWER.OEDIT];
 
 describe("ObjectEditor", () => {
   afterEach(() => {
+    cleanup();
     resetFetchMock();
     useAuthStore.setState({ user: null });
   });
@@ -117,6 +121,41 @@ describe("ObjectEditor", () => {
       expect(screen.queryByText("Weight Capacity")).toBeNull();
       // Generic fallback values (Value 0-3) also absent for known type with empty spec
       expect(screen.queryByText("Value 0")).toBeNull();
+    });
+  });
+
+  describe("type switch updates visible fields", () => {
+    beforeEach(() => {
+      setAuth([...BASE_POWERS, POWER.OEDIT_WEAPONS]);
+    });
+
+    test("switching from weapon to container replaces type-specific fields", async () => {
+      const weaponObj = makeObj({ type: 5, val0: 0x80_50 });
+      mockFetch([{ body: weaponObj, url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      // Weapon fields should be present initially
+      await waitFor(() => {
+        expect(screen.getByText("Current Sharpness")).toBeDefined();
+      });
+
+      // Find the Item Type combobox input and change to Container
+      const typeInput = screen.getByRole("combobox", { name: /item type/i });
+      await user.clear(typeInput);
+      await user.type(typeInput, "Chest");
+
+      // Select the Container option from the dropdown
+      const option = await screen.findByRole("option", {
+        name: /Chest\/Container/,
+      });
+      await user.click(option);
+
+      // Container fields should appear, weapon fields should be gone
+      await waitFor(() => {
+        expect(screen.getByText("Weight Capacity")).toBeDefined();
+      });
+      expect(screen.queryByText("Current Sharpness")).toBeNull();
     });
   });
 

@@ -138,6 +138,40 @@ describe("applyObjFieldChange", () => {
     // name is "" in baseObj, so no diff
     expect(result).toBeNull();
   });
+
+  test("cross-slot edits preserve changes in both slots", () => {
+    const typeSpec = requireSpec(5); // Weapon
+    // Edit a val0 field: maxSharp (bits 8-15 of val0)
+    const afterVal0Edit = applyObjFieldChange(
+      "maxSharp",
+      100,
+      baseObj,
+      typeSpec,
+      null,
+    );
+
+    // Edit a val2 field: weapType0 (bits 0-7 of val2), passing prevEdits from val0
+    const afterVal2Edit = applyObjFieldChange(
+      "weapType0",
+      42,
+      baseObj,
+      typeSpec,
+      afterVal0Edit,
+    );
+
+    expect(afterVal2Edit).not.toBeNull();
+    if (afterVal2Edit === null) throw new Error("expected non-null result");
+
+    // val0 edit survived
+    expect(afterVal2Edit).toHaveProperty("val0");
+    const val0 = afterVal2Edit.val0 ?? 0;
+    expect(getBits(val0, 15, 8)).toBe(100);
+
+    // val2 edit also present
+    expect(afterVal2Edit).toHaveProperty("val2");
+    const val2 = afterVal2Edit.val2 ?? 0;
+    expect(getBits(val2, 7, 8)).toBe(42);
+  });
 });
 
 describe("expandObjFormValues", () => {
