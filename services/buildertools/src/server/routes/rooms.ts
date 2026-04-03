@@ -35,7 +35,7 @@ roomRoutes.use(requirePower(POWER.REDIT, POWER.RSAVE, POWER.EDIT));
 
 roomRoutes.get("/", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const blocks = hasExpandedAccess(user.powers, "room") ? null : user.blocks;
   const rooms = await listRooms(blocks, scope);
   return c.json(rooms);
@@ -43,7 +43,7 @@ roomRoutes.get("/", async (c) => {
 
 roomRoutes.post("/", jsonValidator(roomCreateSchema), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const data = c.req.valid("json");
 
   if (!(await canAccessVnum(data.vnum, user, "room"))) {
@@ -72,7 +72,7 @@ roomRoutes.post("/", jsonValidator(roomCreateSchema), async (c) => {
 
 roomRoutes.get("/search", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const query = c.req.query("q") ?? "";
   if (query.length < 2) {
     return c.json([]);
@@ -83,7 +83,7 @@ roomRoutes.get("/search", async (c) => {
 
 roomRoutes.get("/name/:vnum", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const vnum = Number(c.req.param("vnum"));
   const name = await getRoomName(vnum, scope);
   return c.json({ name, vnum });
@@ -91,7 +91,7 @@ roomRoutes.get("/name/:vnum", async (c) => {
 
 roomRoutes.get("/:vnum", requireVnumAccess("room"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const vnum = Number(c.req.param("vnum"));
 
   const room = await getRoom(vnum, scope);
@@ -108,7 +108,7 @@ roomRoutes.put(
   jsonValidator(roomInputSchema),
   async (c) => {
     const user = c.get("user");
-    const scope = { owner: user.playerName };
+    const scope = { owner: user.playerId };
     const vnum = Number(c.req.param("vnum"));
 
     const current = await getRoom(vnum, scope);
@@ -138,11 +138,11 @@ roomRoutes.put(
 
 roomRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const { vnums } = c.req.valid("json");
 
   const otherBlocks = hasExpandedAccess(user.powers, "room")
-    ? await getOtherBuildersBlocks(user.playerName)
+    ? await getOtherBuildersBlocks(user.playerId)
     : undefined;
   const accessChecks = await Promise.all(
     vnums.map(async (v) => ({
@@ -164,7 +164,7 @@ roomRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
 
 roomRoutes.delete("/:vnum", requireVnumAccess("room"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const vnum = Number(c.req.param("vnum"));
 
   if (!(await roomExists(vnum, scope))) {

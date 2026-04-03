@@ -311,7 +311,7 @@ const DIRECTION_OFFSETS: Record<number, { x: number; y: number; z: number }> = {
 // matches the C++ make_room_coords() behavior when redit auto-creates a room.
 async function deriveCoords(
   vnum: number,
-  owner: string,
+  owner: number,
 ): Promise<{ x: number; y: number; z: number }> {
   const defaultCoords = { x: 0, y: 0, z: 0 };
 

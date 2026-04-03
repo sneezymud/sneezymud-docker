@@ -1,4 +1,5 @@
 import {
+  decimal,
   double,
   int,
   mysqlTable,
@@ -9,18 +10,18 @@ import {
 export const mob = mysqlTable(
   "mob",
   {
-    ac: double().notNull(),
+    ac: decimal({ mode: "number" }).notNull(),
     actions: int({ unsigned: true }).notNull(),
     adjacent_sound: text(),
     affects: int({ unsigned: true }).notNull(),
     agi: int().notNull(),
-    attacks: double().notNull(),
+    attacks: decimal({ mode: "number" }).notNull(),
     bra: int().notNull(),
     can_be_seen: int().notNull(),
     cha: int().notNull(),
     class: int().notNull(),
     con: int().notNull(),
-    damage_level: double().notNull(),
+    damage_level: decimal({ mode: "number" }).notNull(),
     damage_precision: int().notNull(),
     def_position: int().notNull(),
     description: text().notNull(),
@@ -30,7 +31,7 @@ export const mob = mysqlTable(
     foc: int().notNull(),
     gold: int().notNull(),
     height: int().notNull(),
-    hpbonus: double().notNull(),
+    hpbonus: decimal({ mode: "number" }).notNull(),
     intel: int().notNull(),
     kar: int().notNull(),
     letter: text().notNull(),
@@ -39,7 +40,7 @@ export const mob = mysqlTable(
     long_desc: text().notNull(),
     max_exist: int().notNull(),
     name: text().notNull(),
-    owner: text().notNull(),
+    owner: int("player_id").notNull(),
     per: int().notNull(),
     pos: int().notNull(),
     race: int().notNull(),
@@ -63,7 +64,7 @@ export const mobExtra = mysqlTable(
   {
     description: text(),
     keyword: text().notNull(),
-    owner: text().notNull(),
+    owner: int("player_id").notNull(),
     vnum: int().notNull(),
   },
   (table) => [
@@ -75,7 +76,7 @@ export const mobImm = mysqlTable(
   "mob_imm",
   {
     amt: int(),
-    owner: text().notNull(),
+    owner: int("player_id").notNull(),
     type: int().notNull(),
     vnum: int().notNull(),
   },
@@ -83,7 +84,7 @@ export const mobImm = mysqlTable(
 );
 
 export const mobresponses = mysqlTable("mobresponses", {
-  owner: text(),
+  owner: int("player_id"),
   response: text().notNull(),
   vnum: int().notNull(),
 });
@@ -101,7 +102,7 @@ export const obj = mysqlTable(
     max_exist: int().notNull(),
     max_struct: int().notNull(),
     name: text().notNull(),
-    owner: text().notNull(),
+    owner: int("player_id").notNull(),
     price: int().notNull(),
     short_desc: text().notNull(),
     spec_proc: int().notNull(),
@@ -121,7 +122,7 @@ export const obj = mysqlTable(
 export const objaffect = mysqlTable("objaffect", {
   mod1: int().notNull(),
   mod2: int().notNull(),
-  owner: text(),
+  owner: int("player_id"),
   type: int().notNull(),
   vnum: int().notNull(),
 });
@@ -129,7 +130,7 @@ export const objaffect = mysqlTable("objaffect", {
 export const objextra = mysqlTable("objextra", {
   description: text().notNull(),
   name: text().notNull(),
-  owner: text(),
+  owner: int("player_id"),
   vnum: int().notNull(),
 });
 
@@ -141,7 +142,7 @@ export const room = mysqlTable(
     description: text().notNull(),
     height: int().notNull(),
     name: text().notNull(),
-    owner: text().notNull(),
+    owner: int("player_id").notNull(),
     river_dir: int().notNull(),
     river_speed: int().notNull(),
     room_flag: int().notNull(),
@@ -163,7 +164,7 @@ export const roomextra = mysqlTable("roomextra", {
   block: int(),
   description: text().notNull(),
   name: text().notNull(),
-  owner: text(),
+  owner: int("player_id"),
   vnum: int().notNull(),
 });
 
@@ -176,7 +177,7 @@ export const roomexit = mysqlTable("roomexit", {
   key_num: int().notNull(),
   lock_difficulty: int().notNull(),
   name: text().notNull(),
-  owner: text(),
+  owner: int("player_id"),
   type: int().notNull(),
   vnum: int().notNull(),
   weight: int().notNull(),

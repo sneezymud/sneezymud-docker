@@ -52,7 +52,7 @@ export function requireVnumAccess(entityType: EntityType) {
       return next();
     }
     if (hasExpandedAccess(user.powers, entityType)) {
-      const otherBlocks = await getOtherBuildersBlocks(user.playerName);
+      const otherBlocks = await getOtherBuildersBlocks(user.playerId);
       if (!isVnumInBlocks(vnum, otherBlocks)) {
         return next();
       }
@@ -70,7 +70,7 @@ export async function canAccessVnum(
   if (isVnumInBlocks(vnum, user.blocks)) return true;
   if (!hasExpandedAccess(user.powers, entityType)) return false;
   const otherBlocks =
-    prefetchedOtherBlocks ?? (await getOtherBuildersBlocks(user.playerName));
+    prefetchedOtherBlocks ?? (await getOtherBuildersBlocks(user.playerId));
   return !isVnumInBlocks(vnum, otherBlocks);
 }
 

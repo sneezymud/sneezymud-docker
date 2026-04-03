@@ -24,7 +24,7 @@ mobResponseRoutes.use(requirePower(POWER.MEDIT));
 
 mobResponseRoutes.get("/:vnum", requireVnumAccess("mob"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const vnum = Number(c.req.param("vnum"));
 
   if (!(await mobExists(vnum, scope))) {
@@ -41,7 +41,7 @@ mobResponseRoutes.put(
   jsonValidator(mobResponseSchema),
   async (c) => {
     const user = c.get("user");
-    const scope = { owner: user.playerName };
+    const scope = { owner: user.playerId };
     const vnum = Number(c.req.param("vnum"));
 
     if (!(await mobExists(vnum, scope))) {

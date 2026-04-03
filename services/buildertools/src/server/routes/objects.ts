@@ -35,7 +35,7 @@ objectRoutes.use(requirePower(POWER.OEDIT));
 
 objectRoutes.get("/", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const blocks = hasExpandedAccess(user.powers, "object") ? null : user.blocks;
   const objects = await listObjects(blocks, scope);
   return c.json(objects);
@@ -43,7 +43,7 @@ objectRoutes.get("/", async (c) => {
 
 objectRoutes.post("/", jsonValidator(objCreateSchema), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const data = c.req.valid("json");
 
   if (!(await canAccessVnum(data.vnum, user, "object"))) {
@@ -68,7 +68,7 @@ objectRoutes.post("/", jsonValidator(objCreateSchema), async (c) => {
 
 objectRoutes.get("/name/:vnum", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const vnum = Number(c.req.param("vnum"));
   const name = await getObjectShortDesc(vnum, scope);
   return c.json({ name, vnum });
@@ -76,7 +76,7 @@ objectRoutes.get("/name/:vnum", async (c) => {
 
 objectRoutes.get("/search", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const query = c.req.query("q") ?? "";
   if (query.length < 2) {
     return c.json([]);
@@ -87,7 +87,7 @@ objectRoutes.get("/search", async (c) => {
 
 objectRoutes.get("/:vnum", requireVnumAccess("object"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const vnum = Number(c.req.param("vnum"));
 
   const obj = await getObject(vnum, scope);
@@ -104,7 +104,7 @@ objectRoutes.put(
   jsonValidator(objInputSchema),
   async (c) => {
     const user = c.get("user");
-    const scope = { owner: user.playerName };
+    const scope = { owner: user.playerId };
     const vnum = Number(c.req.param("vnum"));
 
     const current = await getObject(vnum, scope);
@@ -153,11 +153,11 @@ objectRoutes.put(
 
 objectRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const { vnums } = c.req.valid("json");
 
   const otherBlocks = hasExpandedAccess(user.powers, "object")
-    ? await getOtherBuildersBlocks(user.playerName)
+    ? await getOtherBuildersBlocks(user.playerId)
     : undefined;
   const accessChecks = await Promise.all(
     vnums.map(async (v) => ({
@@ -179,7 +179,7 @@ objectRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
 
 objectRoutes.delete("/:vnum", requireVnumAccess("object"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const vnum = Number(c.req.param("vnum"));
 
   if (!(await objectExists(vnum, scope))) {

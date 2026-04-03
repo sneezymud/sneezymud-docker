@@ -15,6 +15,7 @@ export type AuthResult =
       kind: "success";
       user: {
         blocks: VnumBlock[];
+        playerId: number;
         playerName: string;
         powers: number[];
         username: string;
@@ -102,6 +103,7 @@ export async function authenticateBuilder(
     kind: "success",
     user: {
       blocks,
+      playerId,
       playerName,
       powers,
       username,
@@ -164,7 +166,7 @@ export async function refreshSessionUser(
  * assigned to another builder.
  */
 export async function getOtherBuildersBlocks(
-  excludePlayerName: string,
+  excludePlayerId: number,
 ): Promise<VnumBlock[]> {
   const rows = await sneezyDb
     .select({
@@ -174,8 +176,7 @@ export async function getOtherBuildersBlocks(
       blockbstart: wizdata.blockbstart,
     })
     .from(wizdata)
-    .innerJoin(player, eq(player.id, wizdata.player_id))
-    .where(ne(player.name, excludePlayerName));
+    .where(ne(wizdata.player_id, excludePlayerId));
 
   const blocks: VnumBlock[] = [];
   for (const row of rows) {

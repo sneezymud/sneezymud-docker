@@ -33,7 +33,7 @@ mobRoutes.use(requirePower(POWER.MEDIT));
 
 mobRoutes.get("/", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const blocks = hasExpandedAccess(user.powers, "mob") ? null : user.blocks;
   const mobs = await listMobs(blocks, scope);
   return c.json(mobs);
@@ -41,7 +41,7 @@ mobRoutes.get("/", async (c) => {
 
 mobRoutes.post("/", jsonValidator(mobCreateSchema), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const data = c.req.valid("json");
 
   if (!(await canAccessVnum(data.vnum, user, "mob"))) {
@@ -66,7 +66,7 @@ mobRoutes.post("/", jsonValidator(mobCreateSchema), async (c) => {
 
 mobRoutes.get("/:vnum", requireVnumAccess("mob"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const vnum = Number(c.req.param("vnum"));
 
   const mob = await getMob(vnum, scope);
@@ -83,7 +83,7 @@ mobRoutes.put(
   jsonValidator(mobInputSchema),
   async (c) => {
     const user = c.get("user");
-    const scope = { owner: user.playerName };
+    const scope = { owner: user.playerId };
     const vnum = Number(c.req.param("vnum"));
 
     const current = await getMob(vnum, scope);
@@ -106,11 +106,11 @@ mobRoutes.put(
 
 mobRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const { vnums } = c.req.valid("json");
 
   const otherBlocks = hasExpandedAccess(user.powers, "mob")
-    ? await getOtherBuildersBlocks(user.playerName)
+    ? await getOtherBuildersBlocks(user.playerId)
     : undefined;
   const accessChecks = await Promise.all(
     vnums.map(async (v) => ({
@@ -132,7 +132,7 @@ mobRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
 
 mobRoutes.delete("/:vnum", requireVnumAccess("mob"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerName };
+  const scope = { owner: user.playerId };
   const vnum = Number(c.req.param("vnum"));
 
   if (!(await mobExists(vnum, scope))) {
