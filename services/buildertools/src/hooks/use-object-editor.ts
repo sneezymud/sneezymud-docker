@@ -18,6 +18,7 @@ export function useObjectEditor(vnumParam: string) {
   const vnum = Number(vnumParam);
   const user = useAuthStore((s) => s.user);
   const powers = user?.powers ?? [];
+  const isSenior = user?.isSenior ?? false;
 
   const {
     data: obj,
@@ -106,6 +107,7 @@ export function useObjectEditor(vnumParam: string) {
     handleSaveAndProceed,
     isError,
     isLoading,
+    isSenior,
     obj,
     powers,
     resetEdits,

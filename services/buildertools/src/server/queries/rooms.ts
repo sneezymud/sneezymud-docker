@@ -7,7 +7,7 @@ import { immortalDb, sneezyDb } from "../db.ts";
 import { room, roomexit, roomextra } from "../schema/immortal.ts";
 import { room as sneezyRoom, zone } from "../schema/sneezy.ts";
 import { escapeLike } from "./like-escape.ts";
-import { ownerEq, type OwnerScope, scopeOwner } from "./owner-scope.ts";
+import { ownerEq, type OwnerScope, scopePlayerId } from "./owner-scope.ts";
 
 export async function listRooms(
   blocks: null | VnumBlock[],
@@ -22,7 +22,7 @@ export async function listRooms(
     .from(room)
     .where(
       and(
-        ownerEq(room.owner, scope),
+        ownerEq(room.player_id, scope),
         blocks === null ? undefined : vnumBlockFilter(blocks),
       ),
     )
@@ -36,7 +36,7 @@ export async function getRoom(
   const [row] = await immortalDb
     .select()
     .from(room)
-    .where(and(eq(room.vnum, vnum), ownerEq(room.owner, scope)));
+    .where(and(eq(room.vnum, vnum), ownerEq(room.player_id, scope)));
 
   if (!row) {
     return null;
@@ -46,20 +46,25 @@ export async function getRoom(
     immortalDb
       .select()
       .from(roomexit)
-      .where(and(eq(roomexit.vnum, vnum), ownerEq(roomexit.owner, scope)))
+      .where(and(eq(roomexit.vnum, vnum), ownerEq(roomexit.player_id, scope)))
       .orderBy(roomexit.direction),
     immortalDb
       .select()
       .from(roomextra)
-      .where(and(eq(roomextra.vnum, vnum), ownerEq(roomextra.owner, scope))),
+      .where(
+        and(eq(roomextra.vnum, vnum), ownerEq(roomextra.player_id, scope)),
+      ),
   ]);
 
-  const { block: _block, owner: _owner, ...roomFields } = row;
+  const { block: _block, player_id: _playerId, ...roomFields } = row;
   return {
     ...roomFields,
-    exits: exits.map(({ owner: _exitOwner, ...exitFields }) => exitFields),
+    exits: exits.map(
+      ({ player_id: _exitPlayerId, ...exitFields }) => exitFields,
+    ),
     extras: extras.map(
-      ({ block: _block, owner: _extraOwner, ...extraFields }) => extraFields,
+      ({ block: _block, player_id: _extraPlayerId, ...extraFields }) =>
+        extraFields,
     ),
   };
 }
@@ -79,7 +84,7 @@ export async function createRoom(
 
   // Derive coordinates from any existing room that has an exit pointing here,
   // matching the C++ make_room_coords() behavior when redit creates a new room
-  const coords = await deriveCoords(vnum, scopeOwner(scope));
+  const coords = await deriveCoords(vnum, scopePlayerId(scope));
 
   await immortalDb.insert(room).values({
     block,
@@ -87,7 +92,7 @@ export async function createRoom(
     description: "",
     height: -1,
     name: "",
-    owner: scopeOwner(scope),
+    player_id: scopePlayerId(scope),
     river_dir: 0,
     river_speed: 0,
     room_flag: 1 << 17,
@@ -108,26 +113,26 @@ export async function updateRoom(
   scope: OwnerScope,
   block: number,
 ): Promise<void> {
-  const owner = scopeOwner(scope);
+  const player_id = scopePlayerId(scope);
   const { exits, extras, vnum: _vnum, ...roomFields } = data;
 
   await immortalDb.transaction(async (tx) => {
     await tx
       .update(room)
-      .set({ ...roomFields, block, owner })
-      .where(and(eq(room.vnum, vnum), ownerEq(room.owner, scope)));
+      .set({ ...roomFields, block, player_id })
+      .where(and(eq(room.vnum, vnum), ownerEq(room.player_id, scope)));
 
     // Replace all exits atomically
     await tx
       .delete(roomexit)
-      .where(and(eq(roomexit.vnum, vnum), ownerEq(roomexit.owner, scope)));
+      .where(and(eq(roomexit.vnum, vnum), ownerEq(roomexit.player_id, scope)));
 
     for (const exit of exits) {
       const { block: _block, vnum: _exitVnum, ...exitFields } = exit;
       await tx.insert(roomexit).values({
         ...exitFields,
         block,
-        owner,
+        player_id,
         vnum,
       });
     }
@@ -135,14 +140,16 @@ export async function updateRoom(
     // Replace all extras atomically
     await tx
       .delete(roomextra)
-      .where(and(eq(roomextra.vnum, vnum), ownerEq(roomextra.owner, scope)));
+      .where(
+        and(eq(roomextra.vnum, vnum), ownerEq(roomextra.player_id, scope)),
+      );
 
     for (const extra of extras) {
       const { vnum: _extraVnum, ...extraFields } = extra;
       await tx.insert(roomextra).values({
         ...extraFields,
         block,
-        owner,
+        player_id,
         vnum,
       });
     }
@@ -156,13 +163,15 @@ export async function deleteRoom(
   await immortalDb.transaction(async (tx) => {
     await tx
       .delete(roomextra)
-      .where(and(eq(roomextra.vnum, vnum), ownerEq(roomextra.owner, scope)));
+      .where(
+        and(eq(roomextra.vnum, vnum), ownerEq(roomextra.player_id, scope)),
+      );
     await tx
       .delete(roomexit)
-      .where(and(eq(roomexit.vnum, vnum), ownerEq(roomexit.owner, scope)));
+      .where(and(eq(roomexit.vnum, vnum), ownerEq(roomexit.player_id, scope)));
     await tx
       .delete(room)
-      .where(and(eq(room.vnum, vnum), ownerEq(room.owner, scope)));
+      .where(and(eq(room.vnum, vnum), ownerEq(room.player_id, scope)));
   });
 }
 
@@ -175,16 +184,19 @@ export async function deleteRooms(
     await tx
       .delete(roomextra)
       .where(
-        and(inArray(roomextra.vnum, vnums), ownerEq(roomextra.owner, scope)),
+        and(
+          inArray(roomextra.vnum, vnums),
+          ownerEq(roomextra.player_id, scope),
+        ),
       );
     await tx
       .delete(roomexit)
       .where(
-        and(inArray(roomexit.vnum, vnums), ownerEq(roomexit.owner, scope)),
+        and(inArray(roomexit.vnum, vnums), ownerEq(roomexit.player_id, scope)),
       );
     const result = await tx
       .delete(room)
-      .where(and(inArray(room.vnum, vnums), ownerEq(room.owner, scope)));
+      .where(and(inArray(room.vnum, vnums), ownerEq(room.player_id, scope)));
     deleted = result[0].affectedRows;
   });
   return deleted;
@@ -199,7 +211,7 @@ export async function getRoomName(
   const [immortalRow] = await immortalDb
     .select({ name: room.name })
     .from(room)
-    .where(and(eq(room.vnum, vnum), ownerEq(room.owner, scope)))
+    .where(and(eq(room.vnum, vnum), ownerEq(room.player_id, scope)))
     .limit(1);
 
   if (immortalRow) {
@@ -240,7 +252,7 @@ export async function searchRooms(
       .from(room)
       .where(
         and(
-          ownerEq(room.owner, scope),
+          ownerEq(room.player_id, scope),
           vnumFilter ? or(vnumFilter, nameFilter) : nameFilter,
         ),
       )
@@ -280,7 +292,7 @@ export async function roomExists(
   const [row] = await immortalDb
     .select({ vnum: room.vnum })
     .from(room)
-    .where(and(eq(room.vnum, vnum), ownerEq(room.owner, scope)))
+    .where(and(eq(room.vnum, vnum), ownerEq(room.player_id, scope)))
     .limit(1);
 
   return row !== undefined;
@@ -311,7 +323,7 @@ const DIRECTION_OFFSETS: Record<number, { x: number; y: number; z: number }> = {
 // matches the C++ make_room_coords() behavior when redit auto-creates a room.
 async function deriveCoords(
   vnum: number,
-  owner: number,
+  playerId: number,
 ): Promise<{ x: number; y: number; z: number }> {
   const defaultCoords = { x: 0, y: 0, z: 0 };
 
@@ -321,7 +333,9 @@ async function deriveCoords(
       sourceVnum: roomexit.vnum,
     })
     .from(roomexit)
-    .where(and(eq(roomexit.destination, vnum), eq(roomexit.owner, owner)))
+    .where(
+      and(eq(roomexit.destination, vnum), eq(roomexit.player_id, playerId)),
+    )
     .limit(1);
 
   if (!incomingExit) return defaultCoords;
@@ -329,7 +343,9 @@ async function deriveCoords(
   const [sourceRoom] = await immortalDb
     .select({ x: room.x, y: room.y, z: room.z })
     .from(room)
-    .where(and(eq(room.vnum, incomingExit.sourceVnum), eq(room.owner, owner)))
+    .where(
+      and(eq(room.vnum, incomingExit.sourceVnum), eq(room.player_id, playerId)),
+    )
     .limit(1);
 
   if (!sourceRoom) return defaultCoords;

@@ -19,6 +19,7 @@ export function EntityHeader({
   onDelete,
   onReset,
   onSave,
+  readOnly,
   saving,
 }: {
   before?: React.ReactNode;
@@ -30,6 +31,7 @@ export function EntityHeader({
   onDelete?: () => void;
   onReset?: () => void;
   onSave: () => void;
+  readOnly?: boolean;
   saving: boolean;
 }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -59,63 +61,67 @@ export function EntityHeader({
         {children}
       </div>
 
-      <div className="flex items-center gap-2">
-        <Button
-          disabled={!dirty || saving}
-          onClick={onSave}
-          size="sm"
-        >
-          {saving ? <Loader2 className="animate-spin" /> : "Save"}
-        </Button>
-
-        {onReset !== undefined && dirty && (
+      {!readOnly && (
+        <div className="flex items-center gap-2">
           <Button
-            className=""
-            onClick={onReset}
+            disabled={!dirty || saving}
+            onClick={onSave}
             size="sm"
-            variant="inline-warning"
           >
-            Undo
+            {saving ? <Loader2 className="animate-spin" /> : "Save"}
           </Button>
-        )}
 
-        {onDelete !== undefined && (
-          <>
+          {onReset !== undefined && dirty && (
             <Button
-              aria-label="Delete"
-              className="text-destructive/60 hover:text-destructive hover:bg-destructive/10 ml-auto"
-              disabled={deletePending}
-              onClick={() => {
-                setShowDeleteConfirm(true);
-              }}
-              size="icon-sm"
-              variant="ghost"
+              className=""
+              onClick={onReset}
+              size="sm"
+              variant="inline-warning"
             >
-              {deletePending ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
+              Undo
             </Button>
+          )}
 
-            <ConfirmDialog
-              confirmLabel="Yes, delete"
-              message={deleteMessage ?? "Are you sure you want to delete this?"}
-              onCancel={() => {
-                setShowDeleteConfirm(false);
-              }}
-              onConfirm={() => {
-                if (deletePending) return;
-                setShowDeleteConfirm(false);
-                onDelete();
-              }}
-              open={showDeleteConfirm}
-              title="Confirm Delete"
-              variant="danger"
-            />
-          </>
-        )}
-      </div>
+          {onDelete !== undefined && (
+            <>
+              <Button
+                aria-label="Delete"
+                className="text-destructive/60 hover:text-destructive hover:bg-destructive/10 ml-auto"
+                disabled={deletePending}
+                onClick={() => {
+                  setShowDeleteConfirm(true);
+                }}
+                size="icon-sm"
+                variant="ghost"
+              >
+                {deletePending ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </Button>
+
+              <ConfirmDialog
+                confirmLabel="Yes, delete"
+                message={
+                  deleteMessage ?? "Are you sure you want to delete this?"
+                }
+                onCancel={() => {
+                  setShowDeleteConfirm(false);
+                }}
+                onConfirm={() => {
+                  if (deletePending) return;
+                  setShowDeleteConfirm(false);
+                  onDelete();
+                }}
+                open={showDeleteConfirm}
+                title="Confirm Delete"
+                variant="danger"
+              />
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -15,6 +15,7 @@ export function useMobEditor(vnumParam: string) {
   const vnum = Number(vnumParam);
   const user = useAuthStore((s) => s.user);
   const powers = user?.powers ?? [];
+  const isSenior = user?.isSenior ?? false;
 
   const {
     data: mob,
@@ -114,6 +115,7 @@ export function useMobEditor(vnumParam: string) {
     immEdits,
     isError,
     isLoading,
+    isSenior,
     mob,
     mobResponse,
     originalValues,

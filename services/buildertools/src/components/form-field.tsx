@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils.ts";
 
 import { BitfieldEditor } from "./bitfield-editor.tsx";
 import { EnumSelect } from "./enum-select.tsx";
+import { HelpTip } from "./help-tip.tsx";
 import { FieldHelp } from "./info-tooltip.tsx";
 import { NumberInput } from "./number-input.tsx";
 import { EntityPicker } from "./pickers/entity-picker.tsx";
@@ -294,6 +295,10 @@ function renderLabelContent(field: FieldDef) {
         >
           *
         </span>
+      ) : null}
+
+      {field.readOnly && field.disabledReason ? (
+        <HelpTip text={field.disabledReason} />
       ) : null}
     </span>
   ) : null;

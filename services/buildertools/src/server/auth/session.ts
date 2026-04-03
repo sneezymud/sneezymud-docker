@@ -75,6 +75,8 @@ export async function touchSession(c: Context): Promise<void> {
     user: {
       ...payload.user,
       blocks: fresh.blocks,
+      isSenior: fresh.isSenior,
+      playerId: fresh.playerId,
       powers: fresh.powers,
     },
   });

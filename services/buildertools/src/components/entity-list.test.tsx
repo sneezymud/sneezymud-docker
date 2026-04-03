@@ -22,6 +22,7 @@ function setAuthRooms() {
   useAuthStore.setState({
     user: {
       blocks: [{ end: 1099, start: 1000 }],
+      isSenior: false,
       playerId: 99_999,
       playerName: "TestBuilder",
       powers: [POWER.BUILDER, POWER.REDIT, POWER.RSAVE, POWER.EDIT],
@@ -35,6 +36,7 @@ function setAuthMobs() {
   useAuthStore.setState({
     user: {
       blocks: [{ end: 1099, start: 1000 }],
+      isSenior: false,
       playerId: 99_999,
       playerName: "TestBuilder",
       powers: [POWER.BUILDER, POWER.MEDIT],

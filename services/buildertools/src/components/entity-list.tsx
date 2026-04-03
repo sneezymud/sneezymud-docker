@@ -72,6 +72,7 @@ interface EntityListProps {
   allowAnyVnum?: boolean;
   banner?: React.ReactNode;
   basePath: string;
+  canEdit?: boolean;
   createPending?: boolean;
   deletePending?: boolean;
   entities: EntityListItem[];
@@ -86,6 +87,7 @@ export function EntityList({
   allowAnyVnum,
   banner,
   basePath,
+  canEdit = true,
   createPending,
   deletePending,
   entities,
@@ -98,7 +100,7 @@ export function EntityList({
   const [showCreate, setShowCreate] = useState(false);
   const [viewMode, setViewMode] = useListViewMode();
 
-  const selectable = Boolean(onDeleteSelected);
+  const selectable = canEdit && Boolean(onDeleteSelected);
   const columns = buildColumns(selectable, secondaryLabel);
 
   const {
@@ -172,7 +174,7 @@ export function EntityList({
           )}
         </Button>
 
-        {onCreateVnum && vnumBlocks ? (
+        {canEdit && onCreateVnum && vnumBlocks ? (
           <VnumPicker
             allowAnyVnum={allowAnyVnum}
             createPending={createPending}
@@ -186,7 +188,7 @@ export function EntityList({
         ) : null}
       </div>
 
-      {onDeleteSelected ? (
+      {canEdit && onDeleteSelected ? (
         <DeleteSelectionBar
           count={selectedVnums.length}
           deletePending={deletePending}

@@ -1,9 +1,12 @@
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 
 import type { ColumnDef } from "@/components/sub-table.tsx";
 import type { MobImm } from "@/shared/schemas/mob.ts";
 
 import { BackLink } from "@/components/back-link.tsx";
+import { DiffButton, DiffSheet } from "@/components/diff-sheet.tsx";
 import { EntityForm } from "@/components/entity-form.tsx";
 import { EntityHeader } from "@/components/entity-header.tsx";
 import { MobStringsEditor } from "@/components/mob-strings-editor.tsx";
@@ -13,15 +16,21 @@ import { SubTable } from "@/components/sub-table.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog.tsx";
 import { useMobEditor } from "@/hooks/use-mob-editor.ts";
+import { apiFetch } from "@/shared/api-client.ts";
 import { IMMUNITY_TYPES } from "@/shared/enums/index.ts";
+import { mobDiffFields } from "@/shared/fields/diff-fields.ts";
 import { mobFieldGroups } from "@/shared/fields/mob-fields.tsx";
+import { resolvePermissions } from "@/shared/permissions.ts";
 import { hasPower, POWER } from "@/shared/powers.ts";
+import { mobDiffSchema } from "@/shared/schemas/publish.ts";
 import {
   gateSpecProcs,
   isUnassignableMobSpecProc,
 } from "@/shared/spec-proc-access.ts";
 
 export function MobEditor({ vnumParam }: { vnumParam: string }) {
+  const [diffOpen, setDiffOpen] = useState(false);
+
   const {
     currentValues,
     deletePending,
@@ -36,6 +45,7 @@ export function MobEditor({ vnumParam }: { vnumParam: string }) {
     immEdits,
     isError,
     isLoading,
+    isSenior,
     mob,
     mobResponse,
     originalValues,
@@ -49,6 +59,14 @@ export function MobEditor({ vnumParam }: { vnumParam: string }) {
     unsavedNavStatus,
     vnum,
   } = useMobEditor(vnumParam);
+
+  const permissions = resolvePermissions(powers, isSenior);
+
+  const diffQuery = useQuery({
+    enabled: false,
+    queryFn: () => apiFetch(`/api/publish/diff/mobs/${vnum}`, mobDiffSchema),
+    queryKey: ["diff", "mob", vnum],
+  });
 
   if (isLoading || isError || !mob) {
     return (
@@ -84,6 +102,25 @@ export function MobEditor({ vnumParam }: { vnumParam: string }) {
         onReset={resetEdits}
         onSave={handleSave}
         saving={saving}
+      >
+        <DiffButton
+          isFetching={diffQuery.isFetching}
+          onDiff={() => {
+            void diffQuery.refetch();
+            setDiffOpen(true);
+          }}
+        />
+      </EntityHeader>
+
+      <DiffSheet
+        canPublish={permissions.canPublish}
+        description={`Mob ${vnum}: ${mob.short_desc || "(unnamed)"}`}
+        diffQuery={diffQuery}
+        entityType="mobs"
+        fields={mobDiffFields}
+        onOpenChange={setDiffOpen}
+        open={diffOpen}
+        vnum={vnum}
       />
 
       <EntityForm

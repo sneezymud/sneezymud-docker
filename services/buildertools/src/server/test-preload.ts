@@ -62,7 +62,15 @@ await sneezyDb.execute(sql`DELETE FROM wizdata`);
 await sneezyDb.execute(sql`DELETE FROM player`);
 await sneezyDb.execute(sql`DELETE FROM account`);
 await sneezyDb.execute(sql`DELETE FROM zone`);
+await sneezyDb.execute(sql`DELETE FROM roomexit`);
+await sneezyDb.execute(sql`DELETE FROM roomextra`);
 await sneezyDb.execute(sql`DELETE FROM room`);
+await sneezyDb.execute(sql`DELETE FROM mob_extra`);
+await sneezyDb.execute(sql`DELETE FROM mob_imm`);
+await sneezyDb.execute(sql`DELETE FROM mobresponses`);
+await sneezyDb.execute(sql`DELETE FROM mob`);
+await sneezyDb.execute(sql`DELETE FROM objaffect`);
+await sneezyDb.execute(sql`DELETE FROM objextra`);
 await sneezyDb.execute(sql`DELETE FROM obj`);
 
 // Seed shared auth fixtures

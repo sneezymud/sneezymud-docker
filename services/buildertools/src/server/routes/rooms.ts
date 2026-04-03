@@ -8,14 +8,12 @@ import { isUnassignableRoomSpecProc } from "@/shared/spec-proc-access.ts";
 import {
   type AuthEnv,
   canAccessVnum,
-  hasExpandedAccess,
   jsonValidator,
   requireAuth,
-  requirePower,
   requireVnumAccess,
+  requireWritePower,
 } from "../auth/middleware.ts";
 import { isDuplicateKeyError } from "../db.ts";
-import { getOtherBuildersBlocks } from "../queries/auth.ts";
 import {
   createRoom,
   deleteRoom,
@@ -31,22 +29,22 @@ import {
 export const roomRoutes = new Hono<AuthEnv>();
 
 roomRoutes.use(requireAuth);
-roomRoutes.use(requirePower(POWER.REDIT, POWER.RSAVE, POWER.EDIT));
+roomRoutes.use(requireWritePower(POWER.REDIT, POWER.RSAVE, POWER.EDIT));
 
 roomRoutes.get("/", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
-  const blocks = hasExpandedAccess(user.powers, "room") ? null : user.blocks;
+  const scope = { playerId: user.playerId };
+  const blocks = user.isSenior ? null : user.blocks;
   const rooms = await listRooms(blocks, scope);
   return c.json(rooms);
 });
 
 roomRoutes.post("/", jsonValidator(roomCreateSchema), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const data = c.req.valid("json");
 
-  if (!(await canAccessVnum(data.vnum, user, "room"))) {
+  if (!canAccessVnum(data.vnum, user)) {
     return c.json({ error: "Vnum outside assigned blocks" }, 403);
   }
 
@@ -72,7 +70,7 @@ roomRoutes.post("/", jsonValidator(roomCreateSchema), async (c) => {
 
 roomRoutes.get("/search", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const query = c.req.query("q") ?? "";
   if (query.length < 2) {
     return c.json([]);
@@ -83,7 +81,7 @@ roomRoutes.get("/search", async (c) => {
 
 roomRoutes.get("/name/:vnum", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const vnum = Number(c.req.param("vnum"));
   const name = await getRoomName(vnum, scope);
   return c.json({ name, vnum });
@@ -91,7 +89,7 @@ roomRoutes.get("/name/:vnum", async (c) => {
 
 roomRoutes.get("/:vnum", requireVnumAccess("room"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const vnum = Number(c.req.param("vnum"));
 
   const room = await getRoom(vnum, scope);
@@ -108,7 +106,7 @@ roomRoutes.put(
   jsonValidator(roomInputSchema),
   async (c) => {
     const user = c.get("user");
-    const scope = { owner: user.playerId };
+    const scope = { playerId: user.playerId };
     const vnum = Number(c.req.param("vnum"));
 
     const current = await getRoom(vnum, scope);
@@ -118,10 +116,18 @@ roomRoutes.put(
 
     const data = c.req.valid("json");
     if (
+      !user.isSenior &&
       !hasPower(user.powers, POWER.REDIT_ENABLED) &&
-      isUnassignableRoomSpecProc(data.spec)
+      isUnassignableRoomSpecProc(data.spec) &&
+      data.spec !== current.spec
     ) {
-      data.spec = current.spec;
+      return c.json(
+        {
+          error:
+            'Changing "spec" to an unassignable value requires POWER_REDIT_ENABLED',
+        },
+        403,
+      );
     }
 
     // Determine which block this vnum belongs to for the owner field
@@ -138,18 +144,13 @@ roomRoutes.put(
 
 roomRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const { vnums } = c.req.valid("json");
 
-  const otherBlocks = hasExpandedAccess(user.powers, "room")
-    ? await getOtherBuildersBlocks(user.playerId)
-    : undefined;
-  const accessChecks = await Promise.all(
-    vnums.map(async (v) => ({
-      ok: await canAccessVnum(v, user, "room", otherBlocks),
-      v,
-    })),
-  );
+  const accessChecks = vnums.map((v) => ({
+    ok: canAccessVnum(v, user),
+    v,
+  }));
   const unauthorized = accessChecks.filter((r) => !r.ok).map((r) => r.v);
   if (unauthorized.length > 0) {
     return c.json(
@@ -164,7 +165,7 @@ roomRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
 
 roomRoutes.delete("/:vnum", requireVnumAccess("room"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const vnum = Number(c.req.param("vnum"));
 
   if (!(await roomExists(vnum, scope))) {

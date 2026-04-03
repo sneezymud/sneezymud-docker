@@ -5,6 +5,7 @@ import { authRoutes } from "./routes/auth.ts";
 import { mobResponseRoutes } from "./routes/mob-responses.ts";
 import { mobRoutes } from "./routes/mobs.ts";
 import { objectRoutes } from "./routes/objects.ts";
+import { publishRoutes } from "./routes/publish.ts";
 import { roomRoutes } from "./routes/rooms.ts";
 import { zoneRoutes } from "./routes/zones.ts";
 
@@ -24,3 +25,4 @@ app.route("/api/objects", objectRoutes);
 app.route("/api/mobs", mobRoutes);
 app.route("/api/mob-responses", mobResponseRoutes);
 app.route("/api/zones", zoneRoutes);
+app.route("/api/publish", publishRoutes);

@@ -1020,12 +1020,13 @@ describe("Block B room creation", () => {
     expect(body).toHaveProperty("vnum", 500);
   });
 
-  test("builder cannot create room outside both blocks", async () => {
+  test("senior builder can create room outside own blocks", async () => {
+    // lowOnlyUser has isSenior=true (POWER_LOW), so vnum checks are bypassed entirely
     const res = await authRequest(app, "/api/rooms", lowOnlyCookie, {
       body: JSON.stringify({ vnum: 700 }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(201);
   });
 });

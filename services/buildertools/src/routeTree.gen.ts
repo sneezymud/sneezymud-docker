@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedZonesRouteImport } from './routes/_authenticated/zones'
+import { Route as AuthenticatedPublishRouteImport } from './routes/_authenticated/publish'
 import { Route as AuthenticatedRoomsIndexRouteImport } from './routes/_authenticated/rooms/index'
 import { Route as AuthenticatedObjectsIndexRouteImport } from './routes/_authenticated/objects/index'
 import { Route as AuthenticatedMobsIndexRouteImport } from './routes/_authenticated/mobs/index'
@@ -39,6 +40,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthenticatedZonesRoute = AuthenticatedZonesRouteImport.update({
   id: '/zones',
   path: '/zones',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPublishRoute = AuthenticatedPublishRouteImport.update({
+  id: '/publish',
+  path: '/publish',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedRoomsIndexRoute = AuthenticatedRoomsIndexRouteImport.update({
@@ -89,6 +95,7 @@ const AuthenticatedMobsVnumResponsesRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/publish': typeof AuthenticatedPublishRoute
   '/zones': typeof AuthenticatedZonesRoute
   '/mobs/$vnum': typeof AuthenticatedMobsVnumRouteWithChildren
   '/objects/$vnum': typeof AuthenticatedObjectsVnumRoute
@@ -102,6 +109,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/publish': typeof AuthenticatedPublishRoute
   '/zones': typeof AuthenticatedZonesRoute
   '/objects/$vnum': typeof AuthenticatedObjectsVnumRoute
   '/rooms/$vnum': typeof AuthenticatedRoomsVnumRoute
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/publish': typeof AuthenticatedPublishRoute
   '/_authenticated/zones': typeof AuthenticatedZonesRoute
   '/_authenticated/mobs/$vnum': typeof AuthenticatedMobsVnumRouteWithChildren
   '/_authenticated/objects/$vnum': typeof AuthenticatedObjectsVnumRoute
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/publish'
     | '/zones'
     | '/mobs/$vnum'
     | '/objects/$vnum'
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/publish'
     | '/zones'
     | '/objects/$vnum'
     | '/rooms/$vnum'
@@ -157,6 +168,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/publish'
     | '/_authenticated/zones'
     | '/_authenticated/mobs/$vnum'
     | '/_authenticated/objects/$vnum'
@@ -202,6 +214,13 @@ declare module '@tanstack/react-router' {
       path: '/zones'
       fullPath: '/zones'
       preLoaderRoute: typeof AuthenticatedZonesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/publish': {
+      id: '/_authenticated/publish'
+      path: '/publish'
+      fullPath: '/publish'
+      preLoaderRoute: typeof AuthenticatedPublishRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/rooms/': {
@@ -279,6 +298,7 @@ const AuthenticatedMobsVnumRouteWithChildren =
   )
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedPublishRoute: typeof AuthenticatedPublishRoute
   AuthenticatedZonesRoute: typeof AuthenticatedZonesRoute
   AuthenticatedMobsVnumRoute: typeof AuthenticatedMobsVnumRouteWithChildren
   AuthenticatedObjectsVnumRoute: typeof AuthenticatedObjectsVnumRoute
@@ -289,6 +309,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedPublishRoute: AuthenticatedPublishRoute,
   AuthenticatedZonesRoute: AuthenticatedZonesRoute,
   AuthenticatedMobsVnumRoute: AuthenticatedMobsVnumRouteWithChildren,
   AuthenticatedObjectsVnumRoute: AuthenticatedObjectsVnumRoute,

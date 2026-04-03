@@ -1,4 +1,8 @@
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+
 import { BackLink } from "@/components/back-link.tsx";
+import { DiffButton, DiffSheet } from "@/components/diff-sheet.tsx";
 import { EntityForm } from "@/components/entity-form.tsx";
 import { EntityHeader } from "@/components/entity-header.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
@@ -6,14 +10,19 @@ import { EntityFormSkeleton } from "@/components/skeleton.tsx";
 import { SubTable } from "@/components/sub-table.tsx";
 import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog.tsx";
 import { useObjectEditor } from "@/hooks/use-object-editor.ts";
+import { apiFetch } from "@/shared/api-client.ts";
 import {
   affectColumns,
   extraColumns,
 } from "@/shared/fields/affect-columns.tsx";
+import { objDiffFields } from "@/shared/fields/diff-fields.ts";
 import { getObjFieldGroups } from "@/shared/fields/obj-fields.tsx";
-import { hasPower, POWER } from "@/shared/powers.ts";
+import { resolvePermissions } from "@/shared/permissions.ts";
+import { objDiffSchema } from "@/shared/schemas/publish.ts";
 
 export function ObjectEditor({ vnumParam }: { vnumParam: string }) {
+  const [diffOpen, setDiffOpen] = useState(false);
+
   const {
     affectEdits,
     currentItemType,
@@ -30,6 +39,7 @@ export function ObjectEditor({ vnumParam }: { vnumParam: string }) {
     handleSaveAndProceed,
     isError,
     isLoading,
+    isSenior,
     obj,
     powers,
     resetEdits,
@@ -41,6 +51,14 @@ export function ObjectEditor({ vnumParam }: { vnumParam: string }) {
     unsavedNavStatus,
     vnum,
   } = useObjectEditor(vnumParam);
+
+  const permissions = resolvePermissions(powers, isSenior);
+
+  const diffQuery = useQuery({
+    enabled: false,
+    queryFn: () => apiFetch(`/api/publish/diff/objects/${vnum}`, objDiffSchema),
+    queryKey: ["diff", "object", vnum],
+  });
 
   if (isLoading || isError || !obj) {
     return (
@@ -76,11 +94,30 @@ export function ObjectEditor({ vnumParam }: { vnumParam: string }) {
         onReset={resetEdits}
         onSave={handleSave}
         saving={saving}
+      >
+        <DiffButton
+          isFetching={diffQuery.isFetching}
+          onDiff={() => {
+            void diffQuery.refetch();
+            setDiffOpen(true);
+          }}
+        />
+      </EntityHeader>
+
+      <DiffSheet
+        canPublish={permissions.canPublish}
+        description={`Object ${vnum}: ${obj.short_desc || "(unnamed)"}`}
+        diffQuery={diffQuery}
+        entityType="objects"
+        fields={objDiffFields}
+        onOpenChange={setDiffOpen}
+        open={diffOpen}
+        vnum={vnum}
       />
 
       <EntityForm
         fieldErrors={fieldErrors}
-        groups={getObjFieldGroups(currentItemType, powers)}
+        groups={getObjFieldGroups(currentItemType, permissions)}
         onChange={handleFieldChange}
         originalValues={expandedOriginal}
         values={expandedValues}
@@ -91,7 +128,7 @@ export function ObjectEditor({ vnumParam }: { vnumParam: string }) {
           helpParagraph="Each apply modifies a character stat when the object is equipped. The in-game engine loads at most 5 applies - extra applies are stored in the database but ignored at runtime."
           label="Applies"
           onChange={setAffectEdits}
-          readOnly={!hasPower(powers, POWER.OEDIT_APPLYS)}
+          readOnly={!permissions.canEditObjectApplys}
           rows={affectEdits ?? obj.affects}
         />
 

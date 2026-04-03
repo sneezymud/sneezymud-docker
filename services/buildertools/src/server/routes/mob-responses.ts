@@ -7,8 +7,8 @@ import {
   type AuthEnv,
   jsonValidator,
   requireAuth,
-  requirePower,
   requireVnumAccess,
+  requireWritePower,
 } from "../auth/middleware.ts";
 import {
   deleteMobResponse,
@@ -20,11 +20,11 @@ import { mobExists } from "../queries/mobs.ts";
 export const mobResponseRoutes = new Hono<AuthEnv>();
 
 mobResponseRoutes.use(requireAuth);
-mobResponseRoutes.use(requirePower(POWER.MEDIT));
+mobResponseRoutes.use(requireWritePower(POWER.MEDIT));
 
 mobResponseRoutes.get("/:vnum", requireVnumAccess("mob"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const vnum = Number(c.req.param("vnum"));
 
   if (!(await mobExists(vnum, scope))) {
@@ -41,7 +41,7 @@ mobResponseRoutes.put(
   jsonValidator(mobResponseSchema),
   async (c) => {
     const user = c.get("user");
-    const scope = { owner: user.playerId };
+    const scope = { playerId: user.playerId };
     const vnum = Number(c.req.param("vnum"));
 
     if (!(await mobExists(vnum, scope))) {

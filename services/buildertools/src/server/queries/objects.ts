@@ -7,7 +7,7 @@ import { immortalDb, sneezyDb } from "../db.ts";
 import { obj, objaffect, objextra } from "../schema/immortal.ts";
 import { obj as sneezyObj } from "../schema/sneezy.ts";
 import { escapeLike } from "./like-escape.ts";
-import { ownerEq, type OwnerScope, scopeOwner } from "./owner-scope.ts";
+import { ownerEq, type OwnerScope, scopePlayerId } from "./owner-scope.ts";
 
 export async function listObjects(
   blocks: null | VnumBlock[],
@@ -34,7 +34,7 @@ export async function listObjects(
       vnum: obj.vnum,
     })
     .from(obj)
-    .where(and(ownerEq(obj.owner, scope), blockFilter))
+    .where(and(ownerEq(obj.player_id, scope), blockFilter))
     .orderBy(obj.vnum);
 }
 
@@ -45,7 +45,7 @@ export async function getObject(
   const [row] = await immortalDb
     .select()
     .from(obj)
-    .where(and(eq(obj.vnum, vnum), ownerEq(obj.owner, scope)));
+    .where(and(eq(obj.vnum, vnum), ownerEq(obj.player_id, scope)));
 
   if (!row) {
     return null;
@@ -55,18 +55,20 @@ export async function getObject(
     immortalDb
       .select()
       .from(objaffect)
-      .where(and(eq(objaffect.vnum, vnum), ownerEq(objaffect.owner, scope))),
+      .where(
+        and(eq(objaffect.vnum, vnum), ownerEq(objaffect.player_id, scope)),
+      ),
     immortalDb
       .select()
       .from(objextra)
-      .where(and(eq(objextra.vnum, vnum), ownerEq(objextra.owner, scope))),
+      .where(and(eq(objextra.vnum, vnum), ownerEq(objextra.player_id, scope))),
   ]);
 
-  const { owner: _owner, ...objFields } = row;
+  const { player_id: _playerId, ...objFields } = row;
   return {
     ...objFields,
-    affects: affects.map(({ owner: _ao, ...fields }) => fields),
-    extras: extras.map(({ owner: _eo, ...fields }) => fields),
+    affects: affects.map(({ player_id: _ao, ...fields }) => fields),
+    extras: extras.map(({ player_id: _eo, ...fields }) => fields),
   };
 }
 
@@ -85,7 +87,7 @@ export async function createObject(
     max_exist: 0,
     max_struct: 0,
     name: "",
-    owner: scopeOwner(scope),
+    player_id: scopePlayerId(scope),
     price: 0,
     short_desc: "",
     spec_proc: 0,
@@ -106,31 +108,33 @@ export async function updateObject(
   data: Obj,
   scope: OwnerScope,
 ): Promise<void> {
-  const owner = scopeOwner(scope);
+  const player_id = scopePlayerId(scope);
   const { affects, extras, vnum: _vnum, ...objFields } = data;
 
   await immortalDb.transaction(async (tx) => {
     await tx
       .update(obj)
-      .set({ ...objFields, owner })
-      .where(and(eq(obj.vnum, vnum), ownerEq(obj.owner, scope)));
+      .set({ ...objFields, player_id })
+      .where(and(eq(obj.vnum, vnum), ownerEq(obj.player_id, scope)));
 
     // Replace affects atomically
     await tx
       .delete(objaffect)
-      .where(and(eq(objaffect.vnum, vnum), ownerEq(objaffect.owner, scope)));
+      .where(
+        and(eq(objaffect.vnum, vnum), ownerEq(objaffect.player_id, scope)),
+      );
     for (const affect of affects) {
       const { vnum: _av, ...fields } = affect;
-      await tx.insert(objaffect).values({ ...fields, owner, vnum });
+      await tx.insert(objaffect).values({ ...fields, player_id, vnum });
     }
 
     // Replace extras atomically
     await tx
       .delete(objextra)
-      .where(and(eq(objextra.vnum, vnum), ownerEq(objextra.owner, scope)));
+      .where(and(eq(objextra.vnum, vnum), ownerEq(objextra.player_id, scope)));
     for (const extra of extras) {
       const { vnum: _ev, ...fields } = extra;
-      await tx.insert(objextra).values({ ...fields, owner, vnum });
+      await tx.insert(objextra).values({ ...fields, player_id, vnum });
     }
   });
 }
@@ -142,13 +146,15 @@ export async function deleteObject(
   await immortalDb.transaction(async (tx) => {
     await tx
       .delete(objaffect)
-      .where(and(eq(objaffect.vnum, vnum), ownerEq(objaffect.owner, scope)));
+      .where(
+        and(eq(objaffect.vnum, vnum), ownerEq(objaffect.player_id, scope)),
+      );
     await tx
       .delete(objextra)
-      .where(and(eq(objextra.vnum, vnum), ownerEq(objextra.owner, scope)));
+      .where(and(eq(objextra.vnum, vnum), ownerEq(objextra.player_id, scope)));
     await tx
       .delete(obj)
-      .where(and(eq(obj.vnum, vnum), ownerEq(obj.owner, scope)));
+      .where(and(eq(obj.vnum, vnum), ownerEq(obj.player_id, scope)));
   });
 }
 
@@ -161,16 +167,19 @@ export async function deleteObjects(
     await tx
       .delete(objaffect)
       .where(
-        and(inArray(objaffect.vnum, vnums), ownerEq(objaffect.owner, scope)),
+        and(
+          inArray(objaffect.vnum, vnums),
+          ownerEq(objaffect.player_id, scope),
+        ),
       );
     await tx
       .delete(objextra)
       .where(
-        and(inArray(objextra.vnum, vnums), ownerEq(objextra.owner, scope)),
+        and(inArray(objextra.vnum, vnums), ownerEq(objextra.player_id, scope)),
       );
     const result = await tx
       .delete(obj)
-      .where(and(inArray(obj.vnum, vnums), ownerEq(obj.owner, scope)));
+      .where(and(inArray(obj.vnum, vnums), ownerEq(obj.player_id, scope)));
     deleted = result[0].affectedRows;
   });
   return deleted;
@@ -196,7 +205,7 @@ export async function searchObjects(
       .from(obj)
       .where(
         and(
-          ownerEq(obj.owner, scope),
+          ownerEq(obj.player_id, scope),
           vnumFilter ? or(vnumFilter, nameFilter) : nameFilter,
         ),
       )
@@ -237,7 +246,7 @@ export async function getObjectShortDesc(
   const [immortalRow] = await immortalDb
     .select({ short_desc: obj.short_desc })
     .from(obj)
-    .where(and(eq(obj.vnum, vnum), ownerEq(obj.owner, scope)))
+    .where(and(eq(obj.vnum, vnum), ownerEq(obj.player_id, scope)))
     .limit(1);
 
   if (immortalRow) {
@@ -264,7 +273,7 @@ export async function objectExists(
   const [row] = await immortalDb
     .select({ vnum: obj.vnum })
     .from(obj)
-    .where(and(eq(obj.vnum, vnum), ownerEq(obj.owner, scope)))
+    .where(and(eq(obj.vnum, vnum), ownerEq(obj.player_id, scope)))
     .limit(1);
 
   return row !== undefined;

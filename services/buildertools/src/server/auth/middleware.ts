@@ -3,11 +3,10 @@ import type { ZodType } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { createMiddleware } from "hono/factory";
 
-import type { SessionUser, VnumBlock } from "@/shared/schemas/auth.ts";
+import type { SessionUser } from "@/shared/schemas/auth.ts";
 
-import { hasPower, POWER } from "@/shared/powers.ts";
+import { hasPower } from "@/shared/powers.ts";
 
-import { getOtherBuildersBlocks } from "../queries/auth.ts";
 import { isVnumInBlocks } from "../queries/vnum-access.ts";
 import { getSession, touchSession } from "./session.ts";
 
@@ -17,15 +16,6 @@ export interface AuthEnv {
   Variables: {
     user: SessionUser;
   };
-}
-
-export function hasExpandedAccess(
-  powers: number[],
-  entityType: EntityType,
-): boolean {
-  if (!hasPower(powers, POWER.LOW)) return false;
-  if (entityType === "room" && !hasPower(powers, POWER.NO_LIMITS)) return false;
-  return true;
 }
 
 export const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
@@ -41,42 +31,42 @@ export const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
   return next();
 });
 
-export function requireVnumAccess(entityType: EntityType) {
+export function requireVnumAccess(_entityType: EntityType) {
   return createMiddleware<AuthEnv>(async (c, next) => {
     const vnum = Number(c.req.param("vnum"));
     if (!Number.isInteger(vnum) || vnum < 0) {
       return c.json({ error: "Invalid vnum" }, 400);
     }
     const user = c.get("user");
-    if (isVnumInBlocks(vnum, user.blocks)) {
+    if (user.isSenior || isVnumInBlocks(vnum, user.blocks)) {
       return next();
-    }
-    if (hasExpandedAccess(user.powers, entityType)) {
-      const otherBlocks = await getOtherBuildersBlocks(user.playerId);
-      if (!isVnumInBlocks(vnum, otherBlocks)) {
-        return next();
-      }
     }
     return c.json({ error: "Vnum outside assigned blocks" }, 403);
   });
 }
 
-export async function canAccessVnum(
-  vnum: number,
-  user: SessionUser,
-  entityType: EntityType,
-  prefetchedOtherBlocks?: VnumBlock[],
-): Promise<boolean> {
-  if (isVnumInBlocks(vnum, user.blocks)) return true;
-  if (!hasExpandedAccess(user.powers, entityType)) return false;
-  const otherBlocks =
-    prefetchedOtherBlocks ?? (await getOtherBuildersBlocks(user.playerId));
-  return !isVnumInBlocks(vnum, otherBlocks);
+export function canAccessVnum(vnum: number, user: SessionUser): boolean {
+  return user.isSenior || isVnumInBlocks(vnum, user.blocks);
 }
 
 export function requirePower(...requiredPowers: number[]) {
   return createMiddleware<AuthEnv>(async (c, next) => {
     const user = c.get("user");
+    if (user.isSenior) return next();
+    for (const p of requiredPowers) {
+      if (!hasPower(user.powers, p)) {
+        return c.json({ error: "Insufficient permissions" }, 403);
+      }
+    }
+    return next();
+  });
+}
+
+export function requireWritePower(...requiredPowers: number[]) {
+  return createMiddleware<AuthEnv>(async (c, next) => {
+    if (c.req.method === "GET") return next();
+    const user = c.get("user");
+    if (user.isSenior) return next();
     for (const p of requiredPowers) {
       if (!hasPower(user.powers, p)) {
         return c.json({ error: "Insufficient permissions" }, 403);

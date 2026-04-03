@@ -11,34 +11,32 @@ import {
 } from "../test-helpers.ts";
 
 /**
- * Tests for expanded vnum access (POWER_LOW / POWER_NO_LIMITS).
+ * Tests for senior user vnum access (POWER_LOW / POWER_NO_LIMITS).
  *
  * Setup:
- * - testUser: blocks 100-199, all powers (no POWER_LOW)
- * - expandedUser: blocks 200-299, POWER_LOW + POWER_NO_LIMITS + entity powers
- * - lowOnlyUser: blocks 300-399, POWER_LOW (no POWER_NO_LIMITS) + entity powers
+ * - testUser: blocks 100-199, all powers (no POWER_LOW) - standard builder
+ * - expandedUser: blocks 200-299, POWER_LOW + POWER_NO_LIMITS - senior user
+ * - lowOnlyUser: blocks 300-399, POWER_LOW - senior user
  *
- * Expanded users can access any vnum NOT assigned to another builder's blocks.
- * Vnums 100-199 are testUser's blocks - expanded users cannot access them.
- * Vnums 200-299 are expandedUser's own blocks (always accessible).
- * Vnums 300-399 are lowOnlyUser's own blocks (always accessible).
- * Vnums 400+ are unassigned - expanded users CAN access these via expansion.
+ * Senior users bypass ALL vnum checks and can access any vnum, including vnums
+ * inside other builders' blocks. Standard builders are restricted to their own
+ * blocks.
  *
- * Rooms additionally require POWER_NO_LIMITS for expansion. lowOnlyUser
- * (POWER_LOW only) can expand for mobs/objects but NOT rooms.
+ * Lists are always scoped by owner, so senior users only see their own entities
+ * regardless of which vnums those entities occupy.
  */
 
 // Vnums reserved for this test file
 const OWN_MOB = 200;
 const OWN_OBJ = 201;
 const OWN_ROOM = 202;
-const EXPANDED_MOB = 400;
-const EXPANDED_OBJ = 401;
-const EXPANDED_ROOM = 402;
-const EXPANDED_MOB_2 = 403;
-const BLOCKED_MOB = 100;
-const BLOCKED_OBJ = 101;
-const BLOCKED_ROOM = 102;
+const OUTSIDE_MOB = 400;
+const OUTSIDE_OBJ = 401;
+const OUTSIDE_ROOM = 402;
+const OUTSIDE_MOB_2 = 403;
+const OTHER_BLOCK_MOB = 100;
+const OTHER_BLOCK_OBJ = 101;
+const OTHER_BLOCK_ROOM = 102;
 const LOW_ONLY_MOB = 404;
 const LOW_ONLY_ROOM = 405;
 
@@ -53,7 +51,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  const allVnums = sql`(${OWN_MOB}, ${EXPANDED_MOB}, ${EXPANDED_MOB_2}, ${BLOCKED_MOB}, ${LOW_ONLY_MOB})`;
+  const allVnums = sql`(${OWN_MOB}, ${OUTSIDE_MOB}, ${OUTSIDE_MOB_2}, ${OTHER_BLOCK_MOB}, ${LOW_ONLY_MOB})`;
   await immortalDb.execute(
     sql`DELETE FROM mob_extra WHERE vnum IN ${allVnums}`,
   );
@@ -63,14 +61,14 @@ afterAll(async () => {
   );
   await immortalDb.execute(sql`DELETE FROM mob WHERE vnum IN ${allVnums}`);
 
-  const objVnums = sql`(${OWN_OBJ}, ${EXPANDED_OBJ}, ${BLOCKED_OBJ})`;
+  const objVnums = sql`(${OWN_OBJ}, ${OUTSIDE_OBJ}, ${OTHER_BLOCK_OBJ})`;
   await immortalDb.execute(
     sql`DELETE FROM objaffect WHERE vnum IN ${objVnums}`,
   );
   await immortalDb.execute(sql`DELETE FROM objextra WHERE vnum IN ${objVnums}`);
   await immortalDb.execute(sql`DELETE FROM obj WHERE vnum IN ${objVnums}`);
 
-  const roomVnums = sql`(${OWN_ROOM}, ${EXPANDED_ROOM}, ${BLOCKED_ROOM}, ${LOW_ONLY_ROOM})`;
+  const roomVnums = sql`(${OWN_ROOM}, ${OUTSIDE_ROOM}, ${OTHER_BLOCK_ROOM}, ${LOW_ONLY_ROOM})`;
   await immortalDb.execute(
     sql`DELETE FROM roomextra WHERE vnum IN ${roomVnums}`,
   );
@@ -176,93 +174,81 @@ const validMobUpdate = {
 // Mobs
 // ---------------------------------------------------------------------------
 
-describe("expanded mob access", () => {
-  test("expanded user can create mob in own block", async () => {
+describe("senior user mob access", () => {
+  test("senior user can create mob in own block", async () => {
     const res = await post("/api/mobs", expandedCookie, { vnum: OWN_MOB });
     expect(res.status).toBe(201);
   });
 
-  test("expanded user can create mob at unassigned vnum", async () => {
+  test("senior user can create mob at vnum outside own block", async () => {
     const res = await post("/api/mobs", expandedCookie, {
-      vnum: EXPANDED_MOB,
+      vnum: OUTSIDE_MOB,
     });
     expect(res.status).toBe(201);
   });
 
-  test("expanded user cannot create mob at vnum in another builder's block", async () => {
-    const res = await post("/api/mobs", expandedCookie, { vnum: BLOCKED_MOB });
-    expect(res.status).toBe(403);
+  test("senior user can create mob at vnum in another builder's block", async () => {
+    // Create a mob as testUser at their block first
+    await post("/api/mobs", testCookie, { vnum: OTHER_BLOCK_MOB });
+    // expandedUser (senior) can also create at that vnum under their own owner
+    const res = await post("/api/mobs", expandedCookie, {
+      vnum: OTHER_BLOCK_MOB,
+    });
+    expect(res.status).toBe(201);
   });
 
-  test("expanded user can GET mob at unassigned vnum", async () => {
-    const res = await get(`/api/mobs/${EXPANDED_MOB}`, expandedCookie);
+  test("senior user can GET mob at vnum outside own block", async () => {
+    const res = await get(`/api/mobs/${OUTSIDE_MOB}`, expandedCookie);
     expect(res.status).toBe(200);
   });
 
-  test("expanded user cannot GET mob at vnum in another builder's block", async () => {
-    // Create a mob as testUser at a vnum in their block
-    await post("/api/mobs", testCookie, { vnum: BLOCKED_MOB });
-    const res = await get(`/api/mobs/${BLOCKED_MOB}`, expandedCookie);
-    expect(res.status).toBe(403);
+  test("senior user can GET their own mob at vnum in another builder's block", async () => {
+    const res = await get(`/api/mobs/${OTHER_BLOCK_MOB}`, expandedCookie);
+    expect(res.status).toBe(200);
   });
 
-  test("expanded user can PUT mob at unassigned vnum", async () => {
-    const res = await put(`/api/mobs/${EXPANDED_MOB}`, expandedCookie, {
+  test("senior user can PUT mob at vnum outside own block", async () => {
+    const res = await put(`/api/mobs/${OUTSIDE_MOB}`, expandedCookie, {
       ...validMobUpdate,
-      vnum: EXPANDED_MOB,
+      vnum: OUTSIDE_MOB,
     });
     expect(res.status).toBe(200);
   });
 
-  test("expanded user cannot PUT mob at vnum in another builder's block", async () => {
-    const res = await put(`/api/mobs/${BLOCKED_MOB}`, expandedCookie, {
+  test("senior user can PUT their own mob at vnum in another builder's block", async () => {
+    const res = await put(`/api/mobs/${OTHER_BLOCK_MOB}`, expandedCookie, {
       ...validMobUpdate,
-      vnum: BLOCKED_MOB,
+      vnum: OTHER_BLOCK_MOB,
     });
-    expect(res.status).toBe(403);
-  });
-
-  test("expanded user can DELETE mob at unassigned vnum", async () => {
-    // Create then delete
-    await post("/api/mobs", expandedCookie, { vnum: EXPANDED_MOB_2 });
-    const res = await del(`/api/mobs/${EXPANDED_MOB_2}`, expandedCookie);
     expect(res.status).toBe(200);
   });
 
-  test("expanded user cannot DELETE mob at vnum in another builder's block", async () => {
-    const res = await del(`/api/mobs/${BLOCKED_MOB}`, expandedCookie);
-    expect(res.status).toBe(403);
-  });
-
-  test("list includes own-block and expanded mobs, excludes other builders", async () => {
-    const res = await get("/api/mobs", expandedCookie);
+  test("senior user can DELETE mob at vnum outside own block", async () => {
+    await post("/api/mobs", expandedCookie, { vnum: OUTSIDE_MOB_2 });
+    const res = await del(`/api/mobs/${OUTSIDE_MOB_2}`, expandedCookie);
     expect(res.status).toBe(200);
-    const body: unknown = await res.json();
-    // Includes own block and expanded vnums
-    expect(body).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ vnum: OWN_MOB }),
-        expect.objectContaining({ vnum: EXPANDED_MOB }),
-      ]),
-    );
-    // Does not include vnum from another builder's block
-    expect(body).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ vnum: BLOCKED_MOB })]),
-    );
   });
 
-  test("expanded user can bulk delete at expanded vnums", async () => {
-    // Re-create for bulk delete
-    await post("/api/mobs", expandedCookie, { vnum: EXPANDED_MOB_2 });
+  test("senior user can bulk delete at vnums outside own block", async () => {
+    await post("/api/mobs", expandedCookie, { vnum: OUTSIDE_MOB_2 });
     const res = await bulkDel("/api/mobs/bulk", expandedCookie, [
-      EXPANDED_MOB_2,
+      OUTSIDE_MOB_2,
     ]);
     expect(res.status).toBe(200);
   });
 
-  test("expanded user cannot bulk delete at vnums in another builder's block", async () => {
-    const res = await bulkDel("/api/mobs/bulk", expandedCookie, [BLOCKED_MOB]);
-    expect(res.status).toBe(403);
+  test("list shows only own entities regardless of vnum", async () => {
+    const res = await get("/api/mobs", expandedCookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    // Includes own mobs at any vnum, including one in another builder's block
+    expect(body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ vnum: OWN_MOB }),
+        expect.objectContaining({ vnum: OUTSIDE_MOB }),
+        expect.objectContaining({ vnum: OTHER_BLOCK_MOB }),
+      ]),
+    );
   });
 });
 
@@ -270,48 +256,45 @@ describe("expanded mob access", () => {
 // Objects
 // ---------------------------------------------------------------------------
 
-describe("expanded object access", () => {
-  test("expanded user can create object in own block", async () => {
+describe("senior user object access", () => {
+  test("senior user can create object in own block", async () => {
     const res = await post("/api/objects", expandedCookie, { vnum: OWN_OBJ });
     expect(res.status).toBe(201);
   });
 
-  test("expanded user can create object at unassigned vnum", async () => {
+  test("senior user can create object at vnum outside own block", async () => {
     const res = await post("/api/objects", expandedCookie, {
-      vnum: EXPANDED_OBJ,
+      vnum: OUTSIDE_OBJ,
     });
     expect(res.status).toBe(201);
   });
 
-  test("expanded user cannot create object at vnum in another builder's block", async () => {
+  test("senior user can create object at vnum in another builder's block", async () => {
     const res = await post("/api/objects", expandedCookie, {
-      vnum: BLOCKED_OBJ,
+      vnum: OTHER_BLOCK_OBJ,
     });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(201);
   });
 
-  test("expanded user can GET object at unassigned vnum", async () => {
-    const res = await get(`/api/objects/${EXPANDED_OBJ}`, expandedCookie);
+  test("senior user can GET object at vnum outside own block", async () => {
+    const res = await get(`/api/objects/${OUTSIDE_OBJ}`, expandedCookie);
     expect(res.status).toBe(200);
   });
 
-  test("expanded user cannot GET object at vnum in another builder's block", async () => {
-    const res = await get(`/api/objects/${BLOCKED_OBJ}`, expandedCookie);
-    expect(res.status).toBe(403);
+  test("senior user can GET their own object at vnum in another builder's block", async () => {
+    const res = await get(`/api/objects/${OTHER_BLOCK_OBJ}`, expandedCookie);
+    expect(res.status).toBe(200);
   });
 
-  test("list includes own-block and expanded objects, excludes other builders", async () => {
+  test("list shows only own entities regardless of vnum", async () => {
     const res = await get("/api/objects", expandedCookie);
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     expect(body).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ vnum: OWN_OBJ }),
-        expect.objectContaining({ vnum: EXPANDED_OBJ }),
+        expect.objectContaining({ vnum: OUTSIDE_OBJ }),
       ]),
-    );
-    expect(body).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ vnum: BLOCKED_OBJ })]),
     );
   });
 });
@@ -320,78 +303,73 @@ describe("expanded object access", () => {
 // Rooms
 // ---------------------------------------------------------------------------
 
-describe("expanded room access", () => {
-  test("expanded user can create room in own block", async () => {
+describe("senior user room access", () => {
+  test("senior user can create room in own block", async () => {
     const res = await post("/api/rooms", expandedCookie, { vnum: OWN_ROOM });
     expect(res.status).toBe(201);
   });
 
-  test("expanded user can create room at unassigned vnum", async () => {
+  test("senior user can create room at vnum outside own block", async () => {
     const res = await post("/api/rooms", expandedCookie, {
-      vnum: EXPANDED_ROOM,
+      vnum: OUTSIDE_ROOM,
     });
     expect(res.status).toBe(201);
   });
 
-  test("expanded user cannot create room at vnum in another builder's block", async () => {
+  test("senior user can create room at vnum in another builder's block", async () => {
     const res = await post("/api/rooms", expandedCookie, {
-      vnum: BLOCKED_ROOM,
+      vnum: OTHER_BLOCK_ROOM,
     });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(201);
   });
 
-  test("expanded user can GET room at unassigned vnum", async () => {
-    const res = await get(`/api/rooms/${EXPANDED_ROOM}`, expandedCookie);
+  test("senior user can GET room at vnum outside own block", async () => {
+    const res = await get(`/api/rooms/${OUTSIDE_ROOM}`, expandedCookie);
     expect(res.status).toBe(200);
   });
 
-  test("expanded user cannot GET room at vnum in another builder's block", async () => {
-    const res = await get(`/api/rooms/${BLOCKED_ROOM}`, expandedCookie);
-    expect(res.status).toBe(403);
+  test("senior user can GET their own room at vnum in another builder's block", async () => {
+    const res = await get(`/api/rooms/${OTHER_BLOCK_ROOM}`, expandedCookie);
+    expect(res.status).toBe(200);
   });
 
-  test("list includes own-block and expanded rooms, excludes other builders", async () => {
+  test("list shows only own entities regardless of vnum", async () => {
     const res = await get("/api/rooms", expandedCookie);
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     expect(body).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ vnum: OWN_ROOM }),
-        expect.objectContaining({ vnum: EXPANDED_ROOM }),
+        expect.objectContaining({ vnum: OUTSIDE_ROOM }),
       ]),
-    );
-    expect(body).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ vnum: BLOCKED_ROOM })]),
     );
   });
 });
 
 // ---------------------------------------------------------------------------
-// Rooms require POWER_NO_LIMITS for expansion (mobs/objects only need LOW)
+// LOW-only user has same senior bypass as LOW+NO_LIMITS
 // ---------------------------------------------------------------------------
 
-describe("POWER_LOW without POWER_NO_LIMITS", () => {
-  test("LOW-only user can create mob at unassigned vnum", async () => {
+describe("POWER_LOW user (without POWER_NO_LIMITS)", () => {
+  test("LOW-only user can create mob at vnum outside own block", async () => {
     const res = await post("/api/mobs", lowOnlyCookie, { vnum: LOW_ONLY_MOB });
     expect(res.status).toBe(201);
   });
 
-  test("LOW-only user cannot create room at unassigned vnum", async () => {
+  test("LOW-only user can create room at vnum outside own block", async () => {
     const res = await post("/api/rooms", lowOnlyCookie, {
       vnum: LOW_ONLY_ROOM,
     });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(201);
   });
 
-  test("LOW-only user can GET mob at unassigned vnum", async () => {
+  test("LOW-only user can GET mob at vnum outside own block", async () => {
     const res = await get(`/api/mobs/${LOW_ONLY_MOB}`, lowOnlyCookie);
     expect(res.status).toBe(200);
   });
 
-  test("LOW-only user cannot GET room at unassigned vnum", async () => {
-    // EXPANDED_ROOM was created by expandedUser - it's at an unassigned vnum
-    // lowOnlyUser has POWER_LOW but rooms need NO_LIMITS too
-    const res = await get(`/api/rooms/${EXPANDED_ROOM}`, lowOnlyCookie);
-    expect(res.status).toBe(403);
+  test("LOW-only user can GET room at vnum outside own block", async () => {
+    const res = await get(`/api/rooms/${LOW_ONLY_ROOM}`, lowOnlyCookie);
+    expect(res.status).toBe(200);
   });
 });

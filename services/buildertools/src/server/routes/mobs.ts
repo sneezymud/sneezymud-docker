@@ -8,14 +8,12 @@ import { isUnassignableMobSpecProc } from "@/shared/spec-proc-access.ts";
 import {
   type AuthEnv,
   canAccessVnum,
-  hasExpandedAccess,
   jsonValidator,
   requireAuth,
-  requirePower,
   requireVnumAccess,
+  requireWritePower,
 } from "../auth/middleware.ts";
 import { isDuplicateKeyError } from "../db.ts";
-import { getOtherBuildersBlocks } from "../queries/auth.ts";
 import {
   createMob,
   deleteMob,
@@ -29,22 +27,22 @@ import {
 export const mobRoutes = new Hono<AuthEnv>();
 
 mobRoutes.use(requireAuth);
-mobRoutes.use(requirePower(POWER.MEDIT));
+mobRoutes.use(requireWritePower(POWER.MEDIT));
 
 mobRoutes.get("/", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
-  const blocks = hasExpandedAccess(user.powers, "mob") ? null : user.blocks;
+  const scope = { playerId: user.playerId };
+  const blocks = user.isSenior ? null : user.blocks;
   const mobs = await listMobs(blocks, scope);
   return c.json(mobs);
 });
 
 mobRoutes.post("/", jsonValidator(mobCreateSchema), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const data = c.req.valid("json");
 
-  if (!(await canAccessVnum(data.vnum, user, "mob"))) {
+  if (!canAccessVnum(data.vnum, user)) {
     return c.json({ error: "Vnum outside assigned blocks" }, 403);
   }
 
@@ -66,7 +64,7 @@ mobRoutes.post("/", jsonValidator(mobCreateSchema), async (c) => {
 
 mobRoutes.get("/:vnum", requireVnumAccess("mob"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const vnum = Number(c.req.param("vnum"));
 
   const mob = await getMob(vnum, scope);
@@ -83,7 +81,7 @@ mobRoutes.put(
   jsonValidator(mobInputSchema),
   async (c) => {
     const user = c.get("user");
-    const scope = { owner: user.playerId };
+    const scope = { playerId: user.playerId };
     const vnum = Number(c.req.param("vnum"));
 
     const current = await getMob(vnum, scope);
@@ -93,10 +91,18 @@ mobRoutes.put(
 
     const data = c.req.valid("json");
     if (
+      !user.isSenior &&
       !hasPower(user.powers, POWER.MEDIT_IMP_POWER) &&
-      isUnassignableMobSpecProc(data.spec_proc)
+      isUnassignableMobSpecProc(data.spec_proc) &&
+      data.spec_proc !== current.spec_proc
     ) {
-      data.spec_proc = current.spec_proc;
+      return c.json(
+        {
+          error:
+            'Changing "spec_proc" to an unassignable value requires POWER_MEDIT_IMP_POWER',
+        },
+        403,
+      );
     }
     await updateMob(vnum, data, scope);
     const updated = await getMob(vnum, scope);
@@ -106,18 +112,13 @@ mobRoutes.put(
 
 mobRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const { vnums } = c.req.valid("json");
 
-  const otherBlocks = hasExpandedAccess(user.powers, "mob")
-    ? await getOtherBuildersBlocks(user.playerId)
-    : undefined;
-  const accessChecks = await Promise.all(
-    vnums.map(async (v) => ({
-      ok: await canAccessVnum(v, user, "mob", otherBlocks),
-      v,
-    })),
-  );
+  const accessChecks = vnums.map((v) => ({
+    ok: canAccessVnum(v, user),
+    v,
+  }));
   const unauthorized = accessChecks.filter((r) => !r.ok).map((r) => r.v);
   if (unauthorized.length > 0) {
     return c.json(
@@ -132,7 +133,7 @@ mobRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
 
 mobRoutes.delete("/:vnum", requireVnumAccess("mob"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const vnum = Number(c.req.param("vnum"));
 
   if (!(await mobExists(vnum, scope))) {

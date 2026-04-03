@@ -32,6 +32,7 @@ describe("POST /api/auth/login", () => {
     expect(body).toEqual(
       expect.objectContaining({
         blocks: testUser.blocks,
+        isSenior: testUser.isSenior,
         playerName: testUser.playerName,
         username: testUser.username,
       }),
@@ -69,7 +70,7 @@ describe("POST /api/auth/login", () => {
 
   test("user with no vnum blocks can log in with POWER_BUILDER", async () => {
     const res = await loginRequest({
-      password: noBlocksUser.password,
+      password: "testpass",
       username: noBlocksUser.username,
     });
 

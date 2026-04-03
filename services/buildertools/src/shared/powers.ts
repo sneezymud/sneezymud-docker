@@ -18,8 +18,15 @@ export const POWER = {
   REDIT: 1,
   REDIT_ENABLED: 2,
   RSAVE: 5,
+  WIZARD: 31,
 } as const;
 
 export function hasPower(powers: number[], power: number): boolean {
   return powers.includes(power);
+}
+
+const SENIOR_POWERS = [POWER.LOW, POWER.NO_LIMITS, POWER.WIZARD] as const;
+
+export function isSenior(powers: number[]): boolean {
+  return SENIOR_POWERS.some((p) => powers.includes(p));
 }

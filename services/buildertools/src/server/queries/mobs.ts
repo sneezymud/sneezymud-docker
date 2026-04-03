@@ -7,7 +7,7 @@ import { mobExtraSchema } from "@/shared/schemas/mob.ts";
 
 import { immortalDb } from "../db.ts";
 import { mob, mobExtra, mobImm, mobresponses } from "../schema/immortal.ts";
-import { ownerEq, type OwnerScope, scopeOwner } from "./owner-scope.ts";
+import { ownerEq, type OwnerScope, scopePlayerId } from "./owner-scope.ts";
 
 export async function listMobs(
   blocks: null | VnumBlock[],
@@ -35,7 +35,7 @@ export async function listMobs(
       vnum: mob.vnum,
     })
     .from(mob)
-    .where(and(ownerEq(mob.owner, scope), blockFilter))
+    .where(and(ownerEq(mob.player_id, scope), blockFilter))
     .orderBy(mob.vnum);
 }
 
@@ -46,7 +46,7 @@ export async function getMob(
   const [row] = await immortalDb
     .select()
     .from(mob)
-    .where(and(eq(mob.vnum, vnum), ownerEq(mob.owner, scope)));
+    .where(and(eq(mob.vnum, vnum), ownerEq(mob.player_id, scope)));
 
   if (!row) {
     return null;
@@ -56,21 +56,26 @@ export async function getMob(
     immortalDb
       .select()
       .from(mobExtra)
-      .where(and(eq(mobExtra.vnum, vnum), ownerEq(mobExtra.owner, scope))),
+      .where(and(eq(mobExtra.vnum, vnum), ownerEq(mobExtra.player_id, scope))),
     immortalDb
       .select()
       .from(mobImm)
-      .where(and(eq(mobImm.vnum, vnum), ownerEq(mobImm.owner, scope))),
+      .where(and(eq(mobImm.vnum, vnum), ownerEq(mobImm.player_id, scope))),
   ]);
 
-  const { letter: _letter, owner: _owner, pos: _pos, ...mobFields } = row;
+  const {
+    letter: _letter,
+    player_id: _playerId,
+    pos: _pos,
+    ...mobFields
+  } = row;
   return {
     ...mobFields,
     adjacent_sound: mobFields.adjacent_sound ?? "",
-    extras: extras.map(({ description, owner: _eo, ...fields }) =>
+    extras: extras.map(({ description, player_id: _eo, ...fields }) =>
       mobExtraSchema.parse({ ...fields, description: description ?? "" }),
     ),
-    immunities: immunities.map(({ amt, owner: _io, ...fields }) => ({
+    immunities: immunities.map(({ amt, player_id: _io, ...fields }) => ({
       ...fields,
       amt: amt ?? 0,
     })),
@@ -113,8 +118,8 @@ export async function createMob(
     long_desc: "",
     max_exist: 0,
     name: "",
-    owner: scopeOwner(scope),
     per: 0,
+    player_id: scopePlayerId(scope),
     pos: 9,
     race: 0,
     sex: 0,
@@ -136,32 +141,32 @@ export async function updateMob(
   data: Mob,
   scope: OwnerScope,
 ): Promise<void> {
-  const owner = scopeOwner(scope);
+  const player_id = scopePlayerId(scope);
   const { extras, immunities, vnum: _vnum, ...mobFields } = data;
   const letter = mobFields.local_sound && !mobFields.adjacent_sound ? "A" : "L";
 
   await immortalDb.transaction(async (tx) => {
     await tx
       .update(mob)
-      .set({ ...mobFields, letter, owner, pos: mobFields.def_position })
-      .where(and(eq(mob.vnum, vnum), ownerEq(mob.owner, scope)));
+      .set({ ...mobFields, letter, player_id, pos: mobFields.def_position })
+      .where(and(eq(mob.vnum, vnum), ownerEq(mob.player_id, scope)));
 
     // Replace extras atomically
     await tx
       .delete(mobExtra)
-      .where(and(eq(mobExtra.vnum, vnum), ownerEq(mobExtra.owner, scope)));
+      .where(and(eq(mobExtra.vnum, vnum), ownerEq(mobExtra.player_id, scope)));
     for (const extra of extras) {
       const { vnum: _ev, ...fields } = extra;
-      await tx.insert(mobExtra).values({ ...fields, owner, vnum });
+      await tx.insert(mobExtra).values({ ...fields, player_id, vnum });
     }
 
     // Replace immunities atomically
     await tx
       .delete(mobImm)
-      .where(and(eq(mobImm.vnum, vnum), ownerEq(mobImm.owner, scope)));
+      .where(and(eq(mobImm.vnum, vnum), ownerEq(mobImm.player_id, scope)));
     for (const imm of immunities) {
       const { vnum: _iv, ...fields } = imm;
-      await tx.insert(mobImm).values({ ...fields, owner, vnum });
+      await tx.insert(mobImm).values({ ...fields, player_id, vnum });
     }
   });
 }
@@ -173,18 +178,21 @@ export async function deleteMob(
   await immortalDb.transaction(async (tx) => {
     await tx
       .delete(mobExtra)
-      .where(and(eq(mobExtra.vnum, vnum), ownerEq(mobExtra.owner, scope)));
+      .where(and(eq(mobExtra.vnum, vnum), ownerEq(mobExtra.player_id, scope)));
     await tx
       .delete(mobImm)
-      .where(and(eq(mobImm.vnum, vnum), ownerEq(mobImm.owner, scope)));
+      .where(and(eq(mobImm.vnum, vnum), ownerEq(mobImm.player_id, scope)));
     await tx
       .delete(mobresponses)
       .where(
-        and(eq(mobresponses.vnum, vnum), ownerEq(mobresponses.owner, scope)),
+        and(
+          eq(mobresponses.vnum, vnum),
+          ownerEq(mobresponses.player_id, scope),
+        ),
       );
     await tx
       .delete(mob)
-      .where(and(eq(mob.vnum, vnum), ownerEq(mob.owner, scope)));
+      .where(and(eq(mob.vnum, vnum), ownerEq(mob.player_id, scope)));
   });
 }
 
@@ -197,22 +205,24 @@ export async function deleteMobs(
     await tx
       .delete(mobExtra)
       .where(
-        and(inArray(mobExtra.vnum, vnums), ownerEq(mobExtra.owner, scope)),
+        and(inArray(mobExtra.vnum, vnums), ownerEq(mobExtra.player_id, scope)),
       );
     await tx
       .delete(mobImm)
-      .where(and(inArray(mobImm.vnum, vnums), ownerEq(mobImm.owner, scope)));
+      .where(
+        and(inArray(mobImm.vnum, vnums), ownerEq(mobImm.player_id, scope)),
+      );
     await tx
       .delete(mobresponses)
       .where(
         and(
           inArray(mobresponses.vnum, vnums),
-          ownerEq(mobresponses.owner, scope),
+          ownerEq(mobresponses.player_id, scope),
         ),
       );
     const result = await tx
       .delete(mob)
-      .where(and(inArray(mob.vnum, vnums), ownerEq(mob.owner, scope)));
+      .where(and(inArray(mob.vnum, vnums), ownerEq(mob.player_id, scope)));
     deleted = result[0].affectedRows;
   });
   return deleted;
@@ -225,7 +235,7 @@ export async function mobExists(
   const [row] = await immortalDb
     .select({ vnum: mob.vnum })
     .from(mob)
-    .where(and(eq(mob.vnum, vnum), ownerEq(mob.owner, scope)))
+    .where(and(eq(mob.vnum, vnum), ownerEq(mob.player_id, scope)))
     .limit(1);
 
   return row !== undefined;

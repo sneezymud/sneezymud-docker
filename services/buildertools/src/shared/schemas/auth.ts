@@ -16,6 +16,7 @@ export type VnumBlock = z.infer<typeof vnumBlockSchema>;
 
 export const sessionUserSchema = z.object({
   blocks: z.array(vnumBlockSchema),
+  isSenior: z.boolean(),
   playerId: z.number().int(),
   playerName: z.string(),
   powers: z.array(z.number().int()),

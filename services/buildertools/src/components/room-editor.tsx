@@ -1,4 +1,8 @@
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+
 import { BackLink } from "@/components/back-link.tsx";
+import { DiffButton, DiffSheet } from "@/components/diff-sheet.tsx";
 import { EntityForm } from "@/components/entity-form.tsx";
 import { EntityHeader } from "@/components/entity-header.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
@@ -7,9 +11,15 @@ import { RoomExtras } from "@/components/room-extras.tsx";
 import { EntityFormSkeleton } from "@/components/skeleton.tsx";
 import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog.tsx";
 import { useRoomEditor } from "@/hooks/use-room-editor.ts";
+import { apiFetch } from "@/shared/api-client.ts";
+import { roomDiffFields } from "@/shared/fields/diff-fields.ts";
 import { getRoomFieldGroups } from "@/shared/fields/room-fields.tsx";
+import { resolvePermissions } from "@/shared/permissions.ts";
+import { roomDiffSchema } from "@/shared/schemas/publish.ts";
 
 export function RoomEditor({ vnumParam }: { vnumParam: string }) {
+  const [diffOpen, setDiffOpen] = useState(false);
+
   const {
     currentValues,
     deletePending,
@@ -38,6 +48,17 @@ export function RoomEditor({ vnumParam }: { vnumParam: string }) {
     zoneEntries,
     zonesError,
   } = useRoomEditor(vnumParam);
+
+  const permissions = resolvePermissions(
+    user?.powers ?? [],
+    user?.isSenior ?? false,
+  );
+
+  const diffQuery = useQuery({
+    enabled: false,
+    queryFn: () => apiFetch(`/api/publish/diff/rooms/${vnum}`, roomDiffSchema),
+    queryKey: ["diff", "room", vnum],
+  });
 
   if (isLoading || isError || !room) {
     return (
@@ -75,6 +96,25 @@ export function RoomEditor({ vnumParam }: { vnumParam: string }) {
         onReset={resetEdits}
         onSave={handleSave}
         saving={saving}
+      >
+        <DiffButton
+          isFetching={diffQuery.isFetching}
+          onDiff={() => {
+            void diffQuery.refetch();
+            setDiffOpen(true);
+          }}
+        />
+      </EntityHeader>
+
+      <DiffSheet
+        canPublish={permissions.canPublish}
+        description={`Room ${vnum}: ${room.name || "(unnamed)"}`}
+        diffQuery={diffQuery}
+        entityType="rooms"
+        fields={roomDiffFields}
+        onOpenChange={setDiffOpen}
+        open={diffOpen}
+        vnum={vnum}
       />
 
       <EntityForm

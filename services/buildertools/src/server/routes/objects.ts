@@ -8,14 +8,12 @@ import { isUnassignableObjSpecProc } from "@/shared/spec-proc-access.ts";
 import {
   type AuthEnv,
   canAccessVnum,
-  hasExpandedAccess,
   jsonValidator,
   requireAuth,
-  requirePower,
   requireVnumAccess,
+  requireWritePower,
 } from "../auth/middleware.ts";
 import { isDuplicateKeyError } from "../db.ts";
-import { getOtherBuildersBlocks } from "../queries/auth.ts";
 import {
   createObject,
   deleteObject,
@@ -31,22 +29,22 @@ import {
 export const objectRoutes = new Hono<AuthEnv>();
 
 objectRoutes.use(requireAuth);
-objectRoutes.use(requirePower(POWER.OEDIT));
+objectRoutes.use(requireWritePower(POWER.OEDIT));
 
 objectRoutes.get("/", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
-  const blocks = hasExpandedAccess(user.powers, "object") ? null : user.blocks;
+  const scope = { playerId: user.playerId };
+  const blocks = user.isSenior ? null : user.blocks;
   const objects = await listObjects(blocks, scope);
   return c.json(objects);
 });
 
 objectRoutes.post("/", jsonValidator(objCreateSchema), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const data = c.req.valid("json");
 
-  if (!(await canAccessVnum(data.vnum, user, "object"))) {
+  if (!canAccessVnum(data.vnum, user)) {
     return c.json({ error: "Vnum outside assigned blocks" }, 403);
   }
 
@@ -68,7 +66,7 @@ objectRoutes.post("/", jsonValidator(objCreateSchema), async (c) => {
 
 objectRoutes.get("/name/:vnum", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const vnum = Number(c.req.param("vnum"));
   const name = await getObjectShortDesc(vnum, scope);
   return c.json({ name, vnum });
@@ -76,7 +74,7 @@ objectRoutes.get("/name/:vnum", async (c) => {
 
 objectRoutes.get("/search", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const query = c.req.query("q") ?? "";
   if (query.length < 2) {
     return c.json([]);
@@ -87,7 +85,7 @@ objectRoutes.get("/search", async (c) => {
 
 objectRoutes.get("/:vnum", requireVnumAccess("object"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const vnum = Number(c.req.param("vnum"));
 
   const obj = await getObject(vnum, scope);
@@ -104,7 +102,7 @@ objectRoutes.put(
   jsonValidator(objInputSchema),
   async (c) => {
     const user = c.get("user");
-    const scope = { owner: user.playerId };
+    const scope = { playerId: user.playerId };
     const vnum = Number(c.req.param("vnum"));
 
     const current = await getObject(vnum, scope);
@@ -114,35 +112,66 @@ objectRoutes.put(
 
     const data = c.req.valid("json");
 
-    // Enforce field-level power restrictions by preserving DB values
+    // Enforce field-level power restrictions
     const ITEM_WEAPON = 5;
     const PROTOTYPE_BIT = 1 << 4;
-    if (!hasPower(user.powers, POWER.OEDIT_COST)) {
-      data.price = current.price;
-    }
-    if (!hasPower(user.powers, POWER.OEDIT_APPLYS)) {
-      data.affects = current.affects;
-    }
-    if (
-      !hasPower(user.powers, POWER.OEDIT_WEAPONS) &&
-      data.type === ITEM_WEAPON
-    ) {
-      data.val0 = current.val0;
-      data.val1 = current.val1;
-      data.val2 = current.val2;
-      data.val3 = current.val3;
-    }
-    if (!hasPower(user.powers, POWER.OEDIT_NOPROTOS)) {
-      // Preserve the PROTOTYPE bit from the current value
-      data.action_flag =
-        (data.action_flag & ~PROTOTYPE_BIT) |
-        (current.action_flag & PROTOTYPE_BIT);
-    }
-    if (
-      !hasPower(user.powers, POWER.OEDIT_IMP_POWER) &&
-      isUnassignableObjSpecProc(data.spec_proc)
-    ) {
-      data.spec_proc = current.spec_proc;
+    if (!user.isSenior) {
+      if (
+        !hasPower(user.powers, POWER.OEDIT_COST) &&
+        data.price !== current.price
+      ) {
+        return c.json(
+          { error: 'Changing "price" requires POWER_OEDIT_COST' },
+          403,
+        );
+      }
+      if (
+        !hasPower(user.powers, POWER.OEDIT_APPLYS) &&
+        JSON.stringify(data.affects) !== JSON.stringify(current.affects)
+      ) {
+        return c.json(
+          { error: 'Changing "affects" requires POWER_OEDIT_APPLYS' },
+          403,
+        );
+      }
+      if (
+        !hasPower(user.powers, POWER.OEDIT_WEAPONS) &&
+        data.type === ITEM_WEAPON &&
+        (data.val0 !== current.val0 ||
+          data.val1 !== current.val1 ||
+          data.val2 !== current.val2 ||
+          data.val3 !== current.val3)
+      ) {
+        return c.json(
+          { error: "Changing weapon values requires POWER_OEDIT_WEAPONS" },
+          403,
+        );
+      }
+      if (
+        !hasPower(user.powers, POWER.OEDIT_NOPROTOS) &&
+        (data.action_flag & PROTOTYPE_BIT) !==
+          (current.action_flag & PROTOTYPE_BIT)
+      ) {
+        return c.json(
+          {
+            error: "Changing the prototype flag requires POWER_OEDIT_NOPROTOS",
+          },
+          403,
+        );
+      }
+      if (
+        !hasPower(user.powers, POWER.OEDIT_IMP_POWER) &&
+        isUnassignableObjSpecProc(data.spec_proc) &&
+        data.spec_proc !== current.spec_proc
+      ) {
+        return c.json(
+          {
+            error:
+              'Changing "spec_proc" to an unassignable value requires POWER_OEDIT_IMP_POWER',
+          },
+          403,
+        );
+      }
     }
 
     await updateObject(vnum, data, scope);
@@ -153,18 +182,13 @@ objectRoutes.put(
 
 objectRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const { vnums } = c.req.valid("json");
 
-  const otherBlocks = hasExpandedAccess(user.powers, "object")
-    ? await getOtherBuildersBlocks(user.playerId)
-    : undefined;
-  const accessChecks = await Promise.all(
-    vnums.map(async (v) => ({
-      ok: await canAccessVnum(v, user, "object", otherBlocks),
-      v,
-    })),
-  );
+  const accessChecks = vnums.map((v) => ({
+    ok: canAccessVnum(v, user),
+    v,
+  }));
   const unauthorized = accessChecks.filter((r) => !r.ok).map((r) => r.v);
   if (unauthorized.length > 0) {
     return c.json(
@@ -179,7 +203,7 @@ objectRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
 
 objectRoutes.delete("/:vnum", requireVnumAccess("object"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const scope = { playerId: user.playerId };
   const vnum = Number(c.req.param("vnum"));
 
   if (!(await objectExists(vnum, scope))) {
