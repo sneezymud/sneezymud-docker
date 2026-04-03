@@ -15,15 +15,16 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 160, 161, 162, 165)`,
+    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 165)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 160, 161, 162, 165)`,
+    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 165)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM obj WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 160, 161, 162, 165)`,
+    sql`DELETE FROM obj WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 165)`,
   );
   await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum IN (5100, 5101)`);
+  await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum BETWEEN 6100 AND 6124`);
 });
 
 const validObjUpdate = {
@@ -317,6 +318,30 @@ describe("object search", () => {
 
   // Search crosses block boundaries intentionally - key pickers need
   // to find objects across all builders' blocks and the production database.
+  test("search finds object by numeric vnum", async () => {
+    await authRequest(app, "/api/objects", cookie, {
+      body: JSON.stringify({ vnum: 144 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(app, "/api/objects/144", cookie, {
+      body: JSON.stringify({
+        ...validObjUpdate,
+        short_desc: "a vnum search test object",
+        vnum: 144,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    const res = await authRequest(app, "/api/objects/search?q=144", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual(
+      expect.arrayContaining([expect.objectContaining({ vnum: 144 })]),
+    );
+  });
+
   test("search finds objects in sneezy database too", async () => {
     const res = await authRequest(
       app,
@@ -561,6 +586,54 @@ describe("update preserves unchanged fields", () => {
   });
 });
 
+// -- Idempotency --
+
+describe("save idempotency", () => {
+  test("saving the same payload twice produces identical data", async () => {
+    await authRequest(app, "/api/objects", cookie, {
+      body: JSON.stringify({ vnum: 115 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const payload = {
+      ...validObjUpdate,
+      affects: [{ mod1: 5, mod2: 0, type: 1, vnum: 115 }],
+      extras: [{ description: "a shiny gem", name: "gem", vnum: 115 }],
+      name: "idempotent sword",
+      short_desc: "an idempotent sword",
+      type: 5,
+      vnum: 115,
+    };
+
+    // First save
+    await authRequest(app, "/api/objects/115", cookie, {
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    const getA = await authRequest(app, "/api/objects/115", cookie);
+    expect(getA.status).toBe(200);
+    const snapshotA: unknown = await getA.json();
+    // Validate shape through Zod
+    const parsedA = objSchema.parse(snapshotA);
+
+    // Second save (identical payload)
+    await authRequest(app, "/api/objects/115", cookie, {
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    const getB = await authRequest(app, "/api/objects/115", cookie);
+    expect(getB.status).toBe(200);
+    const snapshotB: unknown = await getB.json();
+    const parsedB = objSchema.parse(snapshotB);
+
+    // Full deep equality - no duplicate child rows, no changed values
+    expect(parsedB).toEqual(parsedA);
+  });
+});
+
 // -- Schema validation --
 
 describe("response schema validation", () => {
@@ -570,5 +643,64 @@ describe("response schema validation", () => {
     const body: unknown = await res.json();
     const parsed = objSchema.parse(body);
     expect(parsed.vnum).toBe(114);
+  });
+});
+
+// -- Search pagination --
+
+describe("object search pagination", () => {
+  test("search returns at most 20 results", async () => {
+    // Insert 25 objects in sneezy database with matching names
+    for (let i = 0; i < 25; i++) {
+      const vnum = 6100 + i;
+      await sneezyDb.execute(sql`
+        INSERT IGNORE INTO obj (vnum, name, short_desc, long_desc, action_desc)
+        VALUES (${vnum}, ${"ObjPaginationTest " + String(i)}, '', '', '')
+      `);
+    }
+
+    const res = await authRequest(
+      app,
+      "/api/objects/search?q=ObjPaginationTest",
+      cookie,
+    );
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(Array.isArray(body)).toBe(true);
+    if (!Array.isArray(body)) throw new Error("expected array");
+    expect(body.length).toBeLessThanOrEqual(20);
+  });
+});
+
+// -- Multiple affects ordering --
+
+describe("multiple affects", () => {
+  test("multiple affects are saved and returned with correct count and values", async () => {
+    await authRequest(app, "/api/objects", cookie, {
+      body: JSON.stringify({ vnum: 145 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const affects = [
+      { mod1: 1, mod2: 0, type: 19, vnum: 145 },
+      { mod1: 2, mod2: 0, type: 17, vnum: 145 },
+      { mod1: 3, mod2: 0, type: 18, vnum: 145 },
+    ];
+    await authRequest(app, "/api/objects/145", cookie, {
+      body: JSON.stringify({ ...validObjUpdate, affects, vnum: 145 }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    const res = await authRequest(app, "/api/objects/145", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+
+    const parsed = objSchema.parse(body);
+    expect(parsed.affects).toHaveLength(3);
+    // Verify all three types are present (DB may return in any order)
+    const types = parsed.affects.map((a) => a.type).toSorted((a, b) => a - b);
+    expect(types).toEqual([17, 18, 19]);
   });
 });

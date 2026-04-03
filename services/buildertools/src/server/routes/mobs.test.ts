@@ -20,16 +20,16 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM mob_extra WHERE vnum IN (120, 121, 170, 171, 172, 175, 176, 177, 178, 180, 181, 300)`,
+    sql`DELETE FROM mob_extra WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 300)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mob_imm WHERE vnum IN (120, 121, 170, 171, 172, 175, 176, 177, 178, 180, 181, 300)`,
+    sql`DELETE FROM mob_imm WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 300)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mobresponses WHERE vnum IN (120, 121, 170, 171, 172, 175, 176, 177, 178, 180, 181, 300)`,
+    sql`DELETE FROM mobresponses WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 300)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mob WHERE vnum IN (120, 121, 170, 171, 172, 175, 176, 177, 178, 180, 181, 300)`,
+    sql`DELETE FROM mob WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 300)`,
   );
 });
 
@@ -48,7 +48,7 @@ const validMobUpdate = {
   damage_level: 0,
   damage_precision: 0,
   def_position: 9,
-  description: "",
+  description: "A test mob.",
   dex: 0,
   extras: [],
   fact_perc: 0,
@@ -62,13 +62,13 @@ const validMobUpdate = {
   kar: 0,
   level: 1,
   local_sound: "",
-  long_desc: "",
+  long_desc: "A test mob stands here.",
   max_exist: 0,
-  name: "",
+  name: "test mob",
   per: 0,
   race: 0,
   sex: 0,
-  short_desc: "",
+  short_desc: "a test mob",
   skin: 0,
   spe: 0,
   spec_proc: 0,
@@ -504,6 +504,49 @@ describe("delete cascades to child tables", () => {
     expect(body).toHaveProperty("extras", []);
     expect(body).toHaveProperty("immunities", []);
   });
+
+  test("deleting a mob also removes its mob responses", async () => {
+    // Create mob
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum: 143 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    // Create mob response
+    const putRes = await authRequest(app, "/api/mob-responses/143", cookie, {
+      body: JSON.stringify({ response: 'say {"hello";}', vnum: 143 }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(putRes.status).toBe(200);
+
+    // Verify response exists
+    const getBeforeDelete = await authRequest(
+      app,
+      "/api/mob-responses/143",
+      cookie,
+    );
+    expect(getBeforeDelete.status).toBe(200);
+    const beforeBody: unknown = await getBeforeDelete.json();
+    expect(beforeBody).toHaveProperty("response", 'say {"hello";}');
+
+    // Delete mob
+    const delRes = await authRequest(app, "/api/mobs/143", cookie, {
+      method: "DELETE",
+    });
+    expect(delRes.status).toBe(200);
+
+    // Mob response endpoint returns 404 (mobExists check fails)
+    const getAfterDelete = await authRequest(
+      app,
+      "/api/mob-responses/143",
+      cookie,
+    );
+    expect(getAfterDelete.status).toBe(404);
+    const afterBody: unknown = await getAfterDelete.json();
+    expect(afterBody).toHaveProperty("error", "Mob not found");
+  });
 });
 
 // Valid mob payload that satisfies mobInputSchema (non-empty required strings)
@@ -612,11 +655,17 @@ describe("save idempotency", () => {
 
 describe("response schema validation", () => {
   test("GET mob response conforms to mobSchema", async () => {
-    const res = await authRequest(app, "/api/mobs/180", cookie);
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum: 182 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const res = await authRequest(app, "/api/mobs/182", cookie);
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     const parsed = mobSchema.parse(body);
-    expect(parsed.vnum).toBe(180);
+    expect(parsed.vnum).toBe(182);
   });
 });
 

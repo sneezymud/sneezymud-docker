@@ -244,7 +244,7 @@ describe("object power gates", () => {
 
     // Set PROTOTYPE bit via direct DB (simulating a higher-power builder set it)
     await immortalDb.execute(
-      sql`UPDATE obj SET action_flag = ${PROTOTYPE_BIT} WHERE vnum = 193 AND owner = 'OtherBuilder'`,
+      sql`UPDATE obj SET action_flag = ${PROTOTYPE_BIT} WHERE vnum = 193 AND player_id = 99997`,
     );
 
     // otherbuilder tries to clear it (action_flag=0)

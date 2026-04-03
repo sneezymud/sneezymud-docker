@@ -5,7 +5,11 @@ import { roomSchema } from "@/shared/schemas/room.ts";
 
 import { app } from "../app.ts";
 import { immortalDb, sneezyDb } from "../db.ts";
-import { authRequest, getAuthCookie } from "../test-helpers.ts";
+import {
+  authRequest,
+  getAuthCookie,
+  getLowOnlyAuthCookie,
+} from "../test-helpers.ts";
 
 let cookie: string;
 
@@ -15,15 +19,15 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM roomextra WHERE vnum IN (100, 101, 102, 103, 104, 105, 106, 150, 151, 152, 155)`,
+    sql`DELETE FROM roomextra WHERE vnum IN (100, 101, 102, 103, 104, 105, 106, 107, 140, 150, 151, 152, 155)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM roomexit WHERE vnum IN (100, 101, 102, 103, 104, 105, 106, 150, 151, 152, 155)`,
+    sql`DELETE FROM roomexit WHERE vnum IN (100, 101, 102, 103, 104, 105, 106, 107, 140, 150, 151, 152, 155)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM room WHERE vnum IN (100, 101, 102, 103, 104, 105, 106, 150, 151, 152, 155)`,
+    sql`DELETE FROM room WHERE vnum IN (100, 101, 102, 103, 104, 105, 106, 107, 140, 150, 151, 152, 155)`,
   );
-  await sneezyDb.execute(sql`DELETE FROM room WHERE vnum IN (5000, 5001)`);
+  await sneezyDb.execute(sql`DELETE FROM room WHERE vnum IN (140, 5000, 5001)`);
 });
 
 const validRoomUpdate = {
@@ -62,6 +66,24 @@ describe("auth enforcement", () => {
       headers: { Cookie: cookie },
     });
     expect(res.status).toBe(403);
+  });
+});
+
+// -- Invalid vnum parameters --
+
+describe("invalid vnum parameters", () => {
+  test("non-numeric vnum returns 400", async () => {
+    const res = await authRequest(app, "/api/rooms/abc", cookie);
+    expect(res.status).toBe(400);
+    const body: unknown = await res.json();
+    expect(body).toHaveProperty("error", "Invalid vnum");
+  });
+
+  test("negative vnum returns 400", async () => {
+    const res = await authRequest(app, "/api/rooms/-1", cookie);
+    expect(res.status).toBe(400);
+    const body: unknown = await res.json();
+    expect(body).toHaveProperty("error", "Invalid vnum");
   });
 });
 
@@ -893,5 +915,117 @@ describe("room search pagination", () => {
     for (let i = 0; i < 25; i++) {
       await sneezyDb.execute(sql`DELETE FROM room WHERE vnum = ${6000 + i}`);
     }
+  });
+});
+
+// -- Search deduplication --
+
+describe("search deduplication across databases", () => {
+  beforeAll(async () => {
+    // Insert a room in sneezy (production) with a distinctive name
+    await sneezyDb.execute(sql`
+      INSERT INTO room (vnum, name, x, y, z, description, zone, room_flag, sector, teletime, teletarg, telelook, river_speed, river_dir, capacity, height, spec)
+      VALUES (140, 'Sneezy Dedup Room', 0, 0, 0, '', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+    `);
+
+    // Create the same vnum in immortal with a different name
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: 140 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(app, "/api/rooms/140", cookie, {
+      body: JSON.stringify({
+        ...validRoomUpdate,
+        name: "Immortal Dedup Room",
+        vnum: 140,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+  });
+
+  test("immortal version wins over sneezy for same vnum", async () => {
+    const res = await authRequest(
+      app,
+      "/api/rooms/search?q=Dedup+Room",
+      cookie,
+    );
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(Array.isArray(body)).toBe(true);
+    if (!Array.isArray(body)) throw new Error("expected array");
+
+    const matches = body.filter((r: { vnum: number }) => r.vnum === 140);
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toHaveProperty("name", "Immortal Dedup Room");
+  });
+});
+
+// -- Room creation defaults --
+
+describe("room creation defaults", () => {
+  test("newly created room has expected default values", async () => {
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: 107 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const res = await authRequest(app, "/api/rooms/107", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+
+    const parsed = roomSchema.parse(body);
+    expect(parsed.name).toBe("");
+    expect(parsed.description).toBe("");
+    expect(parsed.sector).toBe(60);
+    expect(parsed.height).toBe(-1);
+    expect(parsed.spec).toBe(0);
+    // UNDER_CONSTRUCTION bit (1 << 17 = 131072)
+    expect(parsed.room_flag & (1 << 17)).toBe(1 << 17);
+  });
+});
+
+// -- Block B room creation --
+
+describe("Block B room creation", () => {
+  let lowOnlyCookie: string;
+
+  beforeAll(async () => {
+    lowOnlyCookie = await getLowOnlyAuthCookie(app);
+  });
+
+  afterAll(async () => {
+    await immortalDb.execute(
+      sql`DELETE FROM roomexit WHERE vnum IN (500, 700)`,
+    );
+    await immortalDb.execute(
+      sql`DELETE FROM roomextra WHERE vnum IN (500, 700)`,
+    );
+    await immortalDb.execute(sql`DELETE FROM room WHERE vnum IN (500, 700)`);
+  });
+
+  test("builder can create room in Block B range", async () => {
+    const res = await authRequest(app, "/api/rooms", lowOnlyCookie, {
+      body: JSON.stringify({ vnum: 500 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    expect(res.status).toBe(201);
+
+    const getRes = await authRequest(app, "/api/rooms/500", lowOnlyCookie);
+    expect(getRes.status).toBe(200);
+    const body: unknown = await getRes.json();
+    expect(body).toHaveProperty("vnum", 500);
+  });
+
+  test("builder cannot create room outside both blocks", async () => {
+    const res = await authRequest(app, "/api/rooms", lowOnlyCookie, {
+      body: JSON.stringify({ vnum: 700 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    expect(res.status).toBe(403);
   });
 });
