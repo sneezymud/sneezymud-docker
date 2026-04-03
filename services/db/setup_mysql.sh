@@ -4,12 +4,10 @@
 set -e
 
 for db in immortal sneezy; do
-	for phase in tables views data; do
-		[ -d "/home/sneezy/_Setup-data/sql_$phase/$db" ] || continue
-		for sql in /home/sneezy/_Setup-data/sql_$phase/$db/*.sql; do
-			echo "loading '$sql'"
-			mariadb -u sneezy --password=password $db < $sql
-		done
+	[ -d "/home/sneezy/db/$db" ] || continue
+	for sql in /home/sneezy/db/$db/*.sql; do
+		echo "loading '$sql'"
+		mariadb -u sneezy --password=password $db < $sql
 	done
 done
 
