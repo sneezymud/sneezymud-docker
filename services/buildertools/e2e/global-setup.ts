@@ -21,6 +21,30 @@ export default async function globalSetup(_config: FullConfig) {
     "..",
   );
 
+  // Seed test databases (same as bun test preload - truncates + seeds auth)
+  const seed = spawn(
+    "bun",
+    [
+      "--eval",
+      "await import('./src/server/test-preload.ts'); process.exit(0);",
+    ],
+    {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        DB_NAME_IMMORTAL: "immortal_test",
+        DB_NAME_SNEEZY: "sneezy_test",
+      },
+      stdio: "inherit",
+    },
+  );
+  await new Promise<void>((resolve, reject) => {
+    seed.on("exit", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Seed failed (exit ${code})`));
+    });
+  });
+
   const serverProcess = spawn("bun", ["src/server/index.ts"], {
     cwd: projectRoot,
     env: {
@@ -29,6 +53,7 @@ export default async function globalSetup(_config: FullConfig) {
       BT_SESSION_SECRET: "test-secret",
       DB_NAME_IMMORTAL: "immortal_test",
       DB_NAME_SNEEZY: "sneezy_test",
+      NODE_ENV: "production",
     },
     stdio: "inherit",
   });
