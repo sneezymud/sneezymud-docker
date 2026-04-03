@@ -24,6 +24,7 @@ const ALL_BUILDER_POWERS = [
 // Test builder: vnum blocks 100-199, all powers
 export const testUser: SessionUser = {
   blocks: [{ end: 199, start: 100 }],
+  playerId: 99_999,
   playerName: "TestBuilder",
   powers: ALL_BUILDER_POWERS,
   username: "testbuilder",
@@ -32,6 +33,7 @@ export const testUser: SessionUser = {
 // Second builder: same vnum blocks 100-199, partial powers (mob + object only)
 export const otherUser: SessionUser = {
   blocks: [{ end: 199, start: 100 }],
+  playerId: 99_997,
   playerName: "OtherBuilder",
   powers: [
     POWER.BUILDER,
@@ -47,6 +49,7 @@ export const otherUser: SessionUser = {
 // Expanded-access builder: own blocks 200-299, POWER_LOW + NO_LIMITS for expanded access
 export const expandedUser: SessionUser = {
   blocks: [{ end: 299, start: 200 }],
+  playerId: 99_996,
   playerName: "ExpandedBuilder",
   powers: [
     POWER.BUILDER,
@@ -64,7 +67,11 @@ export const expandedUser: SessionUser = {
 // Expanded mob/object access only: POWER_LOW but NOT POWER_NO_LIMITS
 // Can expand for mobs/objects but NOT rooms
 export const lowOnlyUser: SessionUser = {
-  blocks: [{ end: 399, start: 300 }],
+  blocks: [
+    { end: 399, start: 300 },
+    { end: 599, start: 500 },
+  ],
+  playerId: 99_995,
   playerName: "LowOnlyBuilder",
   powers: [
     POWER.BUILDER,

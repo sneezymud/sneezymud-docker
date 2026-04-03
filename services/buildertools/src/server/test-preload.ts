@@ -158,7 +158,7 @@ await sneezyDb.execute(sql`
 `);
 await sneezyDb.execute(sql`
   INSERT INTO wizdata (player_id, setsev, blockastart, blockaend, blockbstart, blockbend)
-  VALUES (99995, 0, 300, 399, 0, 0)
+  VALUES (99995, 0, 300, 399, 500, 599)
 `);
 // lowonlybuilder: BUILDER + entity powers + LOW (no NO_LIMITS)
 for (const power of [1, 3, 5, 7, 10, 29, 63]) {
