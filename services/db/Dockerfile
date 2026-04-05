@@ -33,8 +33,8 @@ ENV MYSQL_PASSWORD=password
 COPY --chmod=600 ./my.cnf /etc/mysql/my.cnf
 COPY ./init.sql ./setup_mysql.sh /docker-entrypoint-initdb.d/
 
-# Copy database setup data from git stage
-COPY --from=git /home/sneezy/sneezymud/_Setup-data /home/sneezy/_Setup-data
+# Copy database seed data from git stage
+COPY --from=git /home/sneezy/sneezymud/db /home/sneezy/db
 
 # Metadata labels
 LABEL org.opencontainers.image.title="SneezyMUD Database" \
