@@ -1,6 +1,8 @@
 [submodule "sneezymud"]
 	path = services/sneezymud
 	url = https://github.com/sneezymud/sneezymud
+  branch = master
+  update = rebase
 [submodule "connectificator"]
 	path = services/webclient/connectificator
 	url = https://github.com/cizra/connectificator
