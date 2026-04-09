@@ -5,16 +5,21 @@ import type { Mob, MobExtra, MobImm } from "@/shared/schemas/mob.ts";
 
 import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
 import { diffEdits } from "@/lib/diff-edits.ts";
+import { canonicalOwner, entityKeys, ownerSuffix } from "@/lib/entity-keys.ts";
 import { apiFetch } from "@/shared/api-client.ts";
-import { mobKeys } from "@/shared/query-keys.ts";
+import { resolvePermissions } from "@/shared/permissions.ts";
 import { mobResponseSchema } from "@/shared/schemas/mob-response.ts";
 import { mobSchema } from "@/shared/schemas/mob.ts";
 import { useAuthStore } from "@/state/auth.ts";
 
-export function useMobEditor(vnumParam: string) {
+export function useMobEditor(vnumParam: string, owner: number | undefined) {
   const vnum = Number(vnumParam);
   const user = useAuthStore((s) => s.user);
+  const cOwner = canonicalOwner(owner, user?.playerId ?? 0);
   const powers = user?.powers ?? [];
+  const isSenior = user?.isSenior ?? false;
+  const permissions = resolvePermissions(powers, isSenior);
+  const readOnly = !permissions.canEditMobs;
 
   const {
     data: mob,
@@ -22,13 +27,18 @@ export function useMobEditor(vnumParam: string) {
     isError,
     isLoading,
   } = useQuery({
-    queryFn: () => apiFetch(`/api/mobs/${vnum}`, mobSchema),
-    queryKey: mobKeys.detail(vnum),
+    queryFn: () =>
+      apiFetch(`/api/mobs/${vnum}${ownerSuffix(cOwner)}`, mobSchema),
+    queryKey: entityKeys.detail("mob", vnum, cOwner),
   });
 
   const { data: mobResponse } = useQuery({
-    queryFn: () => apiFetch(`/api/mob-responses/${vnum}`, mobResponseSchema),
-    queryKey: mobKeys.response(vnum),
+    queryFn: () =>
+      apiFetch(
+        `/api/mob-responses/${vnum}${ownerSuffix(cOwner)}`,
+        mobResponseSchema,
+      ),
+    queryKey: entityKeys.detail("mob-response", vnum, cOwner),
   });
 
   const [edits, setEdits] = useState<null | Partial<Mob>>(null);
@@ -55,13 +65,14 @@ export function useMobEditor(vnumParam: string) {
     unsavedNavReset,
     unsavedNavStatus,
   } = useEntityEditor({
-    allKey: mobKeys.all,
+    allKey: entityKeys.all("mob"),
     data: mob,
-    deletePath: `/api/mobs/${vnum}`,
-    detailKey: mobKeys.detail(vnum),
+    deletePath: `/api/mobs/${vnum}${ownerSuffix(cOwner)}`,
+    detailKey: entityKeys.detail("mob", vnum, cOwner),
     dirty,
     listPath: "/mobs",
     onReset: resetEdits,
+    readOnly,
     saveFn: async () => {
       if (!mob) return null;
       const body: Mob = {
@@ -70,7 +81,7 @@ export function useMobEditor(vnumParam: string) {
         extras: extraEdits ?? mob.extras,
         immunities: immEdits ?? mob.immunities,
       };
-      return apiFetch(`/api/mobs/${vnum}`, mobSchema, {
+      return apiFetch(`/api/mobs/${vnum}${ownerSuffix(cOwner)}`, mobSchema, {
         body: JSON.stringify(body),
         method: "PUT",
       });
@@ -101,6 +112,7 @@ export function useMobEditor(vnumParam: string) {
   };
 
   return {
+    cOwner,
     currentValues,
     deletePending,
     dirty,
@@ -114,10 +126,13 @@ export function useMobEditor(vnumParam: string) {
     immEdits,
     isError,
     isLoading,
+    isSenior,
     mob,
     mobResponse,
     originalValues,
+    permissions,
     powers,
+    readOnly,
     resetEdits,
     saving,
     setExtraEdits,

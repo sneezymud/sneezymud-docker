@@ -10,10 +10,11 @@ import { hasExitData, useExitEditor } from "./use-exit-editor.ts";
 interface RoomExitsProps {
   exits: RoomExit[];
   onChange: (exits: RoomExit[]) => void;
+  readOnly?: boolean;
   vnum: number;
 }
 
-export function RoomExits({ exits, onChange, vnum }: RoomExitsProps) {
+export function RoomExits({ exits, onChange, readOnly, vnum }: RoomExitsProps) {
   const {
     addExit,
     availableDirections,
@@ -27,15 +28,20 @@ export function RoomExits({ exits, onChange, vnum }: RoomExitsProps) {
   } = useExitEditor(exits, onChange, vnum);
 
   return (
-    <fieldset className="p-1">
+    <fieldset
+      className="p-1"
+      disabled={readOnly}
+    >
       <SectionHeader
         action={
-          <AddButton
-            aria-label="Add exit"
-            className="max-h-min"
-            disabled={availableDirections.length === 0}
-            onClick={addExit}
-          />
+          readOnly ? undefined : (
+            <AddButton
+              aria-label="Add exit"
+              className="max-h-min"
+              disabled={availableDirections.length === 0}
+              onClick={addExit}
+            />
+          )
         }
         title="Exits"
         tooltip={

@@ -76,6 +76,7 @@ function setAuth(powers: number[]) {
   useAuthStore.setState({
     user: {
       blocks: [{ end: 1099, start: 1000 }],
+      isSenior: false,
       playerId: 99_999,
       playerName: "TestBuilder",
       powers,
@@ -103,6 +104,47 @@ describe("MobEditor", () => {
     cleanup();
     resetFetchMock();
     useAuthStore.setState({ user: null });
+  });
+
+  describe("read-only mode", () => {
+    test("TEST-RO-1: renders ReadOnlyBanner when user lacks MEDIT", async () => {
+      setAuth([POWER.BUILDER]);
+      mockMobEndpoints();
+      renderWithProviders(<MobEditor vnumParam={VNUM} />);
+      expect(await screen.findByText(/read[-\s]?only/i)).toBeDefined();
+    });
+
+    test("TEST-RO-2: Save button absent in read-only mode", async () => {
+      setAuth([POWER.BUILDER]);
+      mockMobEndpoints();
+      renderWithProviders(<MobEditor vnumParam={VNUM} />);
+      await screen.findByText(/read[-\s]?only/i);
+      expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+    });
+
+    test("TEST-RO-3: form inputs disabled in read-only mode", async () => {
+      setAuth([POWER.BUILDER]);
+      mockMobEndpoints();
+      renderWithProviders(<MobEditor vnumParam={VNUM} />);
+      await screen.findByText(/read[-\s]?only/i);
+      const nameInput = screen.getByRole("textbox", { name: /keywords/i });
+      expect(
+        nameInput.hasAttribute("disabled") ||
+          nameInput.hasAttribute("readonly"),
+      ).toBe(true);
+    });
+
+    test("TEST-RO-5: Diff button still accessible in read-only mode", async () => {
+      setAuth([POWER.BUILDER]);
+      mockMobEndpoints();
+      renderWithProviders(<MobEditor vnumParam={VNUM} />);
+      await screen.findByText(/read[-\s]?only/i);
+      // EntityHeader renders both mobile and desktop layouts with duplicate buttons
+      const diffButtons = screen.getAllByRole("button", {
+        name: /compare|diff/i,
+      });
+      expect(diffButtons.length).toBeGreaterThan(0);
+    });
   });
 
   describe("dirty state tracking", () => {

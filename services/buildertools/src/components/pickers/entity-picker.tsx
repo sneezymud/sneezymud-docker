@@ -74,6 +74,7 @@ const EMPTY_ITEMS: Array<{ label: string; vnum: number }> = [];
 
 export function EntityPicker({
   className,
+  disabled,
   id,
   max,
   min,
@@ -82,6 +83,7 @@ export function EntityPicker({
   value,
 }: {
   className?: string | undefined;
+  disabled?: boolean | undefined;
   id?: string | undefined;
   max?: number | undefined;
   min?: number | undefined;
@@ -104,9 +106,10 @@ export function EntityPicker({
 
   return (
     <>
-      <Popover open={focused && inputText.length >= 2}>
+      <Popover open={focused && inputText.length >= 2 && !disabled}>
         <PickerInput
           className={className}
+          disabled={disabled}
           id={id}
           inputRef={inputRef}
           inputText={inputText}
@@ -240,6 +243,7 @@ function useEntityPicker({
 
 function PickerInput({
   className,
+  disabled,
   id,
   inputRef,
   inputText,
@@ -250,6 +254,7 @@ function PickerInput({
   onReset,
 }: {
   className?: string | undefined;
+  disabled?: boolean | undefined;
   id?: string | undefined;
   inputRef: React.RefObject<HTMLInputElement | null>;
   inputText: string;
@@ -267,6 +272,7 @@ function PickerInput({
       <div className="relative">
         <Input
           className={cn("px-2 py-1 pr-7", className)}
+          disabled={disabled}
           id={inputId}
           onBlur={onBlur}
           onChange={onInputChange}

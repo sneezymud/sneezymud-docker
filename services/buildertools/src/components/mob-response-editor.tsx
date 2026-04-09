@@ -14,13 +14,24 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog.tsx";
 import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
+import { useOwnerName } from "@/hooks/use-owner-name.ts";
+import { canonicalOwner, entityKeys, ownerSuffix } from "@/lib/entity-keys.ts";
 import { apiFetch } from "@/shared/api-client.ts";
-import { mobKeys } from "@/shared/query-keys.ts";
 import { mobResponseSchema } from "@/shared/schemas/mob-response.ts";
 import { mobSchema } from "@/shared/schemas/mob.ts";
+import { useAuthStore } from "@/state/auth.ts";
 
-export function MobResponseEditor({ vnumParam }: { vnumParam: string }) {
+export function MobResponseEditor({
+  owner,
+  vnumParam,
+}: {
+  owner?: number;
+  vnumParam: string;
+}) {
+  const ownerName = useOwnerName(owner);
+
   const {
+    cOwner,
     currentText,
     dirty,
     error,
@@ -35,13 +46,13 @@ export function MobResponseEditor({ vnumParam }: { vnumParam: string }) {
     unsavedNavReset,
     unsavedNavStatus,
     vnum,
-  } = useMobResponseEditor(vnumParam);
+  } = useMobResponseEditor(vnumParam, owner);
 
   if (isLoading || isError) {
     return (
       <QueryStatus
         backLabel={`Mob ${vnum}`}
-        backTo={`/mobs/${vnum}`}
+        backTo={`/mobs/${vnum}${ownerSuffix(cOwner)}`}
         error={error}
         isError={isError}
         isLoading={isLoading}
@@ -56,7 +67,7 @@ export function MobResponseEditor({ vnumParam }: { vnumParam: string }) {
         before={
           <BackLink
             title="Back to mob"
-            to={`/mobs/${vnum}`}
+            to={`/mobs/${vnum}${ownerSuffix(cOwner)}`}
           />
         }
         breadcrumbs={[
@@ -70,6 +81,7 @@ export function MobResponseEditor({ vnumParam }: { vnumParam: string }) {
         }}
         onSave={handleSave}
         saving={saving}
+        {...(ownerName !== undefined && { ownerName })}
       />
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4">
@@ -127,17 +139,24 @@ export function MobResponseEditor({ vnumParam }: { vnumParam: string }) {
   );
 }
 
-function useMobResponseEditor(vnumParam: string) {
+function useMobResponseEditor(vnumParam: string, owner: number | undefined) {
   const vnum = Number(vnumParam);
+  const user = useAuthStore((s) => s.user);
+  const cOwner = canonicalOwner(owner, user?.playerId ?? 0);
 
   const { data, error, isError, isLoading } = useQuery({
-    queryFn: () => apiFetch(`/api/mob-responses/${vnum}`, mobResponseSchema),
-    queryKey: mobKeys.response(vnum),
+    queryFn: () =>
+      apiFetch(
+        `/api/mob-responses/${vnum}${ownerSuffix(cOwner)}`,
+        mobResponseSchema,
+      ),
+    queryKey: entityKeys.detail("mob-response", vnum, cOwner),
   });
 
   const { data: mob } = useQuery({
-    queryFn: () => apiFetch(`/api/mobs/${vnum}`, mobSchema),
-    queryKey: mobKeys.detail(vnum),
+    queryFn: () =>
+      apiFetch(`/api/mobs/${vnum}${ownerSuffix(cOwner)}`, mobSchema),
+    queryKey: entityKeys.detail("mob", vnum, cOwner),
   });
 
   const mobName =
@@ -159,21 +178,26 @@ function useMobResponseEditor(vnumParam: string) {
     unsavedNavReset,
     unsavedNavStatus,
   } = useEntityEditor({
-    allKey: mobKeys.all,
+    allKey: entityKeys.all("mob"),
     data,
-    detailKey: mobKeys.response(vnum),
+    detailKey: entityKeys.detail("mob-response", vnum, cOwner),
     dirty,
     onReset: () => {
       setDraft(null);
     },
     saveFn: async () =>
-      apiFetch(`/api/mob-responses/${vnum}`, mobResponseSchema, {
-        body: JSON.stringify({ response: currentText, vnum }),
-        method: "PUT",
-      }),
+      apiFetch(
+        `/api/mob-responses/${vnum}${ownerSuffix(cOwner)}`,
+        mobResponseSchema,
+        {
+          body: JSON.stringify({ response: currentText, vnum }),
+          method: "PUT",
+        },
+      ),
   });
 
   return {
+    cOwner,
     currentText,
     dirty,
     error,

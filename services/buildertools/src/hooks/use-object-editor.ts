@@ -4,20 +4,25 @@ import { useState } from "react";
 import type { Obj, ObjAffect, ObjExtra } from "@/shared/schemas/obj.ts";
 
 import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
+import { canonicalOwner, entityKeys, ownerSuffix } from "@/lib/entity-keys.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import {
   applyObjFieldChange,
   expandObjFormValues,
 } from "@/shared/obj-form-logic.ts";
 import { getObjTypeSpec } from "@/shared/obj-type-specs.ts";
-import { objectKeys } from "@/shared/query-keys.ts";
+import { resolvePermissions } from "@/shared/permissions.ts";
 import { objSchema } from "@/shared/schemas/obj.ts";
 import { useAuthStore } from "@/state/auth.ts";
 
-export function useObjectEditor(vnumParam: string) {
+export function useObjectEditor(vnumParam: string, owner: number | undefined) {
   const vnum = Number(vnumParam);
   const user = useAuthStore((s) => s.user);
+  const cOwner = canonicalOwner(owner, user?.playerId ?? 0);
   const powers = user?.powers ?? [];
+  const isSenior = user?.isSenior ?? false;
+  const permissions = resolvePermissions(powers, isSenior);
+  const readOnly = !permissions.canEditObjects;
 
   const {
     data: obj,
@@ -25,8 +30,9 @@ export function useObjectEditor(vnumParam: string) {
     isError,
     isLoading,
   } = useQuery({
-    queryFn: () => apiFetch(`/api/objects/${vnum}`, objSchema),
-    queryKey: objectKeys.detail(vnum),
+    queryFn: () =>
+      apiFetch(`/api/objects/${vnum}${ownerSuffix(cOwner)}`, objSchema),
+    queryKey: entityKeys.detail("object", vnum, cOwner),
   });
 
   const [edits, setEdits] = useState<null | Partial<Obj>>(null);
@@ -53,13 +59,14 @@ export function useObjectEditor(vnumParam: string) {
     unsavedNavReset,
     unsavedNavStatus,
   } = useEntityEditor({
-    allKey: objectKeys.all,
+    allKey: entityKeys.all("object"),
     data: obj,
-    deletePath: `/api/objects/${vnum}`,
-    detailKey: objectKeys.detail(vnum),
+    deletePath: `/api/objects/${vnum}${ownerSuffix(cOwner)}`,
+    detailKey: entityKeys.detail("object", vnum, cOwner),
     dirty,
     listPath: "/objects",
     onReset: resetEdits,
+    readOnly,
     saveFn: async () => {
       if (!obj) return null;
       const body: Obj = {
@@ -68,7 +75,7 @@ export function useObjectEditor(vnumParam: string) {
         affects: affectEdits ?? obj.affects,
         extras: extraEdits ?? obj.extras,
       };
-      return apiFetch(`/api/objects/${vnum}`, objSchema, {
+      return apiFetch(`/api/objects/${vnum}${ownerSuffix(cOwner)}`, objSchema, {
         body: JSON.stringify(body),
         method: "PUT",
       });
@@ -92,6 +99,7 @@ export function useObjectEditor(vnumParam: string) {
 
   return {
     affectEdits,
+    cOwner,
     currentItemType,
     deletePending,
     dirty,
@@ -106,8 +114,11 @@ export function useObjectEditor(vnumParam: string) {
     handleSaveAndProceed,
     isError,
     isLoading,
+    isSenior,
     obj,
+    permissions,
     powers,
+    readOnly,
     resetEdits,
     saving,
     setAffectEdits,

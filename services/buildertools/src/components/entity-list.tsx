@@ -23,6 +23,7 @@ import {
   textSort,
   useSearchableTable,
 } from "@/hooks/use-searchable-table.ts";
+import { canonicalOwner } from "@/lib/entity-keys.ts";
 
 import { SearchInput } from "./search-input.tsx";
 import { SortableTableHeader } from "./sortable-table-header.tsx";
@@ -64,6 +65,8 @@ const COLUMN_WIDTHS: Record<string, string> = {
 interface EntityListItem {
   metadata?: string;
   name: string;
+  owner?: string;
+  playerId: number;
   secondary?: string;
   vnum: number;
 }
@@ -72,12 +75,15 @@ interface EntityListProps {
   allowAnyVnum?: boolean;
   banner?: React.ReactNode;
   basePath: string;
+  canEdit?: boolean;
   createPending?: boolean;
+  currentUserId: number;
   deletePending?: boolean;
   entities: EntityListItem[];
   label: string;
   onCreateVnum?: (vnum: number) => void;
   onDeleteSelected?: (vnums: number[]) => void;
+  ownerFilter?: "all" | "mine";
   secondaryLabel?: string;
   vnumBlocks?: Array<{ end: number; start: number }> | undefined;
 }
@@ -86,20 +92,24 @@ export function EntityList({
   allowAnyVnum,
   banner,
   basePath,
+  canEdit = true,
   createPending,
+  currentUserId,
   deletePending,
   entities,
   label,
   onCreateVnum,
   onDeleteSelected,
+  ownerFilter,
   secondaryLabel,
   vnumBlocks,
 }: EntityListProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [viewMode, setViewMode] = useListViewMode();
 
-  const selectable = Boolean(onDeleteSelected);
-  const columns = buildColumns(selectable, secondaryLabel);
+  const showOwner = ownerFilter === "all";
+  const selectable = canEdit && !showOwner && Boolean(onDeleteSelected);
+  const columns = buildColumns(selectable, secondaryLabel, showOwner);
 
   const {
     canNextPage,
@@ -122,11 +132,14 @@ export function EntityList({
     data: entities,
     defaultSort: { desc: false, id: "vnum" },
     filterFn: matchEntity,
-    getRowId: (row) => String(row.vnum),
+    // Compound key prevents row-collision in "All" view where two owners can
+    // have the same vnum. Bulk-delete is hidden in All view, so selectedVnums
+    // is only populated from rows the user owns (fixed playerId).
+    getRowId: (row) => `${row.playerId}:${row.vnum}`,
   });
 
   const selectedVnums = entities
-    .filter((e) => selectedIds[String(e.vnum)])
+    .filter((e) => selectedIds[`${e.playerId}:${e.vnum}`])
     .map((e) => e.vnum);
   const canCreate = Boolean(onCreateVnum && vnumBlocks);
   const searching = search !== "";
@@ -172,7 +185,7 @@ export function EntityList({
           )}
         </Button>
 
-        {onCreateVnum && vnumBlocks ? (
+        {canEdit && onCreateVnum && vnumBlocks ? (
           <VnumPicker
             allowAnyVnum={allowAnyVnum}
             createPending={createPending}
@@ -186,7 +199,7 @@ export function EntityList({
         ) : null}
       </div>
 
-      {onDeleteSelected ? (
+      {canEdit && onDeleteSelected && ownerFilter !== "all" ? (
         <DeleteSelectionBar
           count={selectedVnums.length}
           deletePending={deletePending}
@@ -201,6 +214,7 @@ export function EntityList({
           basePath={basePath}
           canCreate={canCreate}
           columns={columns}
+          currentUserId={currentUserId}
           label={label}
           rows={rows}
           searching={searching}
@@ -208,6 +222,7 @@ export function EntityList({
           selectable={selectable}
           selectedIds={selectedIds}
           setShowCreate={setShowCreate}
+          showOwner={showOwner}
           sorting={sorting}
           toggleAllPageSelected={toggleAllPageSelected}
           toggleSelected={toggleSelected}
@@ -219,12 +234,14 @@ export function EntityList({
         <MobileCardList
           basePath={basePath}
           canCreate={canCreate}
+          currentUserId={currentUserId}
           label={label}
           rows={rows}
           searching={searching}
           selectable={selectable}
           selectedIds={selectedIds}
           setShowCreate={setShowCreate}
+          showOwner={showOwner}
           toggleAllPageSelected={toggleAllPageSelected}
           toggleSelected={toggleSelected}
         />
@@ -250,20 +267,26 @@ export function EntityList({
 
 function EntityRow({
   basePath,
+  currentUserId,
   entity,
   isSelected,
   onToggleSelected,
   secondaryLabel,
   selectable,
+  showOwner,
 }: {
   basePath: string;
+  currentUserId: number;
   entity: EntityListItem;
   isSelected: boolean;
   onToggleSelected: (selected: boolean) => void;
   secondaryLabel?: string | undefined;
   selectable: boolean;
+  showOwner: boolean;
 }) {
   const to = `${basePath}/${entity.vnum}`;
+  const cOwner = canonicalOwner(entity.playerId, currentUserId);
+  const searchProp = cOwner === undefined ? {} : { search: { owner: cOwner } };
   return (
     <TableRow
       aria-label={`${entity.name || "(unnamed)"} (vnum ${entity.vnum})`}
@@ -290,6 +313,7 @@ function EntityRow({
         <Link
           className="text-accent hover:text-accent/80 block px-2 py-2.5 font-mono outline-none"
           to={to}
+          {...searchProp}
         >
           {entity.vnum}
         </Link>
@@ -300,10 +324,24 @@ function EntityRow({
           className="text-foreground group-hover:text-foreground block px-2 py-2.5 outline-none"
           tabIndex={-1}
           to={to}
+          {...searchProp}
         >
           {entity.name || "(unnamed)"}
         </Link>
       </TableCell>
+
+      {showOwner ? (
+        <TableCell className="p-0">
+          <Link
+            className="text-muted-foreground block px-2 py-2.5 outline-none"
+            tabIndex={-1}
+            to={to}
+            {...searchProp}
+          >
+            {entity.owner ?? ""}
+          </Link>
+        </TableCell>
+      ) : null}
 
       {secondaryLabel ? (
         <TableCell className="hidden p-0">
@@ -311,6 +349,7 @@ function EntityRow({
             className="text-muted-foreground block px-2 py-2.5 outline-none"
             tabIndex={-1}
             to={to}
+            {...searchProp}
           >
             {entity.secondary ?? ""}
           </Link>
@@ -330,9 +369,9 @@ function SelectAllCheckbox({
   toggleAllPageSelected: (checked: boolean) => void;
 }) {
   const checked =
-    rows.length > 0 && rows.every((r) => selectedIds[String(r.vnum)])
+    rows.length > 0 && rows.every((r) => selectedIds[`${r.playerId}:${r.vnum}`])
       ? true
-      : rows.some((r) => selectedIds[String(r.vnum)])
+      : rows.some((r) => selectedIds[`${r.playerId}:${r.vnum}`])
         ? "indeterminate"
         : false;
   return (
@@ -397,6 +436,7 @@ function DesktopTable({
   basePath,
   canCreate,
   columns,
+  currentUserId,
   label,
   rows,
   searching,
@@ -404,6 +444,7 @@ function DesktopTable({
   selectable,
   selectedIds,
   setShowCreate,
+  showOwner,
   sorting,
   toggleAllPageSelected,
   toggleSelected,
@@ -412,6 +453,7 @@ function DesktopTable({
   basePath: string;
   canCreate: boolean;
   columns: Array<Column<EntityListItem>>;
+  currentUserId: number;
   label: string;
   rows: EntityListItem[];
   searching: boolean;
@@ -419,6 +461,7 @@ function DesktopTable({
   selectable: boolean;
   selectedIds: Record<string, boolean>;
   setShowCreate: (open: boolean) => void;
+  showOwner: boolean;
   sorting: { desc: boolean; id: string };
   toggleAllPageSelected: (checked: boolean) => void;
   toggleSelected: (id: string, checked: boolean) => void;
@@ -450,14 +493,18 @@ function DesktopTable({
         {rows.map((entity) => (
           <EntityRow
             basePath={basePath}
+            currentUserId={currentUserId}
             entity={entity}
-            isSelected={selectedIds[String(entity.vnum)] === true}
-            key={entity.vnum}
+            isSelected={
+              selectedIds[`${entity.playerId}:${entity.vnum}`] === true
+            }
+            key={`${entity.playerId}:${entity.vnum}`}
             onToggleSelected={(checked) => {
-              toggleSelected(String(entity.vnum), checked);
+              toggleSelected(`${entity.playerId}:${entity.vnum}`, checked);
             }}
             secondaryLabel={secondaryLabel}
             selectable={selectable}
+            showOwner={showOwner}
           />
         ))}
 
@@ -485,18 +532,24 @@ function DesktopTable({
 
 function EntityCardRow({
   basePath,
+  currentUserId,
   entity,
   isSelected,
   onToggleSelected,
   selectable,
+  showOwner,
 }: {
   basePath: string;
+  currentUserId: number;
   entity: EntityListItem;
   isSelected: boolean;
   onToggleSelected: (selected: boolean) => void;
   selectable: boolean;
+  showOwner: boolean;
 }) {
   const to = `${basePath}/${entity.vnum}`;
+  const cOwner = canonicalOwner(entity.playerId, currentUserId);
+  const searchProp = cOwner === undefined ? {} : { search: { owner: cOwner } };
   return (
     <div className="flex items-center gap-3 py-2.5">
       {selectable ? (
@@ -512,6 +565,7 @@ function EntityCardRow({
       <Link
         className="min-w-0 flex-1"
         to={to}
+        {...searchProp}
       >
         <span className="text-accent font-mono text-xs">{entity.vnum}</span>
 
@@ -524,6 +578,12 @@ function EntityCardRow({
             {entity.metadata}
           </span>
         ) : null}
+
+        {showOwner && entity.owner ? (
+          <span className="text-muted-foreground block text-xs">
+            {entity.owner}
+          </span>
+        ) : null}
       </Link>
     </div>
   );
@@ -532,23 +592,27 @@ function EntityCardRow({
 function MobileCardList({
   basePath,
   canCreate,
+  currentUserId,
   label,
   rows,
   searching,
   selectable,
   selectedIds,
   setShowCreate,
+  showOwner,
   toggleAllPageSelected,
   toggleSelected,
 }: {
   basePath: string;
   canCreate: boolean;
+  currentUserId: number;
   label: string;
   rows: EntityListItem[];
   searching: boolean;
   selectable: boolean;
   selectedIds: Record<string, boolean>;
   setShowCreate: (open: boolean) => void;
+  showOwner: boolean;
   toggleAllPageSelected: (checked: boolean) => void;
   toggleSelected: (id: string, checked: boolean) => void;
 }) {
@@ -570,13 +634,17 @@ function MobileCardList({
         {rows.map((entity) => (
           <EntityCardRow
             basePath={basePath}
+            currentUserId={currentUserId}
             entity={entity}
-            isSelected={selectedIds[String(entity.vnum)] === true}
-            key={entity.vnum}
+            isSelected={
+              selectedIds[`${entity.playerId}:${entity.vnum}`] === true
+            }
+            key={`${entity.playerId}:${entity.vnum}`}
             onToggleSelected={(checked) => {
-              toggleSelected(String(entity.vnum), checked);
+              toggleSelected(`${entity.playerId}:${entity.vnum}`, checked);
             }}
             selectable={selectable}
+            showOwner={showOwner}
           />
         ))}
       </div>
@@ -598,6 +666,7 @@ function MobileCardList({
 function buildColumns(
   selectable: boolean,
   secondaryLabel?: string,
+  showOwner?: boolean,
 ): Array<Column<EntityListItem>> {
   const columns: Array<Column<EntityListItem>> = [];
 
@@ -609,6 +678,14 @@ function buildColumns(
     { compare: numericSort("vnum"), header: "Vnum", id: "vnum" },
     { compare: textSort("name"), header: "Name", id: "name" },
   );
+
+  if (showOwner) {
+    columns.push({
+      compare: textSort("owner"),
+      header: "Owner",
+      id: "owner",
+    });
+  }
 
   if (secondaryLabel) {
     columns.push({ header: secondaryLabel, id: "secondary" });
@@ -648,6 +725,7 @@ function matchEntity(item: EntityListItem, search: string): boolean {
     item.name.toLowerCase().includes(s) ||
     String(item.vnum).includes(search) ||
     (item.secondary?.toLowerCase().includes(s) ?? false) ||
-    (item.metadata?.toLowerCase().includes(s) ?? false)
+    (item.metadata?.toLowerCase().includes(s) ?? false) ||
+    (item.owner?.toLowerCase().includes(s) ?? false)
   );
 }

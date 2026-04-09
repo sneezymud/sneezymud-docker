@@ -28,6 +28,8 @@ interface UseEntityEditorOptions<T> {
   listPath?: string | undefined;
   /** Called after successful save to reset all edit states. */
   onReset: () => void;
+  /** When true, keyboard save shortcut is suppressed. */
+  readOnly?: boolean | undefined;
   /** Performs the save API call. Return saved entity for cache update, or null to skip. */
   saveFn: () => Promise<null | T>;
   /** Pre-save validation. Return field errors to block save, or null to proceed. */
@@ -42,6 +44,7 @@ export function useEntityEditor<T>({
   dirty,
   listPath,
   onReset,
+  readOnly = false,
   saveFn,
   validate,
 }: UseEntityEditorOptions<T>) {
@@ -166,7 +169,7 @@ export function useEntityEditor<T>({
     });
   };
 
-  useKeyboardSave(handleSave, dirty && !saveMutation.isPending);
+  useKeyboardSave(handleSave, dirty && !saveMutation.isPending && !readOnly);
 
   return {
     clearFieldError,

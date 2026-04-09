@@ -22,6 +22,7 @@ function setAuthRooms() {
   useAuthStore.setState({
     user: {
       blocks: [{ end: 1099, start: 1000 }],
+      isSenior: false,
       playerId: 99_999,
       playerName: "TestBuilder",
       powers: [POWER.BUILDER, POWER.REDIT, POWER.RSAVE, POWER.EDIT],
@@ -35,6 +36,7 @@ function setAuthMobs() {
   useAuthStore.setState({
     user: {
       blocks: [{ end: 1099, start: 1000 }],
+      isSenior: false,
       playerId: 99_999,
       playerName: "TestBuilder",
       powers: [POWER.BUILDER, POWER.MEDIT],
@@ -168,6 +170,227 @@ describe("RoomList (EntityList)", () => {
     expect(names.length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Town Square").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Dark Cave").length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+function setAuthSenior() {
+  useAuthStore.setState({
+    user: {
+      blocks: [{ end: 1099, start: 1000 }],
+      isSenior: true,
+      playerId: 42,
+      playerName: "SeniorBuilder",
+      powers: [POWER.BUILDER, POWER.REDIT, POWER.RSAVE, POWER.EDIT],
+      username: "seniorbuilder",
+    },
+  });
+}
+
+describe("RoomList cross-owner", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    cleanup();
+    resetFetchMock();
+    useAuthStore.setState({ user: null });
+  });
+
+  test("TEST-CROSS-OWNER-LIST-1: senior All view shows owner column", async () => {
+    setAuthSenior();
+    // Default "mine" fetch for initial render
+    mockFetch([
+      {
+        body: [
+          {
+            name: "Room A",
+            owner: "TestBuilder",
+            player_id: 42,
+            sector: 0,
+            vnum: 100,
+          },
+        ],
+        url: "/api/rooms",
+      },
+    ]);
+    renderWithProviders(
+      <RoomList
+        from={undefined}
+        to={undefined}
+      />,
+    );
+    const user = userEvent.setup();
+
+    // Wait for table to render
+    await screen.findByRole("table");
+
+    // Reset fetch mock to serve the "all" response
+    resetFetchMock();
+    mockFetch([
+      {
+        body: [
+          {
+            name: "Room A",
+            owner: "TestBuilder",
+            player_id: 42,
+            sector: 0,
+            vnum: 100,
+          },
+          {
+            name: "Room B",
+            owner: "OtherBuilder",
+            player_id: 77,
+            sector: 0,
+            vnum: 101,
+          },
+        ],
+        url: "/api/rooms",
+      },
+    ]);
+
+    // Click All toggle
+    await user.click(screen.getByRole("button", { name: /^All$/i }));
+
+    await waitFor(() => {
+      const freshTable = screen.getByRole("table");
+      expect(within(freshTable).getByText("OtherBuilder")).toBeDefined();
+    });
+    const freshTable = screen.getByRole("table");
+    expect(
+      within(freshTable).getByRole("columnheader", { name: /owner/i }),
+    ).toBeDefined();
+  });
+
+  test("TEST-CROSS-OWNER-LIST-2: non-senior sees no owner toggle", async () => {
+    setAuthRooms();
+    mockFetch([{ body: mockRooms, url: "/api/rooms" }]);
+    renderWithProviders(
+      <RoomList
+        from={undefined}
+        to={undefined}
+      />,
+    );
+    await screen.findByRole("table");
+    expect(screen.queryByRole("button", { name: /^All$/i })).toBeNull();
+  });
+
+  test("TEST-CROSS-OWNER-LIST-3: New button hidden when toggle is All", async () => {
+    setAuthSenior();
+    mockFetch([
+      {
+        body: [
+          {
+            name: "Room A",
+            owner: "TestBuilder",
+            player_id: 42,
+            sector: 0,
+            vnum: 100,
+          },
+        ],
+        url: "/api/rooms",
+      },
+    ]);
+    renderWithProviders(
+      <RoomList
+        from={undefined}
+        to={undefined}
+      />,
+    );
+    const user = userEvent.setup();
+    await screen.findByRole("table");
+
+    // Reset fetch for "all" response
+    resetFetchMock();
+    mockFetch([
+      {
+        body: [
+          {
+            name: "Room A",
+            owner: "TestBuilder",
+            player_id: 42,
+            sector: 0,
+            vnum: 100,
+          },
+        ],
+        url: "/api/rooms",
+      },
+    ]);
+
+    await user.click(screen.getByRole("button", { name: /^All$/i }));
+
+    // The "Add" button (vnum picker trigger) should not appear in All mode
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /add/i })).toBeNull();
+    });
+  });
+
+  test("TEST-CROSS-OWNER-LIST-5: row click URL varies by owner", async () => {
+    setAuthSenior();
+    // Serve initial "mine" data
+    mockFetch([
+      {
+        body: [
+          {
+            name: "Room A",
+            owner: "TestBuilder",
+            player_id: 42,
+            sector: 0,
+            vnum: 100,
+          },
+        ],
+        url: "/api/rooms",
+      },
+    ]);
+    renderWithProviders(
+      <RoomList
+        from={undefined}
+        to={undefined}
+      />,
+    );
+    const user = userEvent.setup();
+    await screen.findByRole("table");
+
+    // Switch to All view
+    resetFetchMock();
+    mockFetch([
+      {
+        body: [
+          {
+            name: "Room A",
+            owner: "TestBuilder",
+            player_id: 42,
+            sector: 0,
+            vnum: 100,
+          },
+          {
+            name: "Room B",
+            owner: "OtherBuilder",
+            player_id: 77,
+            sector: 0,
+            vnum: 101,
+          },
+        ],
+        url: "/api/rooms",
+      },
+    ]);
+    await user.click(screen.getByRole("button", { name: /^All$/i }));
+
+    await waitFor(() => {
+      const freshTable = screen.getByRole("table");
+      expect(within(freshTable).getByText("OtherBuilder")).toBeDefined();
+    });
+
+    // Re-query table after data has loaded
+    const freshTable = screen.getByRole("table");
+
+    // Own-row link: no owner search param (playerId matches currentUserId)
+    const ownLink = within(freshTable).getByRole("link", { name: "100" });
+    expect(ownLink.getAttribute("href")).toBe("/rooms/100");
+
+    // Cross-owner row link: includes ?owner= param
+    const crossLink = within(freshTable).getByRole("link", { name: "101" });
+    expect(crossLink.getAttribute("href")).toContain("owner=77");
   });
 });
 

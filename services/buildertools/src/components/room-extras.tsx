@@ -50,10 +50,16 @@ const hasExtraData = (extra: RoomExtra) =>
 interface RoomExtrasProps {
   extras: RoomExtra[];
   onChange: (extras: RoomExtra[]) => void;
+  readOnly?: boolean;
   vnum: number;
 }
 
-export function RoomExtras({ extras, onChange, vnum }: RoomExtrasProps) {
+export function RoomExtras({
+  extras,
+  onChange,
+  readOnly,
+  vnum,
+}: RoomExtrasProps) {
   const [pendingRemove, setPendingRemove] = useState<null | number>(null);
   const { removeKey, rowKeys, setRowKeys } = useRowKeys(extras.length);
 
@@ -80,14 +86,19 @@ export function RoomExtras({ extras, onChange, vnum }: RoomExtrasProps) {
   };
 
   return (
-    <fieldset className="p-1">
+    <fieldset
+      className="p-1"
+      disabled={readOnly}
+    >
       <SectionHeader
         action={
-          <AddButton
-            aria-label="Add extra description"
-            className="max-h-min"
-            onClick={addExtra}
-          />
+          readOnly ? undefined : (
+            <AddButton
+              aria-label="Add extra description"
+              className="max-h-min"
+              onClick={addExtra}
+            />
+          )
         }
         title="Extra Descriptions"
         tooltip="Extra descriptions for 'look <keyword>' in-game. Keywords are space-separated."
@@ -108,21 +119,23 @@ export function RoomExtras({ extras, onChange, vnum }: RoomExtrasProps) {
               className="relative space-y-3"
               key={prefix}
             >
-              <Button
-                aria-label={`Remove extra description ${index + 1}`}
-                className="absolute top-0 right-0 -mt-1.5 shrink-0"
-                onClick={() => {
-                  if (hasExtraData(extra)) {
-                    setPendingRemove(index);
-                  } else {
-                    removeExtra(index);
-                  }
-                }}
-                size="xs"
-                variant="inline-destructive"
-              >
-                Remove
-              </Button>
+              {!readOnly && (
+                <Button
+                  aria-label={`Remove extra description ${index + 1}`}
+                  className="absolute top-0 right-0 -mt-1.5 shrink-0"
+                  onClick={() => {
+                    if (hasExtraData(extra)) {
+                      setPendingRemove(index);
+                    } else {
+                      removeExtra(index);
+                    }
+                  }}
+                  size="xs"
+                  variant="inline-destructive"
+                >
+                  Remove
+                </Button>
+              )}
 
               {fields.map((field) => (
                 <FormField

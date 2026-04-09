@@ -51,6 +51,7 @@ function setAuth(powers: number[]) {
   useAuthStore.setState({
     user: {
       blocks: [{ end: 1099, start: 1000 }],
+      isSenior: false,
       playerId: 99_999,
       playerName: "TestBuilder",
       powers,
@@ -67,6 +68,60 @@ describe("ObjectEditor", () => {
     cleanup();
     resetFetchMock();
     useAuthStore.setState({ user: null });
+  });
+
+  describe("read-only mode", () => {
+    beforeEach(() => {
+      setAuth([POWER.BUILDER]);
+    });
+
+    test("TEST-RO-1: renders ReadOnlyBanner when user lacks OEDIT", async () => {
+      mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      expect(await screen.findByText(/read[-\s]?only/i)).toBeDefined();
+    });
+
+    test("TEST-RO-2: Save button absent in read-only mode", async () => {
+      mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      await screen.findByText(/read[-\s]?only/i);
+      expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+    });
+
+    test("TEST-RO-3: form inputs disabled in read-only mode", async () => {
+      mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      await screen.findByText(/read[-\s]?only/i);
+      const nameInput = screen.getByRole("textbox", { name: /keywords/i });
+      expect(
+        nameInput.hasAttribute("disabled") ||
+          nameInput.hasAttribute("readonly"),
+      ).toBe(true);
+    });
+
+    test("TEST-RO-4: Applies sub-table Add/Remove buttons hidden when readOnly", async () => {
+      const obj = makeObj({
+        affects: [{ mod1: 0, mod2: 0, type: 0, vnum: 1000 }],
+      });
+      mockFetch([{ body: obj, url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      await screen.findByText(/read[-\s]?only/i);
+      // Add button for applies should not be present
+      expect(screen.queryByRole("button", { name: /add applies/i })).toBeNull();
+      // Remove buttons should not be present
+      expect(screen.queryByRole("button", { name: /remove row/i })).toBeNull();
+    });
+
+    test("TEST-RO-5: Diff button still accessible in read-only mode", async () => {
+      mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      await screen.findByText(/read[-\s]?only/i);
+      // EntityHeader renders both mobile and desktop layouts with duplicate buttons
+      const diffButtons = screen.getAllByRole("button", {
+        name: /compare|diff/i,
+      });
+      expect(diffButtons.length).toBeGreaterThan(0);
+    });
   });
 
   describe("type-specific field rendering", () => {

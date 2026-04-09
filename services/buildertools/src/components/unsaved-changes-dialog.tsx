@@ -6,12 +6,14 @@ import { ConfirmDialog } from "./confirm-dialog.tsx";
 
 export function UnsavedChangesDialog({
   onSaveAndProceed,
+  readOnly = false,
   saving,
   unsavedNavProceed,
   unsavedNavReset,
   unsavedNavStatus,
 }: {
   onSaveAndProceed?: (() => Promise<void>) | undefined;
+  readOnly?: boolean | undefined;
   saving?: boolean | undefined;
   unsavedNavProceed: (() => void) | undefined;
   unsavedNavReset: (() => void) | undefined;
@@ -20,7 +22,7 @@ export function UnsavedChangesDialog({
   return (
     <ConfirmDialog
       additionalActions={
-        onSaveAndProceed ? (
+        onSaveAndProceed && !readOnly ? (
           <Button
             disabled={saving}
             onClick={() => {

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils.ts";
 
 import { BitfieldEditor } from "./bitfield-editor.tsx";
 import { EnumSelect } from "./enum-select.tsx";
+import { HelpTip } from "./help-tip.tsx";
 import { FieldHelp } from "./info-tooltip.tsx";
 import { NumberInput } from "./number-input.tsx";
 import { EntityPicker } from "./pickers/entity-picker.tsx";
@@ -26,7 +27,7 @@ export function FormField({
   field: FieldDef;
   isDirty: boolean;
   onChange: (key: string, value: number | string) => void;
-  value: number | string | undefined;
+  value: null | number | string | undefined;
 }) {
   const { addable, fullWidth, key, readOnly, type } = field;
 
@@ -49,15 +50,17 @@ export function FormField({
         <Label>
           <span {...helpLabelProps}>{labelContent}</span>
 
-          <Button
-            onClick={() => {
-              setExpanded(true);
-            }}
-            size="inline"
-            variant="inline"
-          >
-            Add
-          </Button>
+          {!readOnly && (
+            <Button
+              onClick={() => {
+                setExpanded(true);
+              }}
+              size="inline"
+              variant="inline"
+            >
+              Add
+            </Button>
+          )}
         </Label>
 
         {helpElement}
@@ -87,7 +90,7 @@ export function FormField({
           >
             <span {...helpLabelProps}>{labelContent}</span>
 
-            {field.addable === true && (
+            {field.addable === true && !readOnly && (
               <Button
                 onClick={() => {
                   handleChange?.(key, "");
@@ -174,7 +177,7 @@ function useFieldHelp(field: FieldDef) {
   return { helpElement, helpLabelProps };
 }
 
-function toNumericValue(value: number | string | undefined): number {
+function toNumericValue(value: null | number | string | undefined): number {
   if (typeof value === "number") return value;
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -189,7 +192,7 @@ function FieldInput({
   className?: string | undefined;
   field: FieldDef;
   onChange: ((key: string, value: number | string) => void) | undefined;
-  value: number | string | undefined;
+  value: null | number | string | undefined;
 }) {
   if (field.type === "textarea") {
     return (
@@ -224,6 +227,7 @@ function FieldInput({
     return (
       <BitfieldEditor
         className={className}
+        disabled={field.readOnly}
         entries={field.bitfieldEntries}
         id={field.key}
         onChange={(v) => {
@@ -256,6 +260,7 @@ function FieldInput({
     return (
       <EntityPicker
         className={className}
+        disabled={field.readOnly}
         id={field.key}
         max={field.max}
         min={field.min}
@@ -294,6 +299,10 @@ function renderLabelContent(field: FieldDef) {
         >
           *
         </span>
+      ) : null}
+
+      {field.readOnly && field.disabledReason ? (
+        <HelpTip text={field.disabledReason} />
       ) : null}
     </span>
   ) : null;

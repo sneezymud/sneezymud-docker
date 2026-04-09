@@ -6,15 +6,23 @@ import type { EnumEntry } from "@/shared/types/enums.ts";
 
 import { useEntityEditor } from "@/hooks/use-entity-editor.ts";
 import { diffEdits } from "@/lib/diff-edits.ts";
+import { canonicalOwner, entityKeys, ownerSuffix } from "@/lib/entity-keys.ts";
 import { apiFetch } from "@/shared/api-client.ts";
-import { roomKeys, zoneKeys } from "@/shared/query-keys.ts";
+import { resolvePermissions } from "@/shared/permissions.ts";
+import { zoneKeys } from "@/shared/query-keys.ts";
 import { roomSchema } from "@/shared/schemas/room.ts";
 import { zoneListSchema } from "@/shared/schemas/zone.ts";
 import { useAuthStore } from "@/state/auth.ts";
 
-export function useRoomEditor(vnumParam: string) {
+export function useRoomEditor(vnumParam: string, owner: number | undefined) {
   const vnum = Number(vnumParam);
   const user = useAuthStore((s) => s.user);
+  const cOwner = canonicalOwner(owner, user?.playerId ?? 0);
+  const permissions = resolvePermissions(
+    user?.powers ?? [],
+    user?.isSenior ?? false,
+  );
+  const readOnly = !permissions.canEditRooms;
 
   const {
     data: room,
@@ -22,8 +30,9 @@ export function useRoomEditor(vnumParam: string) {
     isError,
     isLoading,
   } = useQuery({
-    queryFn: () => apiFetch(`/api/rooms/${vnum}`, roomSchema),
-    queryKey: roomKeys.detail(vnum),
+    queryFn: () =>
+      apiFetch(`/api/rooms/${vnum}${ownerSuffix(cOwner)}`, roomSchema),
+    queryKey: entityKeys.detail("room", vnum, cOwner),
   });
 
   const { data: zones, isError: zonesError } = useQuery({
@@ -60,13 +69,14 @@ export function useRoomEditor(vnumParam: string) {
     unsavedNavReset,
     unsavedNavStatus,
   } = useEntityEditor({
-    allKey: roomKeys.all,
+    allKey: entityKeys.all("room"),
     data: room,
-    deletePath: `/api/rooms/${vnum}`,
-    detailKey: roomKeys.detail(vnum),
+    deletePath: `/api/rooms/${vnum}${ownerSuffix(cOwner)}`,
+    detailKey: entityKeys.detail("room", vnum, cOwner),
     dirty,
     listPath: "/rooms",
     onReset: resetEdits,
+    readOnly,
     saveFn: async () => {
       if (!room) return null;
       const body: Room = {
@@ -75,7 +85,7 @@ export function useRoomEditor(vnumParam: string) {
         exits: exitEdits ?? room.exits,
         extras: extraEdits ?? room.extras,
       };
-      return apiFetch(`/api/rooms/${vnum}`, roomSchema, {
+      return apiFetch(`/api/rooms/${vnum}${ownerSuffix(cOwner)}`, roomSchema, {
         body: JSON.stringify(body),
         method: "PUT",
       });
@@ -92,6 +102,7 @@ export function useRoomEditor(vnumParam: string) {
   };
 
   return {
+    cOwner,
     currentValues,
     deletePending,
     dirty,
@@ -106,6 +117,8 @@ export function useRoomEditor(vnumParam: string) {
     isError,
     isLoading,
     originalValues,
+    permissions,
+    readOnly,
     resetEdits,
     room,
     saving,
@@ -124,7 +137,7 @@ export function useRoomEditor(vnumParam: string) {
 function roomToFormValues(
   room: Room,
   edits: null | Partial<Room>,
-): Record<string, number | string> {
+): Record<string, null | number | string> {
   const { exits: _roomExits, extras: _roomExtras, ...roomFields } = room;
   if (!edits) {
     return roomFields;

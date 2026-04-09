@@ -16,6 +16,7 @@ import { hasBit, toggleBit } from "@/shared/bitfield.ts";
 
 interface BitfieldEditorProps {
   className?: string | undefined;
+  disabled?: boolean | undefined;
   entries: BitfieldEntry[];
   id?: string;
   label?: string;
@@ -25,6 +26,7 @@ interface BitfieldEditorProps {
 
 export function BitfieldEditor({
   className,
+  disabled,
   entries,
   id,
   label,
@@ -40,7 +42,11 @@ export function BitfieldEditor({
   return (
     <div
       aria-label={label ? `${label} flags` : "Flags"}
-      className={cn("rounded-md border border-transparent p-1", className)}
+      className={cn(
+        "rounded-md border border-transparent p-1",
+        disabled && "opacity-60",
+        className,
+      )}
       id={id}
       role="group"
     >
@@ -82,6 +88,7 @@ export function BitfieldEditor({
                 <div
                   className={cn(
                     "flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm",
+                    disabled && "cursor-default",
                     isSet
                       ? "bg-primary/10 text-foreground"
                       : "text-foreground/80 hover:bg-muted",
@@ -90,6 +97,7 @@ export function BitfieldEditor({
                   <Checkbox
                     checked={isSet}
                     className="size-5"
+                    disabled={disabled}
                     id={`${id}-${entry.bit}`}
                     onCheckedChange={() => {
                       onChange(toggleBit(value, entry.bit));

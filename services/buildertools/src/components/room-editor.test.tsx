@@ -50,7 +50,7 @@ const mockZones: Zone[] = [
     reset_mode: null,
     top: null,
     util_flag: null,
-    zone_enabled: null,
+    zone_enabled: 0,
     zone_name: "Test Zone",
     zone_nr: 1,
   },
@@ -61,6 +61,7 @@ function setAuth(powers: number[]) {
   useAuthStore.setState({
     user: {
       blocks: [{ end: 1099, start: 1000 }],
+      isSenior: false,
       playerId: 99_999,
       playerName: "TestBuilder",
       powers,
@@ -151,6 +152,85 @@ describe("RoomEditor", () => {
       await waitFor(() => {
         expect(saveButton.hasAttribute("disabled")).toBe(true);
       });
+    });
+  });
+
+  test("read-only mode: banner, no save, inputs disabled, diff accessible", async () => {
+    setAuth([POWER.BUILDER]);
+    mockRoomEndpoints();
+    renderWithProviders(<RoomEditor vnumParam={VNUM} />);
+
+    // TEST-RO-1: ReadOnlyBanner renders
+    expect(await screen.findByText(/read[-\s]?only/i)).toBeDefined();
+
+    // TEST-RO-2: Save button absent
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+
+    // TEST-RO-3: form inputs disabled
+    const nameInput = screen.getByRole("textbox", { name: /name/i });
+    expect(
+      nameInput.hasAttribute("disabled") || nameInput.hasAttribute("readonly"),
+    ).toBe(true);
+
+    // TEST-RO-5: Diff button still accessible
+    const diffButtons = screen.getAllByRole("button", {
+      name: /compare|diff/i,
+    });
+    expect(diffButtons.length).toBeGreaterThan(0);
+  });
+
+  test("cross-owner: editor shows different owner's data after remount", async () => {
+    useAuthStore.setState({
+      user: {
+        blocks: [{ end: 1099, start: 1000 }],
+        isSenior: true,
+        playerId: 42,
+        playerName: "SeniorBuilder",
+        powers: [POWER.BUILDER, POWER.REDIT, POWER.RSAVE, POWER.EDIT],
+        username: "seniorbuilder",
+      },
+    });
+
+    // First mount: owner = 1
+    mockFetch([
+      {
+        body: makeRoom({ name: "owner1 room", vnum: 100 }),
+        url: "/api/rooms/100",
+      },
+      { body: mockZones, url: "/api/zones" },
+      { body: { id: 1, name: "FirstOwner" }, url: "/api/players/1" },
+    ]);
+    const { unmount } = renderWithProviders(
+      <RoomEditor
+        owner={1}
+        vnumParam="100"
+      />,
+    );
+    await waitFor(() => {
+      const input = screen.getByRole("textbox", { name: /name/i });
+      expect(input.getAttribute("value")).toBe("owner1 room");
+    });
+    unmount();
+    resetFetchMock();
+
+    // Second mount: owner = 2
+    mockFetch([
+      {
+        body: makeRoom({ name: "owner2 room", vnum: 100 }),
+        url: "/api/rooms/100",
+      },
+      { body: mockZones, url: "/api/zones" },
+      { body: { id: 2, name: "SecondOwner" }, url: "/api/players/2" },
+    ]);
+    renderWithProviders(
+      <RoomEditor
+        owner={2}
+        vnumParam="100"
+      />,
+    );
+    await waitFor(() => {
+      const input = screen.getByRole("textbox", { name: /name/i });
+      expect(input.getAttribute("value")).toBe("owner2 room");
     });
   });
 

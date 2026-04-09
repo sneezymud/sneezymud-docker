@@ -1,12 +1,14 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useMatchRoute, useNavigate } from "@tanstack/react-router";
-import { Box, DoorOpen, Map, User } from "lucide-react";
+import { Box, DoorOpen, Map, Upload, User } from "lucide-react";
 import { useState } from "react";
 
 import { SneezyLogo } from "@/components/sneezy-logo.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/lib/utils.ts";
-import { hasPower, POWER } from "@/shared/powers.ts";
+import { apiFetch } from "@/shared/api-client.ts";
+import { resolvePermissions } from "@/shared/permissions.ts";
+import { okResponseSchema } from "@/shared/schemas/common.ts";
 import { useAuthStore } from "@/state/auth.ts";
 import { useDirtyStore } from "@/state/dirty.ts";
 import { useSidebarStore } from "@/state/sidebar.ts";
@@ -29,12 +31,13 @@ export function Nav({ className, onNavClick }: NavProps) {
     return null;
   }
 
+  const permissions = resolvePermissions(user.powers, user.isSenior);
+
   const doLogout = () => {
     (async () => {
       useAuthStore.getState().setLoggingOut(true);
       try {
-        await fetch("/api/auth/logout", {
-          headers: { "X-Requested-With": "XMLHttpRequest" },
+        await apiFetch("/api/auth/logout", okResponseSchema, {
           method: "POST",
           signal: AbortSignal.timeout(5000),
         });
@@ -80,35 +83,29 @@ export function Nav({ className, onNavClick }: NavProps) {
       </div>
 
       <div className="flex flex-1 flex-col gap-1.5">
-        {hasPower(user.powers, POWER.REDIT) ? (
-          <NavLink
-            icon={<DoorOpen className="h-4 w-4 shrink-0" />}
-            onClick={onNavClick}
-            to="/rooms"
-          >
-            Rooms
-          </NavLink>
-        ) : null}
+        <NavLink
+          icon={<DoorOpen className="h-4 w-4 shrink-0" />}
+          onClick={onNavClick}
+          to="/rooms"
+        >
+          Rooms
+        </NavLink>
 
-        {hasPower(user.powers, POWER.MEDIT) ? (
-          <NavLink
-            icon={<User className="h-4 w-4 shrink-0" />}
-            onClick={onNavClick}
-            to="/mobs"
-          >
-            Mobs
-          </NavLink>
-        ) : null}
+        <NavLink
+          icon={<User className="h-4 w-4 shrink-0" />}
+          onClick={onNavClick}
+          to="/mobs"
+        >
+          Mobs
+        </NavLink>
 
-        {hasPower(user.powers, POWER.OEDIT) ? (
-          <NavLink
-            icon={<Box className="h-4 w-4 shrink-0" />}
-            onClick={onNavClick}
-            to="/objects"
-          >
-            Objects
-          </NavLink>
-        ) : null}
+        <NavLink
+          icon={<Box className="h-4 w-4 shrink-0" />}
+          onClick={onNavClick}
+          to="/objects"
+        >
+          Objects
+        </NavLink>
 
         <NavLink
           icon={<Map className="h-4 w-4 shrink-0" />}
@@ -117,6 +114,16 @@ export function Nav({ className, onNavClick }: NavProps) {
         >
           Zones
         </NavLink>
+
+        {permissions.canPublish && (
+          <NavLink
+            icon={<Upload className="h-4 w-4 shrink-0" />}
+            onClick={onNavClick}
+            to="/publish"
+          >
+            Publish
+          </NavLink>
+        )}
       </div>
 
       <div className="border-border mt-auto flex justify-between border-t pt-3">

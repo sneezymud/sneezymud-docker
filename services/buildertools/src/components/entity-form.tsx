@@ -13,8 +13,8 @@ interface EntityFormProps {
   fieldErrors?: Record<string, string>;
   groups: FieldGroupDef[];
   onChange: (key: string, value: number | string) => void;
-  originalValues?: Record<string, number | string> | undefined;
-  values: Record<string, number | string>;
+  originalValues?: Record<string, null | number | string> | undefined;
+  values: Record<string, null | number | string>;
 }
 
 export function EntityForm({
@@ -53,8 +53,8 @@ function FieldGroup({
   fieldErrors?: Record<string, string>;
   group: FieldGroupDef;
   onChange: (key: string, value: number | string) => void;
-  originalValues?: Record<string, number | string> | undefined;
-  values: Record<string, number | string>;
+  originalValues?: Record<string, null | number | string> | undefined;
+  values: Record<string, null | number | string>;
 }) {
   const {
     colSpan,

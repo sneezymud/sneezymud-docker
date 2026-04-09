@@ -29,10 +29,12 @@ const MOB_STRING_LABELS: Record<MobStringKeyword, string> = {
 
 export function MobStringsEditor({
   onChange,
+  readOnly,
   rows,
   vnum,
 }: {
   onChange: (rows: MobExtra[]) => void;
+  readOnly?: boolean;
   rows: MobExtra[];
   vnum: number;
 }) {
@@ -59,14 +61,19 @@ export function MobStringsEditor({
   };
 
   return (
-    <fieldset className="bg-card border-border/50 rounded-lg border p-5">
+    <fieldset
+      className="bg-card border-border/50 rounded-lg border p-5"
+      disabled={readOnly}
+    >
       <SectionHeader
         action={
-          <AddButton
-            aria-label="Add mobile string"
-            disabled={availableKeywords.length === 0}
-            onClick={addRow}
-          />
+          readOnly ? undefined : (
+            <AddButton
+              aria-label="Add mobile string"
+              disabled={availableKeywords.length === 0}
+              onClick={addRow}
+            />
+          )
         }
         title="Mobile Strings"
         tooltip={
