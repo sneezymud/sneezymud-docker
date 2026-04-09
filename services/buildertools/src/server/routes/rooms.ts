@@ -1,3 +1,4 @@
+import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 
 import { hasPower, POWER } from "@/shared/powers.ts";
@@ -8,14 +9,17 @@ import { isUnassignableRoomSpecProc } from "@/shared/spec-proc-access.ts";
 import {
   type AuthEnv,
   canAccessVnum,
-  hasExpandedAccess,
   jsonValidator,
   requireAuth,
-  requirePower,
   requireVnumAccess,
+  requireWritePower,
+  resolveListOwner,
+  resolveTargetOwner,
 } from "../auth/middleware.ts";
-import { isDuplicateKeyError } from "../db.ts";
-import { getOtherBuildersBlocks } from "../queries/auth.ts";
+import { immortalDb, isDuplicateKeyError } from "../db.ts";
+import { ownerEq } from "../queries/owner-scope.ts";
+import { resolvePlayerNames } from "../queries/player-names.ts";
+import { EntityNotFoundError } from "../queries/publish.ts";
 import {
   createRoom,
   deleteRoom,
@@ -27,26 +31,51 @@ import {
   searchRooms,
   updateRoom,
 } from "../queries/rooms.ts";
+import { room } from "../schema/immortal.ts";
 
 export const roomRoutes = new Hono<AuthEnv>();
 
 roomRoutes.use(requireAuth);
-roomRoutes.use(requirePower(POWER.REDIT, POWER.RSAVE, POWER.EDIT));
+roomRoutes.use(requireWritePower(POWER.REDIT, POWER.RSAVE, POWER.EDIT));
 
 roomRoutes.get("/", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
-  const blocks = hasExpandedAccess(user.powers, "room") ? null : user.blocks;
-  const rooms = await listRooms(blocks, scope);
-  return c.json(rooms);
+  const resolved = resolveListOwner(c, user);
+  if (resolved.kind === "forbidden")
+    return c.json({ error: resolved.reason }, 403);
+  if (resolved.kind === "bad_request")
+    return c.json({ error: resolved.reason }, 400);
+  const scope = resolved.scope;
+  const blocks = user.isSenior ? null : user.blocks;
+  const includeOwnerName = scope === "all" || scope.playerId !== user.playerId;
+  const rows = await listRooms(blocks, scope, { includeOwnerName });
+  if (includeOwnerName) {
+    const ids = [
+      ...new Set(
+        rows.map((r) => r.player_id).filter((id): id is number => id != null),
+      ),
+    ];
+    const names = await resolvePlayerNames(ids);
+    return c.json(
+      rows.map((r) => ({
+        ...r,
+        owner: names.get(r.player_id ?? 0) ?? "Unknown",
+        playerId: r.player_id,
+      })),
+    );
+  }
+  return c.json(rows);
 });
 
 roomRoutes.post("/", jsonValidator(roomCreateSchema), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  if (c.req.query("owner") !== undefined) {
+    return c.json({ error: "owner parameter not allowed on create" }, 400);
+  }
+  const scope = { playerId: user.playerId };
   const data = c.req.valid("json");
 
-  if (!(await canAccessVnum(data.vnum, user, "room"))) {
+  if (!canAccessVnum(data.vnum, user)) {
     return c.json({ error: "Vnum outside assigned blocks" }, 403);
   }
 
@@ -72,7 +101,11 @@ roomRoutes.post("/", jsonValidator(roomCreateSchema), async (c) => {
 
 roomRoutes.get("/search", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const target = resolveTargetOwner(c, user);
+  if (target.kind === "forbidden") return c.json({ error: target.reason }, 403);
+  if (target.kind === "bad_request")
+    return c.json({ error: target.reason }, 400);
+  const scope = { playerId: target.playerId };
   const query = c.req.query("q") ?? "";
   if (query.length < 2) {
     return c.json([]);
@@ -83,7 +116,11 @@ roomRoutes.get("/search", async (c) => {
 
 roomRoutes.get("/name/:vnum", async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const target = resolveTargetOwner(c, user);
+  if (target.kind === "forbidden") return c.json({ error: target.reason }, 403);
+  if (target.kind === "bad_request")
+    return c.json({ error: target.reason }, 400);
+  const scope = { playerId: target.playerId };
   const vnum = Number(c.req.param("vnum"));
   const name = await getRoomName(vnum, scope);
   return c.json({ name, vnum });
@@ -91,15 +128,19 @@ roomRoutes.get("/name/:vnum", async (c) => {
 
 roomRoutes.get("/:vnum", requireVnumAccess("room"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const target = resolveTargetOwner(c, user);
+  if (target.kind === "forbidden") return c.json({ error: target.reason }, 403);
+  if (target.kind === "bad_request")
+    return c.json({ error: target.reason }, 400);
+  const scope = { playerId: target.playerId };
   const vnum = Number(c.req.param("vnum"));
 
-  const room = await getRoom(vnum, scope);
-  if (!room) {
+  const foundRoom = await getRoom(vnum, scope);
+  if (!foundRoom) {
     return c.json({ error: "Room not found" }, 404);
   }
 
-  return c.json(room);
+  return c.json(foundRoom);
 });
 
 roomRoutes.put(
@@ -108,29 +149,46 @@ roomRoutes.put(
   jsonValidator(roomInputSchema),
   async (c) => {
     const user = c.get("user");
-    const scope = { owner: user.playerId };
+    const target = resolveTargetOwner(c, user);
+    if (target.kind === "forbidden")
+      return c.json({ error: target.reason }, 403);
+    if (target.kind === "bad_request")
+      return c.json({ error: target.reason }, 400);
+    const scope = { playerId: target.playerId };
     const vnum = Number(c.req.param("vnum"));
 
-    const current = await getRoom(vnum, scope);
-    if (!current) {
+    const [existingRow] = await immortalDb
+      .select({ spec: room.spec })
+      .from(room)
+      .where(and(eq(room.vnum, vnum), ownerEq(room.player_id, scope)));
+    if (!existingRow) {
       return c.json({ error: "Room not found" }, 404);
     }
 
     const data = c.req.valid("json");
     if (
+      !user.isSenior &&
       !hasPower(user.powers, POWER.REDIT_ENABLED) &&
-      isUnassignableRoomSpecProc(data.spec)
+      isUnassignableRoomSpecProc(data.spec) &&
+      data.spec !== existingRow.spec
     ) {
-      data.spec = current.spec;
+      return c.json(
+        {
+          error:
+            'Changing "spec" to an unassignable value requires POWER_REDIT_ENABLED',
+        },
+        403,
+      );
     }
 
-    // Determine which block this vnum belongs to for the owner field
-    const blockIndex = user.blocks.findIndex(
-      (b) => vnum >= b.start && vnum <= b.end,
-    );
-    const block = blockIndex + 1; // 1-indexed block number
-
-    await updateRoom(vnum, data, scope, block);
+    try {
+      await updateRoom(vnum, data, scope);
+    } catch (error) {
+      if (error instanceof EntityNotFoundError) {
+        return c.json({ error: "Room not found" }, 404);
+      }
+      throw error;
+    }
     const updated = await getRoom(vnum, scope);
     return c.json(updated);
   },
@@ -138,18 +196,16 @@ roomRoutes.put(
 
 roomRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  if (c.req.query("owner") !== undefined) {
+    return c.json({ error: "owner parameter not allowed on bulk delete" }, 400);
+  }
+  const scope = { playerId: user.playerId };
   const { vnums } = c.req.valid("json");
 
-  const otherBlocks = hasExpandedAccess(user.powers, "room")
-    ? await getOtherBuildersBlocks(user.playerId)
-    : undefined;
-  const accessChecks = await Promise.all(
-    vnums.map(async (v) => ({
-      ok: await canAccessVnum(v, user, "room", otherBlocks),
-      v,
-    })),
-  );
+  const accessChecks = vnums.map((v) => ({
+    ok: canAccessVnum(v, user),
+    v,
+  }));
   const unauthorized = accessChecks.filter((r) => !r.ok).map((r) => r.v);
   if (unauthorized.length > 0) {
     return c.json(
@@ -164,7 +220,11 @@ roomRoutes.delete("/bulk", jsonValidator(bulkDeleteSchema), async (c) => {
 
 roomRoutes.delete("/:vnum", requireVnumAccess("room"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const target = resolveTargetOwner(c, user);
+  if (target.kind === "forbidden") return c.json({ error: target.reason }, 403);
+  if (target.kind === "bad_request")
+    return c.json({ error: target.reason }, 400);
+  const scope = { playerId: target.playerId };
   const vnum = Number(c.req.param("vnum"));
 
   if (!(await roomExists(vnum, scope))) {

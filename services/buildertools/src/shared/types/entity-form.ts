@@ -29,6 +29,7 @@ export interface FieldGroupDef {
 interface FieldDefBase {
   addable?: boolean;
   detailedTooltip?: React.ReactNode;
+  disabledReason?: string;
   fullWidth?: boolean;
   help?: string;
   key: string;

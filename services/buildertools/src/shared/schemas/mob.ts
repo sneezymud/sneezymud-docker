@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { UINT32_MAX } from "@/shared/constants.ts";
 
-import { vnumSchema } from "./common.ts";
+import { playerIdSchema, vnumSchema } from "./common.ts";
 
 export const mobStringKeywords = [
   "bamfin",
@@ -16,7 +16,7 @@ export const mobStringKeywords = [
 export type MobStringKeyword = (typeof mobStringKeywords)[number];
 
 export const mobExtraSchema = z.object({
-  description: z.string(),
+  description: z.string().max(255),
   keyword: z.enum(mobStringKeywords),
   vnum: vnumSchema,
 });
@@ -84,6 +84,7 @@ export type Mob = z.infer<typeof mobSchema>;
 // String fields that medit requires non-empty for saving are enforced with min(1).
 export const mobInputSchema = mobSchema.extend({
   ac: z.number().min(0).max(127),
+  adjacent_sound: z.string().max(255),
   agi: z.number().int().min(-25).max(25),
   attacks: z.number().min(0),
   bra: z.number().int().min(-25).max(25),
@@ -105,13 +106,14 @@ export const mobInputSchema = mobSchema.extend({
   intel: z.number().int().min(-25).max(25),
   kar: z.number().int().min(-25).max(25),
   level: z.number().int().min(1).max(100),
-  long_desc: z.string().min(1),
+  local_sound: z.string().max(255),
+  long_desc: z.string().min(1).max(255),
   max_exist: z.number().int().min(0).max(9999),
-  name: z.string().min(1),
+  name: z.string().min(1).max(127),
   per: z.number().int().min(-25).max(25),
   race: z.number().int().min(0).max(126),
   sex: z.number().int().min(0).max(2),
-  short_desc: z.string().min(1),
+  short_desc: z.string().min(1).max(127),
   skin: z.number().int().min(-200).max(200),
   spe: z.number().int().min(-25).max(25),
   spec_proc: z.number().int().min(0).max(222),
@@ -127,6 +129,8 @@ export type MobInput = z.infer<typeof mobInputSchema>;
 export const mobListItemSchema = z.object({
   level: z.number(),
   name: z.string(),
+  owner: z.string().optional(),
+  player_id: playerIdSchema.optional(),
   race: z.number(),
   short_desc: z.string(),
   vnum: vnumSchema,

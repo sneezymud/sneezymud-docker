@@ -7,7 +7,7 @@ export const zoneSchema = z.object({
   reset_mode: z.number().int().nullable(),
   top: z.number().int().nullable(),
   util_flag: z.number().int().nullable(),
-  zone_enabled: z.number().int().nullable(),
+  zone_enabled: z.number().int(),
   zone_name: z.string(),
   zone_nr: z.number().int(),
 });

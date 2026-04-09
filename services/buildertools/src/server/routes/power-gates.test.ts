@@ -174,18 +174,19 @@ describe("object power gates", () => {
 
   test("without OEDIT_COST: price change is silently reverted", async () => {
     // otherbuilder's object at 190 has price=0 (default from creation)
-    // otherbuilder lacks OEDIT_COST, so price is reverted to current DB value
+    // otherbuilder lacks OEDIT_COST, so the request is rejected with 403
     const putRes = await put("/api/objects/190", otherCookie, {
       ...baseObjPayload,
       price: 500,
       vnum: 190,
     });
-    expect(putRes.status).toBe(200);
-
-    const getRes = await get("/api/objects/190", otherCookie);
-    expect(getRes.status).toBe(200);
-    const body: unknown = await getRes.json();
-    expect(body).toEqual(expect.objectContaining({ price: 0, vnum: 190 }));
+    expect(putRes.status).toBe(403);
+    const body: unknown = await putRes.json();
+    expect(body).toEqual(
+      expect.objectContaining({
+        error: 'Changing "price" requires POWER_OEDIT_COST',
+      }),
+    );
   });
 
   test("without OEDIT_APPLYS: affects change is silently reverted", async () => {
@@ -195,12 +196,13 @@ describe("object power gates", () => {
       affects: [{ mod1: 5, mod2: 0, type: 18, vnum: 191 }],
       vnum: 191,
     });
-    expect(putRes.status).toBe(200);
-
-    const getRes = await get("/api/objects/191", otherCookie);
-    expect(getRes.status).toBe(200);
-    const body: unknown = await getRes.json();
-    expect(body).toHaveProperty("affects", []);
+    expect(putRes.status).toBe(403);
+    const body: unknown = await putRes.json();
+    expect(body).toEqual(
+      expect.objectContaining({
+        error: 'Changing "affects" requires POWER_OEDIT_APPLYS',
+      }),
+    );
   });
 
   test("without OEDIT_WEAPONS: weapon val0-val3 changes are silently reverted", async () => {
@@ -213,7 +215,7 @@ describe("object power gates", () => {
       vnum: 192,
     });
 
-    // Now try to change weapon values - should be reverted
+    // Now try to change weapon values - should be rejected with 403
     const putRes = await put("/api/objects/192", otherCookie, {
       ...baseObjPayload,
       type: ITEM_WEAPON,
@@ -223,18 +225,11 @@ describe("object power gates", () => {
       val3: 40,
       vnum: 192,
     });
-    expect(putRes.status).toBe(200);
-
-    const getRes = await get("/api/objects/192", otherCookie);
-    expect(getRes.status).toBe(200);
-    const body: unknown = await getRes.json();
+    expect(putRes.status).toBe(403);
+    const body: unknown = await putRes.json();
     expect(body).toEqual(
       expect.objectContaining({
-        val0: 0,
-        val1: 0,
-        val2: 0,
-        val3: 0,
-        vnum: 192,
+        error: "Changing weapon values requires POWER_OEDIT_WEAPONS",
       }),
     );
   });
@@ -247,21 +242,17 @@ describe("object power gates", () => {
       sql`UPDATE obj SET action_flag = ${PROTOTYPE_BIT} WHERE vnum = 193 AND player_id = 99997`,
     );
 
-    // otherbuilder tries to clear it (action_flag=0)
+    // otherbuilder tries to clear it (action_flag=0) - should be rejected with 403
     const putRes = await put("/api/objects/193", otherCookie, {
       ...baseObjPayload,
       action_flag: 0,
       vnum: 193,
     });
-    expect(putRes.status).toBe(200);
-
-    const getRes = await get("/api/objects/193", otherCookie);
-    expect(getRes.status).toBe(200);
-    const body: unknown = await getRes.json();
+    expect(putRes.status).toBe(403);
+    const body: unknown = await putRes.json();
     expect(body).toEqual(
       expect.objectContaining({
-        action_flag: PROTOTYPE_BIT,
-        vnum: 193,
+        error: "Changing the prototype flag requires POWER_OEDIT_NOPROTOS",
       }),
     );
   });
@@ -270,38 +261,36 @@ describe("object power gates", () => {
     const PROTOTYPE_BIT = 1 << 4;
 
     // Object 194 starts with action_flag=0 (no PROTOTYPE)
-    // otherbuilder tries to set the PROTOTYPE bit
+    // otherbuilder tries to set the PROTOTYPE bit - should be rejected with 403
     const putRes = await put("/api/objects/194", otherCookie, {
       ...baseObjPayload,
       action_flag: PROTOTYPE_BIT,
       vnum: 194,
     });
-    expect(putRes.status).toBe(200);
-
-    const getRes = await get("/api/objects/194", otherCookie);
-    expect(getRes.status).toBe(200);
-    const body: unknown = await getRes.json();
+    expect(putRes.status).toBe(403);
+    const body: unknown = await putRes.json();
     expect(body).toEqual(
       expect.objectContaining({
-        action_flag: 0,
-        vnum: 194,
+        error: "Changing the prototype flag requires POWER_OEDIT_NOPROTOS",
       }),
     );
   });
 
   test("without OEDIT_IMP_POWER: unassignable spec_proc is silently reverted", async () => {
-    // spec_proc 5 is unassignable for objects
+    // spec_proc 5 is unassignable for objects - should be rejected with 403
     const putRes = await put("/api/objects/195", otherCookie, {
       ...baseObjPayload,
       spec_proc: 5,
       vnum: 195,
     });
-    expect(putRes.status).toBe(200);
-
-    const getRes = await get("/api/objects/195", otherCookie);
-    expect(getRes.status).toBe(200);
-    const body: unknown = await getRes.json();
-    expect(body).toEqual(expect.objectContaining({ spec_proc: 0, vnum: 195 }));
+    expect(putRes.status).toBe(403);
+    const body: unknown = await putRes.json();
+    expect(body).toEqual(
+      expect.objectContaining({
+        error:
+          'Changing "spec_proc" to an unassignable value requires POWER_OEDIT_IMP_POWER',
+      }),
+    );
   });
 });
 
@@ -365,18 +354,20 @@ describe("mob power gates", () => {
   });
 
   test("without MEDIT_IMP_POWER: unassignable spec_proc is silently reverted", async () => {
-    // spec_proc 3 is unassignable for mobs
+    // spec_proc 3 is unassignable for mobs - should be rejected with 403
     const putRes = await put("/api/mobs/196", otherCookie, {
       ...baseMobPayload,
       spec_proc: 3,
       vnum: 196,
     });
-    expect(putRes.status).toBe(200);
-
-    const getRes = await get("/api/mobs/196", otherCookie);
-    expect(getRes.status).toBe(200);
-    const body: unknown = await getRes.json();
-    expect(body).toEqual(expect.objectContaining({ spec_proc: 0, vnum: 196 }));
+    expect(putRes.status).toBe(403);
+    const body: unknown = await putRes.json();
+    expect(body).toEqual(
+      expect.objectContaining({
+        error:
+          'Changing "spec_proc" to an unassignable value requires POWER_MEDIT_IMP_POWER',
+      }),
+    );
   });
 });
 
@@ -410,18 +401,20 @@ describe("room power gates", () => {
   });
 
   test("without REDIT_ENABLED: unassignable room spec is silently reverted", async () => {
-    // spec 1 is unassignable (only 0 and 33 are assignable)
+    // spec 1 is unassignable - should be rejected with 403
     const putRes = await put("/api/rooms/197", otherCookie, {
       ...baseRoomPayload,
       spec: 1,
       vnum: 197,
     });
-    expect(putRes.status).toBe(200);
-
-    const getRes = await get("/api/rooms/197", otherCookie);
-    expect(getRes.status).toBe(200);
-    const body: unknown = await getRes.json();
-    expect(body).toEqual(expect.objectContaining({ spec: 0, vnum: 197 }));
+    expect(putRes.status).toBe(403);
+    const body: unknown = await putRes.json();
+    expect(body).toEqual(
+      expect.objectContaining({
+        error:
+          'Changing "spec" to an unassignable value requires POWER_REDIT_ENABLED',
+      }),
+    );
   });
 
   test("without REDIT_ENABLED: assignable room spec persists", async () => {

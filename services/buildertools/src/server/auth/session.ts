@@ -64,7 +64,7 @@ export async function touchSession(c: Context): Promise<void> {
   }
   // Re-query powers and blocks so permission changes take effect
   // within one session half-life (~15 days) instead of requiring re-login
-  const fresh = await refreshSessionUser(payload.user.username);
+  const fresh = await refreshSessionUser(payload.user.playerId);
   if (!fresh) {
     // User lost builder access - destroy their session
     destroySession(c);
@@ -75,6 +75,8 @@ export async function touchSession(c: Context): Promise<void> {
     user: {
       ...payload.user,
       blocks: fresh.blocks,
+      isSenior: fresh.isSenior,
+      playerId: fresh.playerId,
       powers: fresh.powers,
     },
   });

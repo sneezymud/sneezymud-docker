@@ -62,7 +62,15 @@ await sneezyDb.execute(sql`DELETE FROM wizdata`);
 await sneezyDb.execute(sql`DELETE FROM player`);
 await sneezyDb.execute(sql`DELETE FROM account`);
 await sneezyDb.execute(sql`DELETE FROM zone`);
+await sneezyDb.execute(sql`DELETE FROM roomexit`);
+await sneezyDb.execute(sql`DELETE FROM roomextra`);
 await sneezyDb.execute(sql`DELETE FROM room`);
+await sneezyDb.execute(sql`DELETE FROM mob_extra`);
+await sneezyDb.execute(sql`DELETE FROM mob_imm`);
+await sneezyDb.execute(sql`DELETE FROM mobresponses`);
+await sneezyDb.execute(sql`DELETE FROM mob`);
+await sneezyDb.execute(sql`DELETE FROM objaffect`);
+await sneezyDb.execute(sql`DELETE FROM objextra`);
 await sneezyDb.execute(sql`DELETE FROM obj`);
 
 // Seed shared auth fixtures
@@ -183,6 +191,83 @@ await sneezyDb.execute(sql`
 // nonbuilder: NO powers at all (specifically no POWER_BUILDER=29)
 // The wizdata row is critical - authenticateBuilder does INNER JOIN wizdata,
 // so without it the query returns no rows and hits not_found instead of not_immortal.
+
+// Seed multi-character account (TEST-REFRESH / B-H3 coverage).
+// crypt("testpass", "mu") - DES crypt uses only the first 2 chars of the salt
+const MULTICHAR_PASSWORD_HASH = "mulNplYVYy";
+await sneezyDb.execute(sql`
+  INSERT INTO account (account_id, name, passwd)
+  VALUES (99990, 'multicharbuilder', ${MULTICHAR_PASSWORD_HASH})
+`);
+// Character A: senior (POWER_LOW + NO_LIMITS), blocks 600-699
+await sneezyDb.execute(sql`
+  INSERT INTO player (id, account_id, name)
+  VALUES (99990, 99990, 'MultiCharA')
+`);
+await sneezyDb.execute(sql`
+  INSERT INTO wizdata (player_id, setsev, blockastart, blockaend, blockbstart, blockbend)
+  VALUES (99990, 0, 600, 699, 0, 0)
+`);
+for (const power of [1, 3, 5, 7, 10, 29, 63, 110]) {
+  await sneezyDb.execute(
+    sql`INSERT INTO wizpower (player_id, wizpower) VALUES (99990, ${power})`,
+  );
+}
+// Character B: non-senior (BUILDER only), blocks 700-799
+await sneezyDb.execute(sql`
+  INSERT INTO player (id, account_id, name)
+  VALUES (99989, 99990, 'MultiCharB')
+`);
+await sneezyDb.execute(sql`
+  INSERT INTO wizdata (player_id, setsev, blockastart, blockaend, blockbstart, blockbend)
+  VALUES (99989, 0, 700, 799, 0, 0)
+`);
+await sneezyDb.execute(
+  sql`INSERT INTO wizpower (player_id, wizpower) VALUES (99989, 29)`,
+);
+
+// Seed view-only builder: senior (POWER_LOW) but no entity edit powers
+const VIEW_ONLY_PASSWORD_HASH = "vipZ51m94.";
+await sneezyDb.execute(sql`
+  INSERT INTO account (account_id, name, passwd)
+  VALUES (99993, 'viewonly', ${VIEW_ONLY_PASSWORD_HASH})
+`);
+await sneezyDb.execute(sql`
+  INSERT INTO player (id, account_id, name)
+  VALUES (99993, 99993, 'ViewOnly')
+`);
+await sneezyDb.execute(sql`
+  INSERT INTO wizdata (player_id, setsev, blockastart, blockaend, blockbstart, blockbend)
+  VALUES (99993, 0, 90000, 90099, 0, 0)
+`);
+// viewonly: BUILDER + LOW (senior, but no REDIT/MEDIT/OEDIT)
+for (const power of [29, 63]) {
+  await sneezyDb.execute(
+    sql`INSERT INTO wizpower (player_id, wizpower) VALUES (99993, ${power})`,
+  );
+}
+
+// Seed NO_LIMITS-only builder: senior via NO_LIMITS (no POWER_LOW)
+// NOTE: DES crypt salt "no" is same as noblocks/nonbuilder - hash is identical
+const NO_LIMITS_ONLY_PASSWORD_HASH = "noA/WtpIgY";
+await sneezyDb.execute(sql`
+  INSERT INTO account (account_id, name, passwd)
+  VALUES (99992, 'nolimitsonly', ${NO_LIMITS_ONLY_PASSWORD_HASH})
+`);
+await sneezyDb.execute(sql`
+  INSERT INTO player (id, account_id, name)
+  VALUES (99992, 99992, 'NoLimitsOnly')
+`);
+await sneezyDb.execute(sql`
+  INSERT INTO wizdata (player_id, setsev, blockastart, blockaend, blockbstart, blockbend)
+  VALUES (99992, 0, 90100, 90199, 0, 0)
+`);
+// nolimitsonly: BUILDER + entity edit powers + NO_LIMITS (no LOW)
+for (const power of [1, 3, 5, 7, 10, 29, 110]) {
+  await sneezyDb.execute(
+    sql`INSERT INTO wizpower (player_id, wizpower) VALUES (99992, ${power})`,
+  );
+}
 
 // Clean up connection pools when all test files finish
 process.on("beforeExit", () => {

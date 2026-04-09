@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { INT32_MAX, INT32_MIN } from "@/shared/constants.ts";
 
-import { vnumSchema } from "./common.ts";
+import { playerIdSchema, vnumSchema } from "./common.ts";
 
 export const objAffectSchema = z.object({
   mod1: z.number().int().min(INT32_MIN).max(INT32_MAX),
@@ -15,7 +15,7 @@ export type ObjAffect = z.infer<typeof objAffectSchema>;
 
 export const objExtraSchema = z.object({
   description: z.string(),
-  name: z.string(),
+  name: z.string().max(127),
   vnum: vnumSchema,
 });
 
@@ -52,14 +52,18 @@ export type Obj = z.infer<typeof objSchema>;
 
 // Oedit-matching range constraints for write validation
 export const objInputSchema = objSchema.extend({
+  action_desc: z.string().max(255),
   action_flag: z.number().int().min(INT32_MIN).max(INT32_MAX),
   can_be_seen: z.number().int().min(0).max(25),
   cur_struct: z.number().int().min(-1).max(32_767),
   decay: z.number().int().min(-1).max(10_000),
+  long_desc: z.string().max(255),
   material: z.number().int().min(0).max(200),
   max_exist: z.number().int().min(0).max(9999),
   max_struct: z.number().int().min(-1).max(32_767),
+  name: z.string().max(127),
   price: z.number().int().min(0).max(1_000_000),
+  short_desc: z.string().max(127),
   spec_proc: z.number().int().min(0).max(164),
   type: z.number().int().min(0).max(76),
   val0: z.number().int().min(INT32_MIN).max(INT32_MAX),
@@ -75,6 +79,8 @@ export type ObjInput = z.infer<typeof objInputSchema>;
 
 export const objListItemSchema = z.object({
   name: z.string(),
+  owner: z.string().optional(),
+  player_id: playerIdSchema.optional(),
   short_desc: z.string(),
   type: z.number(),
   vnum: vnumSchema,

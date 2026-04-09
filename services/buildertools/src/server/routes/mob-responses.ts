@@ -7,8 +7,9 @@ import {
   type AuthEnv,
   jsonValidator,
   requireAuth,
-  requirePower,
   requireVnumAccess,
+  requireWritePower,
+  resolveTargetOwner,
 } from "../auth/middleware.ts";
 import {
   deleteMobResponse,
@@ -20,11 +21,15 @@ import { mobExists } from "../queries/mobs.ts";
 export const mobResponseRoutes = new Hono<AuthEnv>();
 
 mobResponseRoutes.use(requireAuth);
-mobResponseRoutes.use(requirePower(POWER.MEDIT));
+mobResponseRoutes.use(requireWritePower(POWER.MEDIT));
 
 mobResponseRoutes.get("/:vnum", requireVnumAccess("mob"), async (c) => {
   const user = c.get("user");
-  const scope = { owner: user.playerId };
+  const target = resolveTargetOwner(c, user);
+  if (target.kind === "forbidden") return c.json({ error: target.reason }, 403);
+  if (target.kind === "bad_request")
+    return c.json({ error: target.reason }, 400);
+  const scope = { playerId: target.playerId };
   const vnum = Number(c.req.param("vnum"));
 
   if (!(await mobExists(vnum, scope))) {
@@ -41,7 +46,12 @@ mobResponseRoutes.put(
   jsonValidator(mobResponseSchema),
   async (c) => {
     const user = c.get("user");
-    const scope = { owner: user.playerId };
+    const target = resolveTargetOwner(c, user);
+    if (target.kind === "forbidden")
+      return c.json({ error: target.reason }, 403);
+    if (target.kind === "bad_request")
+      return c.json({ error: target.reason }, 400);
+    const scope = { playerId: target.playerId };
     const vnum = Number(c.req.param("vnum"));
 
     if (!(await mobExists(vnum, scope))) {

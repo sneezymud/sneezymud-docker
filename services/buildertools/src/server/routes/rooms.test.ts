@@ -1,14 +1,18 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { roomSchema } from "@/shared/schemas/room.ts";
 
 import { app } from "../app.ts";
 import { immortalDb, sneezyDb } from "../db.ts";
+import { room } from "../schema/immortal.ts";
 import {
   authRequest,
   getAuthCookie,
+  getExpandedAuthCookie,
   getLowOnlyAuthCookie,
+  getOtherAuthCookie,
+  testUser,
 } from "../test-helpers.ts";
 
 let cookie: string;
@@ -18,16 +22,19 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  const testVnums = sql`(100, 101, 102, 103, 104, 105, 106, 107, 110, 111, 140, 150, 151, 152, 155, 162, 180, 181)`;
   await immortalDb.execute(
-    sql`DELETE FROM roomextra WHERE vnum IN (100, 101, 102, 103, 104, 105, 106, 107, 140, 150, 151, 152, 155)`,
+    sql`DELETE FROM roomextra WHERE vnum IN ${testVnums}`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM roomexit WHERE vnum IN (100, 101, 102, 103, 104, 105, 106, 107, 140, 150, 151, 152, 155)`,
+    sql`DELETE FROM roomexit WHERE vnum IN ${testVnums}`,
   );
-  await immortalDb.execute(
-    sql`DELETE FROM room WHERE vnum IN (100, 101, 102, 103, 104, 105, 106, 107, 140, 150, 151, 152, 155)`,
-  );
+  await immortalDb.execute(sql`DELETE FROM room WHERE vnum IN ${testVnums}`);
   await sneezyDb.execute(sql`DELETE FROM room WHERE vnum IN (140, 5000, 5001)`);
+  // Restore testUser's wizdata in case TEST-OWNER-4b changed it
+  await sneezyDb.execute(
+    sql`UPDATE wizdata SET blockastart = 100, blockaend = 199 WHERE player_id = ${testUser.playerId}`,
+  );
 });
 
 const validRoomUpdate = {
@@ -1020,12 +1027,183 @@ describe("Block B room creation", () => {
     expect(body).toHaveProperty("vnum", 500);
   });
 
-  test("builder cannot create room outside both blocks", async () => {
+  test("senior builder can create room outside own blocks", async () => {
+    // lowOnlyUser has isSenior=true (POWER_LOW), so vnum checks are bypassed entirely
     const res = await authRequest(app, "/api/rooms", lowOnlyCookie, {
       body: JSON.stringify({ vnum: 700 }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
+    expect(res.status).toBe(201);
+  });
+});
+
+// -- Owner scoping --
+
+/** Create an entity in immortal via API and update it with full data. */
+async function createAndUpdate(
+  vnum: number,
+  authCookie: string,
+  updatePayload: Record<string, unknown>,
+) {
+  const createRes = await authRequest(app, "/api/rooms", authCookie, {
+    body: JSON.stringify({ vnum }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+  });
+  expect(createRes.status).toBe(201);
+
+  const putRes = await authRequest(app, `/api/rooms/${vnum}`, authCookie, {
+    body: JSON.stringify({ ...updatePayload, vnum }),
+    headers: { "Content-Type": "application/json" },
+    method: "PUT",
+  });
+  expect(putRes.status).toBe(200);
+}
+
+describe("owner scoping", () => {
+  let expandedCookie: string;
+  let otherCookie: string;
+
+  beforeAll(async () => {
+    expandedCookie = await getExpandedAuthCookie(app);
+    otherCookie = await getOtherAuthCookie(app);
+  });
+
+  test("TEST-OWNER-1: GET /api/rooms?owner=mine excludes other owners' entities", async () => {
+    const vnumA = 110;
+    const vnumB = 111;
+    await createAndUpdate(vnumA, cookie, { ...validRoomUpdate });
+    await createAndUpdate(vnumB, otherCookie, { ...validRoomUpdate });
+
+    const res = await authRequest(app, "/api/rooms?owner=mine", cookie);
+    expect(res.status).toBe(200);
+    const rows: unknown = await res.json();
+    if (!Array.isArray(rows)) throw new Error("expected array");
+    const vnums = rows
+      .filter(
+        (r): r is { vnum: number } =>
+          typeof r === "object" && r !== null && "vnum" in r,
+      )
+      .map((r) => r.vnum);
+    expect(vnums).toContain(vnumA);
+    expect(vnums).not.toContain(vnumB);
+  });
+
+  test("TEST-OWNER-3: cross-owner GET returns target's draft, not senior's", async () => {
+    const vnum = 180;
+    await createAndUpdate(vnum, cookie, {
+      ...validRoomUpdate,
+      name: "test user content",
+    });
+    // expandedUser has no draft at this vnum
+    const res = await authRequest(
+      app,
+      `/api/rooms/${vnum}?owner=${testUser.playerId}`,
+      expandedCookie,
+    );
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toHaveProperty("name", "test user content");
+  });
+
+  test("TEST-OWNER-5: cross-owner DELETE removes target's row", async () => {
+    const vnum = 181;
+    await createAndUpdate(vnum, cookie, { ...validRoomUpdate });
+    const res = await authRequest(
+      app,
+      `/api/rooms/${vnum}?owner=${testUser.playerId}`,
+      expandedCookie,
+      { method: "DELETE" },
+    );
+    expect(res.status).toBe(200);
+    const getRes = await authRequest(app, `/api/rooms/${vnum}`, cookie);
+    expect(getRes.status).toBe(404);
+  });
+
+  test("TEST-OWNER-4b: block preservation under blocks-mismatch", async () => {
+    const vnum = 162;
+    await createAndUpdate(vnum, cookie, {
+      ...validRoomUpdate,
+      name: "original",
+    });
+
+    // Simulate a wizdata shift: move testUser's blockA out from under the vnum
+    await sneezyDb.execute(
+      sql`UPDATE wizdata SET blockastart = 1000, blockaend = 1099 WHERE player_id = ${testUser.playerId}`,
+    );
+
+    // Senior PUTs, changing only the name
+    const getRes = await authRequest(
+      app,
+      `/api/rooms/${vnum}?owner=${testUser.playerId}`,
+      expandedCookie,
+    );
+    expect(getRes.status).toBe(200);
+    const original: unknown = await getRes.json();
+    if (typeof original !== "object" || original === null) {
+      throw new Error("expected room object");
+    }
+
+    const putRes = await authRequest(
+      app,
+      `/api/rooms/${vnum}?owner=${testUser.playerId}`,
+      expandedCookie,
+      {
+        body: JSON.stringify({
+          ...original,
+          name: "edited despite blocks shift",
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+    );
+    expect(putRes.status).toBe(200);
+
+    // Verify the stored block is still 1
+    const [row] = await immortalDb
+      .select({ block: room.block, name: room.name })
+      .from(room)
+      .where(and(eq(room.vnum, vnum), eq(room.player_id, testUser.playerId)));
+    expect(row?.name).toBe("edited despite blocks shift");
+    expect(row?.block).toBe(1);
+
+    // Restore testUser's wizdata for subsequent tests
+    await sneezyDb.execute(
+      sql`UPDATE wizdata SET blockastart = 100, blockaend = 199 WHERE player_id = ${testUser.playerId}`,
+    );
+  });
+
+  test("TEST-OWNER-6: non-senior ?owner= rejection on GET", async () => {
+    const res = await authRequest(
+      app,
+      `/api/rooms/100?owner=${testUser.playerId}`,
+      otherCookie,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  test("TEST-OWNER-6: non-senior ?owner= rejection on PUT", async () => {
+    const res = await authRequest(
+      app,
+      `/api/rooms/100?owner=${testUser.playerId}`,
+      otherCookie,
+      {
+        body: JSON.stringify({ ...validRoomUpdate, vnum: 100 }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  test("TEST-OWNER-6: non-senior ?owner= rejection on DELETE", async () => {
+    const res = await authRequest(
+      app,
+      `/api/rooms/100?owner=${testUser.playerId}`,
+      otherCookie,
+      { method: "DELETE" },
+    );
     expect(res.status).toBe(403);
   });
 });

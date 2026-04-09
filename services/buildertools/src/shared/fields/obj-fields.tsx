@@ -1,4 +1,5 @@
 import type { ObjValueField } from "@/shared/obj-type-specs.ts";
+import type { BuilderPermissions } from "@/shared/permissions.ts";
 import type { FieldDef, FieldGroupDef } from "@/shared/types/entity-form.ts";
 
 import {
@@ -9,7 +10,6 @@ import {
   WEAR_FLAGS,
 } from "@/shared/enums/index.ts";
 import { getObjTypeSpec } from "@/shared/obj-type-specs.ts";
-import { hasPower, POWER } from "@/shared/powers.ts";
 import {
   gateSpecProcs,
   isUnassignableObjSpecProc,
@@ -44,7 +44,7 @@ export function specFieldToFieldDef(field: ObjValueField): FieldDef {
 
 export function getObjFieldGroups(
   itemType: number,
-  powers: number[],
+  permissions: BuilderPermissions,
 ): FieldGroupDef[] {
   const spec = getObjTypeSpec(itemType);
 
@@ -57,13 +57,14 @@ export function getObjFieldGroups(
 
   const ITEM_WEAPON = 5;
   const weaponReadOnly =
-    itemType === ITEM_WEAPON && !hasPower(powers, POWER.OEDIT_WEAPONS);
+    itemType === ITEM_WEAPON && !permissions.canEditObjectWeapons;
 
   const typeSpecificFields: FieldDef[] = spec
     ? spec.fields.map((f) => {
         const def = specFieldToFieldDef(f);
         if (weaponReadOnly) {
           def.readOnly = true;
+          def.disabledReason = "Requires POWER_OEDIT_WEAPONS";
         }
         return def;
       })
@@ -71,26 +72,38 @@ export function getObjFieldGroups(
         {
           key: "val0",
           label: "Value 0",
-          readOnly: weaponReadOnly,
           type: "number" as const,
+          ...(weaponReadOnly && {
+            disabledReason: "Requires POWER_OEDIT_WEAPONS",
+            readOnly: true,
+          }),
         },
         {
           key: "val1",
           label: "Value 1",
-          readOnly: weaponReadOnly,
           type: "number" as const,
+          ...(weaponReadOnly && {
+            disabledReason: "Requires POWER_OEDIT_WEAPONS",
+            readOnly: true,
+          }),
         },
         {
           key: "val2",
           label: "Value 2",
-          readOnly: weaponReadOnly,
           type: "number" as const,
+          ...(weaponReadOnly && {
+            disabledReason: "Requires POWER_OEDIT_WEAPONS",
+            readOnly: true,
+          }),
         },
         {
           key: "val3",
           label: "Value 3",
-          readOnly: weaponReadOnly,
           type: "number" as const,
+          ...(weaponReadOnly && {
+            disabledReason: "Requires POWER_OEDIT_WEAPONS",
+            readOnly: true,
+          }),
         },
       ];
 
@@ -218,9 +231,12 @@ export function getObjFieldGroups(
           label: "Price",
           max: 1_000_000,
           min: 0,
-          readOnly: !hasPower(powers, POWER.OEDIT_COST),
           step: 1,
           type: "number",
+          ...(!permissions.canEditObjectCost && {
+            disabledReason: "Requires POWER_OEDIT_COST",
+            readOnly: true,
+          }),
         },
         {
           enumEntries: MATERIAL_TYPES,
@@ -525,7 +541,7 @@ export function getObjFieldGroups(
           type: "number",
         },
         {
-          enumEntries: hasPower(powers, POWER.OEDIT_IMP_POWER)
+          enumEntries: permissions.canEditUnassignableObjSpecProc
             ? OBJ_SPEC_PROCS
             : gateSpecProcs(OBJ_SPEC_PROCS, isUnassignableObjSpecProc),
           key: "spec_proc",
@@ -539,7 +555,7 @@ export function getObjFieldGroups(
       defaultExpanded: false,
       fields: [
         {
-          bitfieldEntries: hasPower(powers, POWER.OEDIT_NOPROTOS)
+          bitfieldEntries: permissions.canEditPrototypeFlag
             ? EXTRA_FLAGS.map((e) =>
                 e.bit === 4 ? { bit: e.bit, label: e.label } : e,
               )

@@ -1,8 +1,12 @@
-import { count, desc, eq, ne, sql } from "drizzle-orm";
+import { count, desc, eq, sql } from "drizzle-orm";
 
 import type { VnumBlock } from "@/shared/schemas/auth.ts";
 
-import { hasPower, POWER } from "@/shared/powers.ts";
+import {
+  isSenior as computeIsSenior,
+  hasPower,
+  POWER,
+} from "@/shared/powers.ts";
 
 import { verifyPassword } from "../auth/crypt.ts";
 import { sneezyDb } from "../db.ts";
@@ -15,6 +19,7 @@ export type AuthResult =
       kind: "success";
       user: {
         blocks: VnumBlock[];
+        isSenior: boolean;
         playerId: number;
         playerName: string;
         powers: number[];
@@ -50,7 +55,7 @@ export async function authenticateBuilder(
     })
     .from(account)
     .innerJoin(player, eq(player.account_id, account.account_id))
-    .innerJoin(wizdata, eq(wizdata.player_id, player.id))
+    .leftJoin(wizdata, eq(wizdata.player_id, player.id))
     .leftJoin(wizpower, eq(wizpower.player_id, player.id))
     .where(eq(account.name, username))
     .groupBy(
@@ -71,16 +76,14 @@ export async function authenticateBuilder(
     return { kind: "wrong_password" };
   }
 
-  const playerName = row.player_name ?? "";
+  const playerName = row.player_name;
   const playerId = row.player_id;
 
   const powerRows = await sneezyDb
     .select({ wizpower: wizpower.wizpower })
     .from(wizpower)
     .where(eq(wizpower.player_id, playerId));
-  const powers = powerRows
-    .map((r) => r.wizpower)
-    .filter((p): p is number => p !== null);
+  const powers = powerRows.map((r) => r.wizpower);
 
   if (!hasPower(powers, POWER.BUILDER)) {
     return { kind: "not_immortal", playerName };
@@ -103,6 +106,7 @@ export async function authenticateBuilder(
     kind: "success",
     user: {
       blocks,
+      isSenior: computeIsSenior(powers),
       playerId,
       playerName,
       powers,
@@ -117,9 +121,12 @@ export async function authenticateBuilder(
  * re-authentication. Returns null if the player no longer exists or
  * lost builder access.
  */
-export async function refreshSessionUser(
-  username: string,
-): Promise<null | { blocks: VnumBlock[]; powers: number[] }> {
+export async function refreshSessionUser(playerId: number): Promise<null | {
+  blocks: VnumBlock[];
+  isSenior: boolean;
+  playerId: number;
+  powers: number[];
+}> {
   const [row] = await sneezyDb
     .select({
       blockaend: wizdata.blockaend,
@@ -129,9 +136,8 @@ export async function refreshSessionUser(
       player_id: player.id,
     })
     .from(player)
-    .innerJoin(account, eq(player.account_id, account.account_id))
-    .innerJoin(wizdata, eq(wizdata.player_id, player.id))
-    .where(eq(account.name, username));
+    .leftJoin(wizdata, eq(wizdata.player_id, player.id))
+    .where(eq(player.id, playerId));
 
   if (!row) return null;
 
@@ -139,9 +145,7 @@ export async function refreshSessionUser(
     .select({ wizpower: wizpower.wizpower })
     .from(wizpower)
     .where(eq(wizpower.player_id, row.player_id));
-  const powers = powerRows
-    .map((r) => r.wizpower)
-    .filter((p): p is number => p !== null);
+  const powers = powerRows.map((r) => r.wizpower);
 
   if (!hasPower(powers, POWER.BUILDER)) return null;
 
@@ -157,39 +161,10 @@ export async function refreshSessionUser(
     blocks.push({ end: blockBEnd, start: blockBStart });
   }
 
-  return { blocks, powers };
-}
-
-/**
- * Fetch vnum blocks assigned to all builders except the given player.
- * Used for POWER_LOW expansion - expanded users can access any vnum not
- * assigned to another builder.
- */
-export async function getOtherBuildersBlocks(
-  excludePlayerId: number,
-): Promise<VnumBlock[]> {
-  const rows = await sneezyDb
-    .select({
-      blockaend: wizdata.blockaend,
-      blockastart: wizdata.blockastart,
-      blockbend: wizdata.blockbend,
-      blockbstart: wizdata.blockbstart,
-    })
-    .from(wizdata)
-    .where(ne(wizdata.player_id, excludePlayerId));
-
-  const blocks: VnumBlock[] = [];
-  for (const row of rows) {
-    const aStart = row.blockastart ?? 0;
-    const aEnd = row.blockaend ?? 0;
-    const bStart = row.blockbstart ?? 0;
-    const bEnd = row.blockbend ?? 0;
-    if (aStart > 0 || aEnd > 0) {
-      blocks.push({ end: aEnd, start: aStart });
-    }
-    if (bStart > 0 || bEnd > 0) {
-      blocks.push({ end: bEnd, start: bStart });
-    }
-  }
-  return blocks;
+  return {
+    blocks,
+    isSenior: computeIsSenior(powers),
+    playerId: row.player_id,
+    powers,
+  };
 }

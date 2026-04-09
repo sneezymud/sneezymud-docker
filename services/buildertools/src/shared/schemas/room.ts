@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { INT32_MAX, INT32_MIN } from "@/shared/constants.ts";
 
-import { vnumSchema } from "./common.ts";
+import { playerIdSchema, vnumSchema } from "./common.ts";
 
 export const roomExitSchema = z.object({
   block: z.number().int().nullable(),
@@ -18,7 +18,7 @@ export const roomExitSchema = z.object({
       message: "Use -1 for no key, or enter a positive object vnum",
     }),
   lock_difficulty: z.number().int().min(0).max(100),
-  name: z.string(),
+  name: z.string().max(127),
   type: z.number().int(),
   vnum: vnumSchema,
   weight: z.number().int().min(0).max(50),
@@ -28,7 +28,7 @@ export type RoomExit = z.infer<typeof roomExitSchema>;
 
 export const roomExtraSchema = z.object({
   description: z.string(),
-  name: z.string(),
+  name: z.string().max(255),
   vnum: vnumSchema,
 });
 
@@ -53,7 +53,7 @@ export const roomSchema = z.object({
   x: z.number().int(),
   y: z.number().int(),
   z: z.number().int(),
-  zone: z.number().int(),
+  zone: z.number().int().nullable(),
 });
 
 export type Room = z.infer<typeof roomSchema>;
@@ -62,6 +62,7 @@ export type Room = z.infer<typeof roomSchema>;
 export const roomInputSchema = roomSchema.extend({
   capacity: z.number().int().min(0).max(100),
   height: z.number().int().min(-1).max(1000),
+  name: z.string().max(127),
   river_dir: z.number().int().min(-1).max(9),
   river_speed: z.number().int().min(0).max(200),
   room_flag: z.number().int().min(INT32_MIN).max(INT32_MAX),
@@ -73,13 +74,15 @@ export const roomInputSchema = roomSchema.extend({
   x: z.number().int().min(-1000).max(1000),
   y: z.number().int().min(-1000).max(1000),
   z: z.number().int().min(-1000).max(1000),
-  zone: z.number().int().min(0).max(500),
+  zone: z.number().int().min(0).max(500).nullable(),
 });
 
 export type RoomInput = z.infer<typeof roomInputSchema>;
 
 export const roomListItemSchema = z.object({
   name: z.string(),
+  owner: z.string().optional(),
+  player_id: playerIdSchema.optional(),
   sector: z.number(),
   vnum: vnumSchema,
 });
