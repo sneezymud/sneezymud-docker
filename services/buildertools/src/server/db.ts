@@ -52,7 +52,10 @@ const immortalPool = mysql.createPool({
   database: process.env["DB_NAME_IMMORTAL"] ?? "immortal",
 });
 
-// Production game database — accounts, players, wizdata, zones (read-only from this app)
+// sneezyDb is the connection pool for the production game database.
+// Read paths: accounts, zones, wizdata, player lookups.
+// Write paths: publish.ts copies immortal drafts into sneezy as part of
+// the publish transaction.
 const sneezyPool = mysql.createPool({
   ...poolConfig,
   database: process.env["DB_NAME_SNEEZY"] ?? "sneezy",
@@ -72,5 +75,26 @@ export function isDuplicateKeyError(err: unknown): boolean {
     err !== null &&
     "errno" in err &&
     (err as { errno: unknown }).errno === 1062
+  );
+}
+
+/** MySQL FK constraint errors: ER_NO_REFERENCED_ROW_2 (child references
+ * missing parent) or ER_ROW_IS_REFERENCED_2 (parent still has children).
+ * Checks both the error itself and its `cause` (Drizzle wraps MySQL errors
+ * in DrizzleQueryError with the original as `cause`). */
+export function isConstraintError(err: unknown): boolean {
+  if (hasConstraintCode(err)) return true;
+  if (err != null && typeof err === "object" && "cause" in err) {
+    return hasConstraintCode((err as { cause: unknown }).cause);
+  }
+  return false;
+}
+
+function hasConstraintCode(err: unknown): boolean {
+  if (err == null || typeof err !== "object" || !("code" in err)) return false;
+  const { code } = err as Record<string, unknown>;
+  return (
+    typeof code === "string" &&
+    (code === "ER_NO_REFERENCED_ROW_2" || code === "ER_ROW_IS_REFERENCED_2")
   );
 }
