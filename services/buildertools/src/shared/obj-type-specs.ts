@@ -1489,6 +1489,9 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
 
 // ---- Public API ----
 
+/** Highest defined item type number. Used by tests to iterate all types. */
+export const MAX_ITEM_TYPE = 76;
+
 /** Get the type spec for an item type. Returns undefined for unknown types (>76). */
 export function getObjTypeSpec(itemType: number): ObjTypeSpec | undefined {
   return OBJ_TYPE_SPECS[itemType];

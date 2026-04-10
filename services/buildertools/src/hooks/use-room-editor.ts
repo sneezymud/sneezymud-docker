@@ -90,6 +90,18 @@ export function useRoomEditor(vnumParam: string, owner: number | undefined) {
         method: "PUT",
       });
     },
+    validate: () => {
+      if (!room) return null;
+      const merged = { ...room, ...edits };
+      const requiredFields = [
+        { key: "name" as const, label: "Name" },
+        { key: "description" as const, label: "Description" },
+      ];
+      const errors = requiredFields
+        .filter((f) => !merged[f.key].trim())
+        .map((f) => ({ field: f.key, message: `${f.label} is required` }));
+      return errors.length > 0 ? errors : null;
+    },
   });
 
   const currentValues = room ? roomToFormValues(room, edits) : {};
