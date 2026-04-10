@@ -80,6 +80,19 @@ export function useObjectEditor(vnumParam: string, owner: number | undefined) {
         method: "PUT",
       });
     },
+    validate: () => {
+      if (!obj) return null;
+      const merged = { ...obj, ...edits };
+      const requiredFields = [
+        { key: "name" as const, label: "Keywords" },
+        { key: "short_desc" as const, label: "Short Description" },
+        { key: "long_desc" as const, label: "Long Description" },
+      ];
+      const errors = requiredFields
+        .filter((f) => !merged[f.key].trim())
+        .map((f) => ({ field: f.key, message: `${f.label} is required` }));
+      return errors.length > 0 ? errors : null;
+    },
   });
 
   const currentValues = obj ? objToFormValues(obj, edits) : {};
