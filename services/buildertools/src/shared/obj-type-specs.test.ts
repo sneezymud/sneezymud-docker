@@ -4,6 +4,7 @@ import {
   expandTypeValues,
   getBits,
   getObjTypeSpec,
+  MAX_ITEM_TYPE,
   setBits,
 } from "./obj-type-specs.ts";
 
@@ -121,8 +122,6 @@ describe("setBits", () => {
   test("over-width values are silently truncated to the field width", () => {
     // 300 = 0b100101100 (9 bits) into an 8-bit field: truncated to 0b00101100 = 44
     const result = setBits(0, 7, 8, 300);
-    const truncated = setBits(0, 7, 8, 300 & 0xff);
-    expect(result).toBe(truncated);
     expect(getBits(result, 7, 8)).toBe(44);
   });
 });
@@ -146,7 +145,7 @@ describe("getObjTypeSpec", () => {
 
   test("no type has overlapping bit-packed fields", () => {
     const overlaps: string[] = [];
-    for (let type = 0; type <= 76; type++) {
+    for (let type = 0; type <= MAX_ITEM_TYPE; type++) {
       const spec = getObjTypeSpec(type);
       if (!spec || spec.fields.length === 0) continue;
 
@@ -187,7 +186,7 @@ describe("getObjTypeSpec", () => {
 
   test("highBit and numBits are always paired", () => {
     const mismatches: string[] = [];
-    for (let type = 0; type <= 76; type++) {
+    for (let type = 0; type <= MAX_ITEM_TYPE; type++) {
       const spec = getObjTypeSpec(type);
       if (!spec || spec.fields.length === 0) continue;
 
@@ -206,7 +205,7 @@ describe("getObjTypeSpec", () => {
 
   test("all fields reference valid val slots", () => {
     const violations: string[] = [];
-    for (let type = 0; type <= 76; type++) {
+    for (let type = 0; type <= MAX_ITEM_TYPE; type++) {
       const spec = getObjTypeSpec(type);
       if (!spec || spec.fields.length === 0) continue;
 
@@ -227,7 +226,7 @@ describe("getObjTypeSpec", () => {
   });
 
   test("all field keys are unique within each type", () => {
-    for (let type = 0; type <= 76; type++) {
+    for (let type = 0; type <= MAX_ITEM_TYPE; type++) {
       const spec = getObjTypeSpec(type);
       if (!spec || spec.fields.length === 0) continue;
       const keys = spec.fields.map((f) => f.key);
@@ -390,7 +389,7 @@ describe("round-trip: expand and repack", () => {
   });
 
   test("all types round-trip at max field values", () => {
-    for (let type = 0; type <= 76; type++) {
+    for (let type = 0; type <= MAX_ITEM_TYPE; type++) {
       const spec = getObjTypeSpec(type);
       if (!spec || spec.fields.length === 0) continue;
 

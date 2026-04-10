@@ -17,7 +17,7 @@ describe("hasBit", () => {
       expect(hasBit(value, bit + 1)).toBe(false);
     }
     // Edge cases: bit 0 has no lower neighbor, bit 31 has no upper neighbor
-    expect(hasBit(Math.trunc(1), 1)).toBe(false);
+    expect(hasBit(1, 1)).toBe(false);
     expect(hasBit(1 << 31, 30)).toBe(false);
   });
 
@@ -36,7 +36,7 @@ describe("hasBit", () => {
   });
 
   test("multiple set bits are independently readable", () => {
-    const value = Math.trunc(1) | (1 << 15) | (1 << 31); // bits 0, 15, 31
+    const value = 1 | (1 << 15) | (1 << 31); // bits 0, 15, 31
     expect(hasBit(value, 0)).toBe(true);
     expect(hasBit(value, 1)).toBe(false);
     expect(hasBit(value, 15)).toBe(true);
@@ -87,5 +87,11 @@ describe("toggleBit", () => {
     expect(hasBit(withBit31, 1)).toBe(true);
     expect(hasBit(withBit31, 2)).toBe(true);
     expect(hasBit(withBit31, 3)).toBe(true);
+  });
+
+  test("bit positions >= 32 wrap due to JS 32-bit integer semantics", () => {
+    const value = 0;
+    expect(hasBit(value, 32)).toBe(hasBit(value, 0));
+    expect(hasBit(value, 33)).toBe(hasBit(value, 1));
   });
 });

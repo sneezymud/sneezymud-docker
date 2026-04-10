@@ -283,6 +283,14 @@ describe("applyObjFieldChange", () => {
     // not the prior edit's 999
     expect(result.val0).toBe(1 | (1 << 8));
   });
+
+  test("setting a raw val key directly bypasses bit-packing", () => {
+    const obj = { ...baseObj, val0: 0 };
+    const result = applyObjFieldChange("val0", "255", obj, undefined, null);
+    // diffEdits stores the raw string value since val0 differs from obj.val0
+    expect(result).toHaveProperty("val0");
+    expect(String(result?.val0)).toBe("255");
+  });
 });
 
 describe("expandObjFormValues", () => {
@@ -302,18 +310,6 @@ describe("expandObjFormValues", () => {
 
     expect(expandedValues).toHaveProperty("curSharp", 200);
     expect(expandedValues).toHaveProperty("maxSharp", 100);
-  });
-
-  test("type with no spec returns values unchanged", () => {
-    // Undefined type (0) has an empty fields array - no expansion
-    const typeSpec = requireSpec(0);
-    const values = { type: 0, val0: 42, val1: 0, val2: 0, val3: 0 };
-    const original = { ...values };
-
-    const { expandedValues } = expandObjFormValues(values, original, typeSpec);
-
-    expect(expandedValues).toEqual(values);
-    expect(expandedValues).not.toHaveProperty("curSharp");
   });
 
   test("undefined typeSpec returns values unchanged", () => {

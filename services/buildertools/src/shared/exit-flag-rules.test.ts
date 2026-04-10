@@ -24,13 +24,13 @@ describe("enforceExitFlagRules", () => {
       oldFlags | EXIT_DESTROYED | EXIT_CLOSED | EXIT_LOCKED | EXIT_SECRET;
     const result = enforceExitFlagRules(oldFlags, newFlags);
 
-    expect(result & EXIT_DESTROYED).toBeTruthy();
-    expect(result & EXIT_CLOSED).toBeFalsy();
-    expect(result & EXIT_LOCKED).toBeFalsy();
-    expect(result & EXIT_SECRET).toBeFalsy();
+    expect(result & EXIT_DESTROYED).toBe(EXIT_DESTROYED);
+    expect(result & EXIT_CLOSED).toBe(0);
+    expect(result & EXIT_LOCKED).toBe(0);
+    expect(result & EXIT_SECRET).toBe(0);
     // Unrelated flags survive the cascade
-    expect(result & UNRELATED_BIT4).toBeTruthy();
-    expect(result & UNRELATED_BIT7).toBeTruthy();
+    expect(result & UNRELATED_BIT4).toBe(UNRELATED_BIT4);
+    expect(result & UNRELATED_BIT7).toBe(UNRELATED_BIT7);
   });
 
   test("CAVED_IN forces CLOSED and clears LOCKED and SECRET while preserving unrelated flags", () => {
@@ -38,13 +38,13 @@ describe("enforceExitFlagRules", () => {
     const newFlags = oldFlags | EXIT_CAVED_IN | EXIT_LOCKED | EXIT_SECRET;
     const result = enforceExitFlagRules(oldFlags, newFlags);
 
-    expect(result & EXIT_CAVED_IN).toBeTruthy();
-    expect(result & EXIT_CLOSED).toBeTruthy(); // auto-set
-    expect(result & EXIT_LOCKED).toBeFalsy(); // cleared
-    expect(result & EXIT_SECRET).toBeFalsy(); // cleared
+    expect(result & EXIT_CAVED_IN).toBe(EXIT_CAVED_IN);
+    expect(result & EXIT_CLOSED).toBe(EXIT_CLOSED); // auto-set
+    expect(result & EXIT_LOCKED).toBe(0); // cleared
+    expect(result & EXIT_SECRET).toBe(0); // cleared
     // Unrelated flags survive the cascade
-    expect(result & UNRELATED_BIT4).toBeTruthy();
-    expect(result & UNRELATED_BIT7).toBeTruthy();
+    expect(result & UNRELATED_BIT4).toBe(UNRELATED_BIT4);
+    expect(result & UNRELATED_BIT7).toBe(UNRELATED_BIT7);
   });
 
   test("SLOPED_UP and SLOPED_DOWN are mutually exclusive while preserving unrelated flags", () => {
@@ -53,20 +53,20 @@ describe("enforceExitFlagRules", () => {
     const newFlags = oldFlags | EXIT_SLOPED_UP;
     const result = enforceExitFlagRules(oldFlags, newFlags);
 
-    expect(result & EXIT_SLOPED_UP).toBeTruthy();
-    expect(result & EXIT_SLOPED_DOWN).toBeFalsy();
-    expect(result & UNRELATED_BIT4).toBeTruthy();
-    expect(result & UNRELATED_BIT7).toBeTruthy();
+    expect(result & EXIT_SLOPED_UP).toBe(EXIT_SLOPED_UP);
+    expect(result & EXIT_SLOPED_DOWN).toBe(0);
+    expect(result & UNRELATED_BIT4).toBe(UNRELATED_BIT4);
+    expect(result & UNRELATED_BIT7).toBe(UNRELATED_BIT7);
 
     // Turning on SLOPED_DOWN clears SLOPED_UP
     const oldFlags2 = EXIT_SLOPED_UP | UNRELATED_BIT4 | UNRELATED_BIT7;
     const newFlags2 = oldFlags2 | EXIT_SLOPED_DOWN;
     const result2 = enforceExitFlagRules(oldFlags2, newFlags2);
 
-    expect(result2 & EXIT_SLOPED_DOWN).toBeTruthy();
-    expect(result2 & EXIT_SLOPED_UP).toBeFalsy();
-    expect(result2 & UNRELATED_BIT4).toBeTruthy();
-    expect(result2 & UNRELATED_BIT7).toBeTruthy();
+    expect(result2 & EXIT_SLOPED_DOWN).toBe(EXIT_SLOPED_DOWN);
+    expect(result2 & EXIT_SLOPED_UP).toBe(0);
+    expect(result2 & UNRELATED_BIT4).toBe(UNRELATED_BIT4);
+    expect(result2 & UNRELATED_BIT7).toBe(UNRELATED_BIT7);
   });
 
   test("removing a flag does not trigger its cascade rule", () => {
@@ -76,19 +76,9 @@ describe("enforceExitFlagRules", () => {
     const result = enforceExitFlagRules(oldFlags, newFlags);
 
     // CLOSED and LOCKED should survive - only turnedOn flags trigger rules
-    expect(result & EXIT_CLOSED).toBeTruthy();
-    expect(result & EXIT_LOCKED).toBeTruthy();
-    expect(result & EXIT_DESTROYED).toBeFalsy();
-  });
-
-  test("unrelated flags survive all cascade rules", () => {
-    const UNRELATED_FLAG = 1 << 4; // bit 4 - not one of the rule flags
-    const oldFlags = UNRELATED_FLAG;
-    const newFlags = UNRELATED_FLAG | EXIT_DESTROYED;
-    const result = enforceExitFlagRules(oldFlags, newFlags);
-
-    expect(result & UNRELATED_FLAG).toBeTruthy();
-    expect(result & EXIT_DESTROYED).toBeTruthy();
+    expect(result & EXIT_CLOSED).toBe(EXIT_CLOSED);
+    expect(result & EXIT_LOCKED).toBe(EXIT_LOCKED);
+    expect(result & EXIT_DESTROYED).toBe(0);
   });
 
   test("unchanged flags pass through without modification", () => {
@@ -103,8 +93,8 @@ describe("enforceExitFlagRules", () => {
     const newFlags = EXIT_CLOSED | EXIT_CAVED_IN;
     const result = enforceExitFlagRules(oldFlags, newFlags);
 
-    expect(result & EXIT_CAVED_IN).toBeTruthy();
-    expect(result & EXIT_CLOSED).toBeTruthy();
+    expect(result & EXIT_CAVED_IN).toBe(EXIT_CAVED_IN);
+    expect(result & EXIT_CLOSED).toBe(EXIT_CLOSED);
   });
 
   test("simultaneous DESTROYED and CAVED_IN interact correctly", () => {
@@ -114,11 +104,11 @@ describe("enforceExitFlagRules", () => {
     const newFlags = EXIT_DESTROYED | EXIT_CAVED_IN;
     const result = enforceExitFlagRules(oldFlags, newFlags);
 
-    expect(result & EXIT_DESTROYED).toBeTruthy();
-    expect(result & EXIT_CAVED_IN).toBeTruthy();
-    expect(result & EXIT_CLOSED).toBeTruthy(); // CAVED_IN re-adds it
-    expect(result & EXIT_LOCKED).toBeFalsy(); // both rules clear this
-    expect(result & EXIT_SECRET).toBeFalsy(); // both rules clear this
+    expect(result & EXIT_DESTROYED).toBe(EXIT_DESTROYED);
+    expect(result & EXIT_CAVED_IN).toBe(EXIT_CAVED_IN);
+    expect(result & EXIT_CLOSED).toBe(EXIT_CLOSED); // CAVED_IN re-adds it
+    expect(result & EXIT_LOCKED).toBe(0); // both rules clear this
+    expect(result & EXIT_SECRET).toBe(0); // both rules clear this
   });
 
   test("simultaneously enabling both slopes cancels both", () => {
@@ -129,8 +119,8 @@ describe("enforceExitFlagRules", () => {
     const newFlags = EXIT_SLOPED_UP | EXIT_SLOPED_DOWN;
     const result = enforceExitFlagRules(oldFlags, newFlags);
 
-    expect(result & EXIT_SLOPED_DOWN).toBeFalsy();
-    expect(result & EXIT_SLOPED_UP).toBeFalsy();
+    expect(result & EXIT_SLOPED_DOWN).toBe(0);
+    expect(result & EXIT_SLOPED_UP).toBe(0);
   });
 
   test("CAVED_IN clears pre-existing LOCKED", () => {
@@ -138,8 +128,8 @@ describe("enforceExitFlagRules", () => {
     const newFlags = EXIT_LOCKED | EXIT_CAVED_IN;
     const result = enforceExitFlagRules(oldFlags, newFlags);
 
-    expect(result & EXIT_CAVED_IN).toBeTruthy();
-    expect(result & EXIT_CLOSED).toBeTruthy();
-    expect(result & EXIT_LOCKED).toBeFalsy();
+    expect(result & EXIT_CAVED_IN).toBe(EXIT_CAVED_IN);
+    expect(result & EXIT_CLOSED).toBe(EXIT_CLOSED);
+    expect(result & EXIT_LOCKED).toBe(0);
   });
 });
