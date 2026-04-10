@@ -115,6 +115,20 @@ describe("room creation", () => {
     expect(body).toHaveProperty("error", "Room already exists");
   });
 
+  test("POST with ?owner= parameter returns 400", async () => {
+    const res = await authRequest(
+      app,
+      `/api/rooms?owner=${testUser.playerId}`,
+      cookie,
+      {
+        body: JSON.stringify({ vnum: 199 }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+    );
+    expect(res.status).toBe(400);
+  });
+
   test("creating a room outside assigned blocks returns 403", async () => {
     const res = await authRequest(app, "/api/rooms", cookie, {
       body: JSON.stringify({ vnum: 500 }),
@@ -229,6 +243,9 @@ describe("room updates", () => {
     expect(parsed.exits[0]?.direction).toBe(0);
     expect(parsed.exits[0]?.type).toBe(1);
     expect(parsed.extras).toHaveLength(1);
+    expect(parsed.extras[0]?.description).toBe(
+      "You see faded writing on the wall.",
+    );
     expect(parsed.extras[0]?.name).toBe("wall writing");
   });
 
@@ -795,7 +812,7 @@ describe("update preserves unchanged fields", () => {
 // -- Idempotency --
 
 describe("save idempotency", () => {
-  test("saving the same payload twice produces correct data", async () => {
+  test("saving the same payload twice produces identical data", async () => {
     await authRequest(app, "/api/rooms", cookie, {
       body: JSON.stringify({ vnum: 105 }),
       headers: { "Content-Type": "application/json" },
@@ -823,27 +840,30 @@ describe("save idempotency", () => {
       vnum: 105,
     };
 
-    // Save twice
+    // First save
     await authRequest(app, "/api/rooms/105", cookie, {
       body: JSON.stringify(payload),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
-    const secondPut = await authRequest(app, "/api/rooms/105", cookie, {
+    const getA = await authRequest(app, "/api/rooms/105", cookie);
+    expect(getA.status).toBe(200);
+    const snapshotA: unknown = await getA.json();
+    const parsedA = roomSchema.parse(snapshotA);
+
+    // Second save (identical payload)
+    await authRequest(app, "/api/rooms/105", cookie, {
       body: JSON.stringify(payload),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
-    expect(secondPut.status).toBe(200);
+    const getB = await authRequest(app, "/api/rooms/105", cookie);
+    expect(getB.status).toBe(200);
+    const snapshotB: unknown = await getB.json();
+    const parsedB = roomSchema.parse(snapshotB);
 
-    const res = await authRequest(app, "/api/rooms/105", cookie);
-    const body: unknown = await res.json();
-    expect(body).toEqual(
-      expect.objectContaining({ name: "Idempotent Room", vnum: 105 }),
-    );
-    expect(body).toHaveProperty("exits", [
-      expect.objectContaining({ name: "north door" }),
-    ]);
+    // Full deep equality - no duplicate child rows, no changed values
+    expect(parsedB).toEqual(parsedA);
   });
 });
 

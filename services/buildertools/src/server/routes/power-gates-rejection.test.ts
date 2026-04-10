@@ -4,7 +4,13 @@ import { sql } from "drizzle-orm";
 
 import { app } from "../app.ts";
 import { immortalDb } from "../db.ts";
-import { authRequest, getAuthCookie } from "../test-helpers.ts";
+import {
+  authRequest,
+  getAuthCookie,
+  validMobPayload,
+  validObjPayload,
+  validRoomPayload,
+} from "../test-helpers.ts";
 
 // noBlocksUser has POWER_BUILDER only - no MEDIT, OEDIT, REDIT, RSAVE, EDIT.
 // testUser has all powers (used for control tests).
@@ -60,7 +66,7 @@ describe("mob endpoints reject user without MEDIT", () => {
 
   test("PUT /api/mobs/131 returns 403", async () => {
     const res = await authRequest(app, "/api/mobs/131", noBlocksCookie, {
-      body: JSON.stringify({ vnum: 131 }),
+      body: JSON.stringify(validMobPayload({ vnum: 131 })),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -107,7 +113,7 @@ describe("object endpoints reject user without OEDIT", () => {
 
   test("PUT /api/objects/132 returns 403", async () => {
     const res = await authRequest(app, "/api/objects/132", noBlocksCookie, {
-      body: JSON.stringify({ vnum: 132 }),
+      body: JSON.stringify(validObjPayload({ vnum: 132 })),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -154,7 +160,7 @@ describe("room endpoints reject user without REDIT+RSAVE+EDIT", () => {
 
   test("PUT /api/rooms/133 returns 403", async () => {
     const res = await authRequest(app, "/api/rooms/133", noBlocksCookie, {
-      body: JSON.stringify({ vnum: 133 }),
+      body: JSON.stringify(validRoomPayload({ vnum: 133 })),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });

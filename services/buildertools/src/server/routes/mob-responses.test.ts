@@ -11,11 +11,16 @@ beforeAll(async () => {
   cookie = await getAuthCookie(app, "testbuilder");
 
   // Create a mob to attach responses to
-  await authRequest(app, "/api/mobs", cookie, {
+  const createRes = await authRequest(app, "/api/mobs", cookie, {
     body: JSON.stringify({ vnum: 130 }),
     headers: { "Content-Type": "application/json" },
     method: "POST",
   });
+  if (createRes.status !== 201) {
+    throw new Error(
+      `Mob creation failed (${createRes.status}): ${await createRes.text()}`,
+    );
+  }
 });
 
 afterAll(async () => {
@@ -70,6 +75,15 @@ describe("mob responses", () => {
   });
 
   test("clear response by sending empty string", async () => {
+    // Set a response first so this test doesn't depend on prior test state
+    const setupRes = await authRequest(app, "/api/mob-responses/130", cookie, {
+      body: JSON.stringify({ response: 'say {"hi";\n}', vnum: 130 }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(setupRes.status).toBe(200);
+
+    // Now clear it
     const res = await authRequest(app, "/api/mob-responses/130", cookie, {
       body: JSON.stringify({ response: "", vnum: 130 }),
       headers: { "Content-Type": "application/json" },
@@ -79,6 +93,14 @@ describe("mob responses", () => {
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     expect(body).toEqual(expect.objectContaining({ response: "", vnum: 130 }));
+
+    // Verify via GET that it's actually cleared
+    const getRes = await authRequest(app, "/api/mob-responses/130", cookie);
+    expect(getRes.status).toBe(200);
+    const getBody: unknown = await getRes.json();
+    expect(getBody).toEqual(
+      expect.objectContaining({ response: "", vnum: 130 }),
+    );
   });
 
   test("whitespace-only response is treated as empty and deletes the row", async () => {

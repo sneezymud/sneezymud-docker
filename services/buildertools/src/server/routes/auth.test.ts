@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
+import { POWER } from "@/shared/powers.ts";
 import { sessionUserSchema } from "@/shared/schemas/auth.ts";
 
 import { app } from "../app.ts";
 import {
+  authRequest,
   extractCookie,
   noBlocksUser,
   nonBuilderUser,
@@ -137,12 +139,22 @@ describe("GET /api/auth/me", () => {
 
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
-    expect(body).toEqual(
-      expect.objectContaining({
-        blocks: testUser.blocks,
-        username: testUser.username,
-      }),
+    const parsed = sessionUserSchema.parse(body);
+    expect(parsed.username).toBe("testbuilder");
+    expect(parsed.playerName).toBe("TestBuilder");
+    expect(parsed.playerId).toBe(99_999);
+    expect(parsed.isSenior).toBe(false);
+    expect(parsed.blocks).toEqual([{ end: 199, start: 100 }]);
+    expect(parsed.powers).toContain(POWER.BUILDER);
+  });
+
+  test("tampered session cookie returns 401", async () => {
+    const res = await authRequest(
+      app,
+      "/api/auth/me",
+      "session=invalid-garbage-data",
     );
+    expect(res.status).toBe(401);
   });
 
   test("returns 401 without session", async () => {

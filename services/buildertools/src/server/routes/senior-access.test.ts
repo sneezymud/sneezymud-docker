@@ -3,7 +3,13 @@ import { sql } from "drizzle-orm";
 
 import { app } from "../app.ts";
 import { immortalDb } from "../db.ts";
-import { authRequest, getAuthCookie } from "../test-helpers.ts";
+import {
+  authRequest,
+  getAuthCookie,
+  testUser,
+  validObjPayload,
+  validRoomPayload,
+} from "../test-helpers.ts";
 
 /**
  * Tests for senior user vnum access (POWER_LOW / POWER_NO_LIMITS).
@@ -32,6 +38,10 @@ const OUTSIDE_MOB_2 = 403;
 const OTHER_BLOCK_MOB = 100;
 const OTHER_BLOCK_OBJ = 101;
 const OTHER_BLOCK_ROOM = 102;
+const OUTSIDE_OBJ_DEL = 411;
+const OUTSIDE_OBJ_BULK = 412;
+const OUTSIDE_ROOM_DEL = 413;
+const OUTSIDE_ROOM_BULK = 414;
 const LOW_ONLY_MOB = 404;
 const LOW_ONLY_ROOM = 405;
 
@@ -56,14 +66,14 @@ afterAll(async () => {
   );
   await immortalDb.execute(sql`DELETE FROM mob WHERE vnum IN ${allVnums}`);
 
-  const objVnums = sql`(${OWN_OBJ}, ${OUTSIDE_OBJ}, ${OTHER_BLOCK_OBJ})`;
+  const objVnums = sql`(${OWN_OBJ}, ${OUTSIDE_OBJ}, ${OTHER_BLOCK_OBJ}, ${OUTSIDE_OBJ_DEL}, ${OUTSIDE_OBJ_BULK})`;
   await immortalDb.execute(
     sql`DELETE FROM objaffect WHERE vnum IN ${objVnums}`,
   );
   await immortalDb.execute(sql`DELETE FROM objextra WHERE vnum IN ${objVnums}`);
   await immortalDb.execute(sql`DELETE FROM obj WHERE vnum IN ${objVnums}`);
 
-  const roomVnums = sql`(${OWN_ROOM}, ${OUTSIDE_ROOM}, ${OTHER_BLOCK_ROOM}, ${LOW_ONLY_ROOM})`;
+  const roomVnums = sql`(${OWN_ROOM}, ${OUTSIDE_ROOM}, ${OTHER_BLOCK_ROOM}, ${LOW_ONLY_ROOM}, ${OUTSIDE_ROOM_DEL}, ${OUTSIDE_ROOM_BULK})`;
   await immortalDb.execute(
     sql`DELETE FROM roomextra WHERE vnum IN ${roomVnums}`,
   );
@@ -244,6 +254,12 @@ describe("senior user mob access", () => {
         expect.objectContaining({ vnum: OTHER_BLOCK_MOB }),
       ]),
     );
+    // Does not include entities owned by other builders
+    expect(body).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ playerId: testUser.playerId }),
+      ]),
+    );
   });
 });
 
@@ -281,6 +297,34 @@ describe("senior user object access", () => {
     expect(res.status).toBe(200);
   });
 
+  test("senior user can PUT object at vnum outside own block", async () => {
+    const res = await put(`/api/objects/${OUTSIDE_OBJ}`, expandedCookie, {
+      ...validObjPayload({ vnum: OUTSIDE_OBJ }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test("senior user can PUT their own object at vnum in another builder's block", async () => {
+    const res = await put(`/api/objects/${OTHER_BLOCK_OBJ}`, expandedCookie, {
+      ...validObjPayload({ vnum: OTHER_BLOCK_OBJ }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test("senior user can DELETE object at vnum outside own block", async () => {
+    await post("/api/objects", expandedCookie, { vnum: OUTSIDE_OBJ_DEL });
+    const res = await del(`/api/objects/${OUTSIDE_OBJ_DEL}`, expandedCookie);
+    expect(res.status).toBe(200);
+  });
+
+  test("senior user can bulk delete objects at vnums outside own block", async () => {
+    await post("/api/objects", expandedCookie, { vnum: OUTSIDE_OBJ_BULK });
+    const res = await bulkDel("/api/objects/bulk", expandedCookie, [
+      OUTSIDE_OBJ_BULK,
+    ]);
+    expect(res.status).toBe(200);
+  });
+
   test("list shows only own entities regardless of vnum", async () => {
     const res = await get("/api/objects", expandedCookie);
     expect(res.status).toBe(200);
@@ -289,6 +333,12 @@ describe("senior user object access", () => {
       expect.arrayContaining([
         expect.objectContaining({ vnum: OWN_OBJ }),
         expect.objectContaining({ vnum: OUTSIDE_OBJ }),
+      ]),
+    );
+    // Does not include entities owned by other builders
+    expect(body).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ playerId: testUser.playerId }),
       ]),
     );
   });
@@ -328,6 +378,34 @@ describe("senior user room access", () => {
     expect(res.status).toBe(200);
   });
 
+  test("senior user can PUT room at vnum outside own block", async () => {
+    const res = await put(`/api/rooms/${OUTSIDE_ROOM}`, expandedCookie, {
+      ...validRoomPayload({ vnum: OUTSIDE_ROOM }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test("senior user can PUT their own room at vnum in another builder's block", async () => {
+    const res = await put(`/api/rooms/${OTHER_BLOCK_ROOM}`, expandedCookie, {
+      ...validRoomPayload({ vnum: OTHER_BLOCK_ROOM }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test("senior user can DELETE room at vnum outside own block", async () => {
+    await post("/api/rooms", expandedCookie, { vnum: OUTSIDE_ROOM_DEL });
+    const res = await del(`/api/rooms/${OUTSIDE_ROOM_DEL}`, expandedCookie);
+    expect(res.status).toBe(200);
+  });
+
+  test("senior user can bulk delete rooms at vnums outside own block", async () => {
+    await post("/api/rooms", expandedCookie, { vnum: OUTSIDE_ROOM_BULK });
+    const res = await bulkDel("/api/rooms/bulk", expandedCookie, [
+      OUTSIDE_ROOM_BULK,
+    ]);
+    expect(res.status).toBe(200);
+  });
+
   test("list shows only own entities regardless of vnum", async () => {
     const res = await get("/api/rooms", expandedCookie);
     expect(res.status).toBe(200);
@@ -336,6 +414,12 @@ describe("senior user room access", () => {
       expect.arrayContaining([
         expect.objectContaining({ vnum: OWN_ROOM }),
         expect.objectContaining({ vnum: OUTSIDE_ROOM }),
+      ]),
+    );
+    // Does not include entities owned by other builders
+    expect(body).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ playerId: testUser.playerId }),
       ]),
     );
   });

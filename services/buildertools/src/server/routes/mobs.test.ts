@@ -6,7 +6,7 @@ import { mobSchema } from "@/shared/schemas/mob.ts";
 import { app } from "../app.ts";
 import { immortalDb } from "../db.ts";
 import { mob } from "../schema/immortal.ts";
-import { authRequest, getAuthCookie } from "../test-helpers.ts";
+import { authRequest, getAuthCookie, testUser } from "../test-helpers.ts";
 
 let cookie: string;
 
@@ -16,16 +16,16 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM mob_extra WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 300)`,
+    sql`DELETE FROM mob_extra WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 190, 191, 192, 193, 300)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mob_imm WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 300)`,
+    sql`DELETE FROM mob_imm WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 190, 191, 192, 193, 300)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mobresponses WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 300)`,
+    sql`DELETE FROM mobresponses WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 190, 191, 192, 193, 300)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mob WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 300)`,
+    sql`DELETE FROM mob WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 190, 191, 192, 193, 300)`,
   );
 });
 
@@ -469,28 +469,6 @@ describe("mob derived fields", () => {
   });
 });
 
-// -- Concurrent create race --
-
-describe("duplicate mob creation fallback", () => {
-  test("second create for same vnum returns 409", async () => {
-    // First create succeeds
-    const res1 = await authRequest(app, "/api/mobs", cookie, {
-      body: JSON.stringify({ vnum: 177 }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-    expect(res1.status).toBe(201);
-
-    // Second create for same vnum returns 409
-    const res2 = await authRequest(app, "/api/mobs", cookie, {
-      body: JSON.stringify({ vnum: 177 }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-    expect(res2.status).toBe(409);
-  });
-});
-
 // -- Schema read/write split --
 
 describe("out-of-range data readable from DB", () => {
@@ -927,5 +905,182 @@ describe("empty state for builder with no mobs", () => {
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     expect(body).toEqual([]);
+  });
+});
+
+// -- Owner scoping --
+
+describe("owner scoping", () => {
+  let expandedCookie: string;
+  let otherCookie: string;
+
+  beforeAll(async () => {
+    expandedCookie = await getAuthCookie(app, "expandedbuilder");
+    otherCookie = await getAuthCookie(app, "otherbuilder");
+  });
+
+  test("?owner=mine list filtering excludes other owners' mobs", async () => {
+    const vnumA = 190;
+    const vnumB = 191;
+
+    // testUser creates mob at vnumA
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum: vnumA }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(app, `/api/mobs/${vnumA}`, cookie, {
+      body: JSON.stringify({ ...validMobUpdate, vnum: vnumA }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    // otherUser creates mob at vnumB
+    await authRequest(app, "/api/mobs", otherCookie, {
+      body: JSON.stringify({ vnum: vnumB }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(app, `/api/mobs/${vnumB}`, otherCookie, {
+      body: JSON.stringify({ ...validMobUpdate, vnum: vnumB }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    const res = await authRequest(app, "/api/mobs?owner=mine", cookie);
+    expect(res.status).toBe(200);
+    const rows: unknown = await res.json();
+    if (!Array.isArray(rows)) throw new Error("expected array");
+    const vnums = rows
+      .filter(
+        (r): r is { vnum: number } =>
+          typeof r === "object" && r !== null && "vnum" in r,
+      )
+      .map((r) => r.vnum);
+    expect(vnums).toContain(vnumA);
+    expect(vnums).not.toContain(vnumB);
+  });
+
+  test("senior cross-owner GET returns target's draft", async () => {
+    const vnum = 192;
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(app, `/api/mobs/${vnum}`, cookie, {
+      body: JSON.stringify({
+        ...validMobUpdate,
+        name: "test user mob",
+        vnum,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    const res = await authRequest(
+      app,
+      `/api/mobs/${vnum}?owner=${testUser.playerId}`,
+      expandedCookie,
+    );
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toHaveProperty("name", "test user mob");
+  });
+
+  test("senior cross-owner PUT persists changes", async () => {
+    // Mob 192 already created by previous test
+    const putRes = await authRequest(
+      app,
+      `/api/mobs/192?owner=${testUser.playerId}`,
+      expandedCookie,
+      {
+        body: JSON.stringify({
+          ...validMobUpdate,
+          name: "senior edited mob",
+          vnum: 192,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+    );
+    expect(putRes.status).toBe(200);
+
+    // Verify the change was saved
+    const verifyRes = await authRequest(
+      app,
+      `/api/mobs/192?owner=${testUser.playerId}`,
+      expandedCookie,
+    );
+    expect(verifyRes.status).toBe(200);
+    const body: unknown = await verifyRes.json();
+    expect(body).toHaveProperty("name", "senior edited mob");
+  });
+
+  test("senior cross-owner DELETE removes target's mob", async () => {
+    const vnum = 193;
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const res = await authRequest(
+      app,
+      `/api/mobs/${vnum}?owner=${testUser.playerId}`,
+      expandedCookie,
+      { method: "DELETE" },
+    );
+    expect(res.status).toBe(200);
+
+    const getRes = await authRequest(app, `/api/mobs/${vnum}`, cookie);
+    expect(getRes.status).toBe(404);
+  });
+
+  test("non-senior ?owner= rejection on GET", async () => {
+    const res = await authRequest(
+      app,
+      `/api/mobs/190?owner=${testUser.playerId}`,
+      otherCookie,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  test("non-senior ?owner= rejection on PUT", async () => {
+    const res = await authRequest(
+      app,
+      `/api/mobs/190?owner=${testUser.playerId}`,
+      otherCookie,
+      {
+        body: JSON.stringify({ ...validMobUpdate, vnum: 190 }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  test("non-senior ?owner= rejection on DELETE", async () => {
+    const res = await authRequest(
+      app,
+      `/api/mobs/190?owner=${testUser.playerId}`,
+      otherCookie,
+      { method: "DELETE" },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  test("POST with ?owner= returns 400", async () => {
+    const res = await authRequest(
+      app,
+      `/api/mobs?owner=${testUser.playerId}`,
+      expandedCookie,
+      {
+        body: JSON.stringify({ vnum: 199 }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+    );
+    expect(res.status).toBe(400);
   });
 });

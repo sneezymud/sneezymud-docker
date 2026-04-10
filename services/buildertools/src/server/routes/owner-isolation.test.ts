@@ -104,6 +104,21 @@ describe("mob owner isolation", () => {
 
     const resB = await post("/api/mobs", cookieB, { vnum: MOB_SHARED });
     expect(resB.status).toBe(201);
+
+    // Verify both entities are independently accessible with their own data
+    const getA = await authRequest(app, `/api/mobs/${MOB_SHARED}`, cookieA);
+    const getB = await authRequest(app, `/api/mobs/${MOB_SHARED}`, cookieB);
+    expect(getA.status).toBe(200);
+    expect(getB.status).toBe(200);
+    const bodyA: unknown = await getA.json();
+    const bodyB: unknown = await getB.json();
+    expect(bodyA).toEqual(expect.objectContaining({ vnum: MOB_SHARED }));
+    expect(bodyB).toEqual(expect.objectContaining({ vnum: MOB_SHARED }));
+  });
+
+  test("non-senior builder cannot use ?owner=all", async () => {
+    const res = await authRequest(app, "/api/mobs?owner=all", cookieA);
+    expect(res.status).toBe(403);
   });
 
   test("builder A cannot see builder B's entity", async () => {

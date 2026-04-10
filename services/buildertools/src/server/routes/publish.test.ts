@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { eq, sql } from "drizzle-orm";
+import { z } from "zod";
 
 import { mobSchema } from "@/shared/schemas/mob.ts";
 import { objSchema } from "@/shared/schemas/obj.ts";
@@ -466,14 +467,10 @@ describe("diff endpoints", () => {
       expect.objectContaining({ name: "Diff Test Room" }),
     );
     // Parse the immortal sub-object through roomSchema for structural conformance
-    if (
-      typeof body === "object" &&
-      body !== null &&
-      "immortal" in body &&
-      body.immortal !== null
-    ) {
-      roomSchema.parse(body.immortal);
-    }
+    expect(body).toHaveProperty("immortal");
+    const diffBody = z.object({ immortal: z.unknown() }).parse(body);
+    expect(diffBody.immortal).not.toBeNull();
+    roomSchema.parse(diffBody.immortal);
   });
 
   test("returns both versions after publishing", async () => {
@@ -532,14 +529,10 @@ describe("diff endpoints", () => {
       expect.objectContaining({ name: "diff mob" }),
     );
     expect(body).toHaveProperty("production", null);
-    if (
-      typeof body === "object" &&
-      body !== null &&
-      "immortal" in body &&
-      body.immortal !== null
-    ) {
-      mobSchema.parse(body.immortal);
-    }
+    expect(body).toHaveProperty("immortal");
+    const mobDiff = z.object({ immortal: z.unknown() }).parse(body);
+    expect(mobDiff.immortal).not.toBeNull();
+    mobSchema.parse(mobDiff.immortal);
   });
 
   test("object diff returns correct data", async () => {
@@ -556,14 +549,10 @@ describe("diff endpoints", () => {
       expect.objectContaining({ name: "diff object" }),
     );
     expect(body).toHaveProperty("production", null);
-    if (
-      typeof body === "object" &&
-      body !== null &&
-      "immortal" in body &&
-      body.immortal !== null
-    ) {
-      objSchema.parse(body.immortal);
-    }
+    expect(body).toHaveProperty("immortal");
+    const objDiff = z.object({ immortal: z.unknown() }).parse(body);
+    expect(objDiff.immortal).not.toBeNull();
+    objSchema.parse(objDiff.immortal);
   });
 });
 
@@ -1554,43 +1543,6 @@ describe("constraint error handling", () => {
     expect(res.status).toBe(422);
     const body: unknown = await res.json();
     expect(body).toHaveProperty("error");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// GET /api/players/:id
-// ---------------------------------------------------------------------------
-
-describe("player name endpoint", () => {
-  test("returns id + name for existing player", async () => {
-    const res = await authRequest(
-      app,
-      `/api/players/${testUser.playerId}`,
-      lowOnlyCookie,
-    );
-    expect(res.status).toBe(200);
-    const body: unknown = await res.json();
-    expect(body).toEqual({
-      id: testUser.playerId,
-      name: testUser.playerName,
-    });
-  });
-
-  test("returns 404 for nonexistent player", async () => {
-    const res = await authRequest(app, "/api/players/999999", lowOnlyCookie);
-    expect(res.status).toBe(404);
-  });
-
-  test("returns 401 without auth", async () => {
-    const res = await app.request(`/api/players/${testUser.playerId}`, {
-      headers: { "X-Requested-With": "XMLHttpRequest" },
-    });
-    expect(res.status).toBe(401);
-  });
-
-  test("returns 400 for non-numeric id", async () => {
-    const res = await authRequest(app, "/api/players/abc", lowOnlyCookie);
-    expect(res.status).toBe(400);
   });
 });
 

@@ -6,7 +6,7 @@ import { immortalDb } from "../db.ts";
 import { authRequest, getAuthCookie } from "../test-helpers.ts";
 
 // Vnums 190-199 reserved for power gate tests (otherbuilder/testbuilder)
-// Vnums 200-203 reserved for senior bypass tests (expandedbuilder)
+// Vnums 200-205 reserved for senior bypass tests (expandedbuilder)
 let testCookie: string; // testbuilder - all powers
 let otherCookie: string; // otherbuilder - partial powers (no OEDIT_COST, OEDIT_APPLYS, OEDIT_WEAPONS, OEDIT_NOPROTOS, OEDIT_IMP_POWER, MEDIT_IMP_POWER, REDIT_ENABLED)
 let seniorCookie: string; // expandedbuilder - senior (isSenior=true), lacks OEDIT_COST, OEDIT_WEAPONS, OEDIT_IMP_POWER, MEDIT_IMP_POWER, REDIT_ENABLED
@@ -18,7 +18,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  const vnums = sql`(190, 191, 192, 193, 194, 195, 196, 197, 200, 201, 202, 203)`;
+  const vnums = sql`(190, 191, 192, 193, 194, 195, 196, 197, 200, 201, 202, 203, 204, 205)`;
   await immortalDb.execute(sql`DELETE FROM objaffect WHERE vnum IN ${vnums}`);
   await immortalDb.execute(sql`DELETE FROM objextra WHERE vnum IN ${vnums}`);
   await immortalDb.execute(sql`DELETE FROM obj WHERE vnum IN ${vnums}`);
@@ -514,6 +514,8 @@ describe("senior users bypass power gates", () => {
     await post("/api/objects", seniorCookie, { vnum: 201 });
     await post("/api/mobs", seniorCookie, { vnum: 202 });
     await post("/api/rooms", seniorCookie, { vnum: 203 });
+    await post("/api/objects", seniorCookie, { vnum: 204 });
+    await post("/api/objects", seniorCookie, { vnum: 205 });
   });
 
   test("senior can change object price without OEDIT_COST", async () => {
@@ -574,5 +576,39 @@ describe("senior users bypass power gates", () => {
     expect(getRes.status).toBe(200);
     const body: unknown = await getRes.json();
     expect(body).toEqual(expect.objectContaining({ spec: 1, vnum: 203 }));
+  });
+
+  test("senior can change affects without OEDIT_APPLYS", async () => {
+    const putRes = await put("/api/objects/204", seniorCookie, {
+      ...baseObjPayload,
+      affects: [{ mod1: 5, mod2: 0, type: 18, vnum: 204 }],
+      vnum: 204,
+    });
+    expect(putRes.status).toBe(200);
+
+    const getRes = await get("/api/objects/204", seniorCookie);
+    expect(getRes.status).toBe(200);
+    const body: unknown = await getRes.json();
+    expect(body).toHaveProperty(
+      "affects",
+      expect.arrayContaining([expect.objectContaining({ mod1: 5, type: 18 })]),
+    );
+  });
+
+  test("senior can change prototype flag without OEDIT_NOPROTOS", async () => {
+    const PROTOTYPE_BIT = 1 << 4;
+    const putRes = await put("/api/objects/205", seniorCookie, {
+      ...baseObjPayload,
+      action_flag: PROTOTYPE_BIT,
+      vnum: 205,
+    });
+    expect(putRes.status).toBe(200);
+
+    const getRes = await get("/api/objects/205", seniorCookie);
+    expect(getRes.status).toBe(200);
+    const body: unknown = await getRes.json();
+    expect(body).toEqual(
+      expect.objectContaining({ action_flag: PROTOTYPE_BIT, vnum: 205 }),
+    );
   });
 });

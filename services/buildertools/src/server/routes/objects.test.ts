@@ -5,7 +5,7 @@ import { objSchema } from "@/shared/schemas/obj.ts";
 
 import { app } from "../app.ts";
 import { immortalDb, sneezyDb } from "../db.ts";
-import { authRequest, getAuthCookie } from "../test-helpers.ts";
+import { authRequest, getAuthCookie, testUser } from "../test-helpers.ts";
 
 let cookie: string;
 
@@ -15,15 +15,15 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 165, 180, 181, 500)`,
+    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 180, 181, 500)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 165, 180, 181)`,
+    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 180, 181)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM obj WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 165, 180, 181)`,
+    sql`DELETE FROM obj WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 180, 181)`,
   );
-  await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum IN (5100, 5101)`);
+  await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum IN (5100, 5101, 5102)`);
   await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum BETWEEN 6100 AND 6124`);
 });
 
@@ -82,6 +82,15 @@ describe("invalid vnum parameters", () => {
 
   test("GET /api/objects/-1 returns 400", async () => {
     const res = await authRequest(app, "/api/objects/-1", cookie);
+    expect(res.status).toBe(400);
+  });
+
+  test("PUT /api/objects/abc returns 400", async () => {
+    const res = await authRequest(app, "/api/objects/abc", cookie, {
+      body: JSON.stringify(validObjUpdate),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
     expect(res.status).toBe(400);
   });
 });
@@ -306,6 +315,10 @@ describe("object search", () => {
     const body: unknown = await res.json();
     expect(body).toEqual(
       expect.arrayContaining([expect.objectContaining({ vnum: 111 })]),
+    );
+    // Object 110 exists but doesn't match "glowing orb"
+    expect(body).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ vnum: 110 })]),
     );
   });
 
@@ -879,6 +892,59 @@ describe("object search pagination", () => {
   });
 });
 
+// -- Search deduplication --
+
+describe("search deduplication across databases", () => {
+  beforeAll(async () => {
+    // Insert an object in sneezy (production) with a distinctive name
+    await sneezyDb.execute(sql`
+      INSERT INTO obj (vnum, name, short_desc, long_desc, action_desc)
+      VALUES (5102, 'DedupTestObj', 'a dedup test object', '', '')
+    `);
+
+    // Create the same vnum in immortal with a different name
+    await authRequest(app, "/api/objects", cookie, {
+      body: JSON.stringify({ vnum: 169 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(app, "/api/objects/169", cookie, {
+      body: JSON.stringify({
+        ...validObjUpdate,
+        short_desc: "an immortal dedup test object",
+        vnum: 169,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+  });
+
+  test("immortal version wins over sneezy for same vnum", async () => {
+    // Insert a sneezy row at the same vnum as the immortal object
+    await sneezyDb.execute(sql`
+      INSERT IGNORE INTO obj (vnum, name, short_desc, long_desc, action_desc)
+      VALUES (169, 'DedupConflict', 'a sneezy dedup conflict object', '', '')
+    `);
+
+    const res = await authRequest(app, "/api/objects/search?q=dedup", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(Array.isArray(body)).toBe(true);
+    if (!Array.isArray(body)) throw new Error("expected array");
+
+    const matches = body.filter((r: { vnum: number }) => r.vnum === 169);
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toHaveProperty(
+      "short_desc",
+      "an immortal dedup test object",
+    );
+  });
+
+  afterAll(async () => {
+    await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum = 169`);
+  });
+});
+
 // -- Multiple affects ordering --
 
 describe("multiple affects", () => {
@@ -909,6 +975,175 @@ describe("multiple affects", () => {
     // Verify all three types are present (DB may return in any order)
     const types = parsed.affects.map((a) => a.type).toSorted((a, b) => a - b);
     expect(types).toEqual([17, 18, 19]);
+  });
+});
+
+// -- Owner scoping --
+
+/** Create an object in immortal via API and update it with full data. */
+async function createAndUpdate(
+  vnum: number,
+  authCookie: string,
+  updatePayload: Record<string, unknown>,
+) {
+  const createRes = await authRequest(app, "/api/objects", authCookie, {
+    body: JSON.stringify({ vnum }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+  });
+  expect(createRes.status).toBe(201);
+
+  const putRes = await authRequest(app, `/api/objects/${vnum}`, authCookie, {
+    body: JSON.stringify({ ...updatePayload, vnum }),
+    headers: { "Content-Type": "application/json" },
+    method: "PUT",
+  });
+  expect(putRes.status).toBe(200);
+}
+
+describe("owner scoping", () => {
+  let expandedCookie: string;
+  let otherCookie: string;
+
+  beforeAll(async () => {
+    expandedCookie = await getAuthCookie(app, "expandedbuilder");
+    otherCookie = await getAuthCookie(app, "otherbuilder");
+  });
+
+  test("GET /api/objects?owner=mine excludes other owners' entities", async () => {
+    const vnumA = 163;
+    const vnumB = 164;
+    await createAndUpdate(vnumA, cookie, { ...validObjUpdate });
+    await createAndUpdate(vnumB, otherCookie, { ...validObjUpdate });
+
+    const res = await authRequest(app, "/api/objects?owner=mine", cookie);
+    expect(res.status).toBe(200);
+    const rows: unknown = await res.json();
+    if (!Array.isArray(rows)) throw new Error("expected array");
+    const vnums = rows
+      .filter(
+        (r): r is { vnum: number } =>
+          typeof r === "object" && r !== null && "vnum" in r,
+      )
+      .map((r) => r.vnum);
+    expect(vnums).toContain(vnumA);
+    expect(vnums).not.toContain(vnumB);
+  });
+
+  test("senior cross-owner GET returns target's draft", async () => {
+    const vnum = 166;
+    await createAndUpdate(vnum, cookie, {
+      ...validObjUpdate,
+      name: "test user object",
+    });
+    const res = await authRequest(
+      app,
+      `/api/objects/${vnum}?owner=${testUser.playerId}`,
+      expandedCookie,
+    );
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toHaveProperty("name", "test user object");
+  });
+
+  test("senior cross-owner PUT persists changes", async () => {
+    // expandedUser (senior) edits testUser's object 166 - already created above
+    const getRes = await authRequest(
+      app,
+      `/api/objects/166?owner=${testUser.playerId}`,
+      expandedCookie,
+    );
+    expect(getRes.status).toBe(200);
+    const original: unknown = await getRes.json();
+    if (typeof original !== "object" || original === null) {
+      throw new Error("expected object");
+    }
+
+    const putRes = await authRequest(
+      app,
+      `/api/objects/166?owner=${testUser.playerId}`,
+      expandedCookie,
+      {
+        body: JSON.stringify({
+          ...original,
+          name: "senior edited object",
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+    );
+    expect(putRes.status).toBe(200);
+
+    // Verify via GET that the change was actually saved
+    const verifyRes = await authRequest(
+      app,
+      `/api/objects/166?owner=${testUser.playerId}`,
+      expandedCookie,
+    );
+    expect(verifyRes.status).toBe(200);
+    const verifyBody: unknown = await verifyRes.json();
+    expect(verifyBody).toHaveProperty("name", "senior edited object");
+  });
+
+  test("senior cross-owner DELETE removes target's row", async () => {
+    const vnum = 167;
+    await createAndUpdate(vnum, cookie, { ...validObjUpdate });
+    const res = await authRequest(
+      app,
+      `/api/objects/${vnum}?owner=${testUser.playerId}`,
+      expandedCookie,
+      { method: "DELETE" },
+    );
+    expect(res.status).toBe(200);
+    const getRes = await authRequest(app, `/api/objects/${vnum}`, cookie);
+    expect(getRes.status).toBe(404);
+  });
+
+  test("non-senior ?owner= rejection on GET", async () => {
+    const res = await authRequest(
+      app,
+      `/api/objects/163?owner=${testUser.playerId}`,
+      otherCookie,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  test("non-senior ?owner= rejection on PUT", async () => {
+    const res = await authRequest(
+      app,
+      `/api/objects/163?owner=${testUser.playerId}`,
+      otherCookie,
+      {
+        body: JSON.stringify({ ...validObjUpdate, vnum: 163 }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  test("non-senior ?owner= rejection on DELETE", async () => {
+    const res = await authRequest(
+      app,
+      `/api/objects/163?owner=${testUser.playerId}`,
+      otherCookie,
+      { method: "DELETE" },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  test("POST ?owner= rejection", async () => {
+    const res = await authRequest(
+      app,
+      `/api/objects?owner=${testUser.playerId}`,
+      expandedCookie,
+      {
+        body: JSON.stringify({ vnum: 168 }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+    );
+    expect(res.status).toBe(400);
   });
 });
 
