@@ -6,7 +6,7 @@ const SEED_VNUM = 150;
 
 test("senior cross-owner happy path: edit testbuilder's room as expandedbuilder", async ({
   authenticatedPage,
-  expandedPage: page,
+  seniorPage: page,
 }) => {
   // Seed: create a room as testbuilder so expandedbuilder has something to find.
   const createRes = await authenticatedPage.request.post("/api/rooms", {

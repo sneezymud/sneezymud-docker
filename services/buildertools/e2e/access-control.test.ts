@@ -29,22 +29,32 @@ test("builder sees no entities outside their vnum blocks", async ({
       .getByRole("row")
       .filter({ hasNot: page.getByRole("columnheader") });
     const rowCount = await rows.count();
+    const extractedVnums: number[] = [];
     for (let i = 0; i < rowCount; i++) {
       const label = await rows.nth(i).getAttribute("aria-label");
       if (label) {
         const vnumMatch = /vnum (\d+)/.exec(label);
         if (vnumMatch) {
-          const vnum = Number(vnumMatch[1]);
-          expect(
-            vnum,
-            `${linkName} list rendered out-of-range vnum ${vnum}`,
-          ).toBeGreaterThanOrEqual(100);
-          expect(
-            vnum,
-            `${linkName} list rendered out-of-range vnum ${vnum}`,
-          ).toBeLessThanOrEqual(199);
+          extractedVnums.push(Number(vnumMatch[1]));
         }
       }
+    }
+
+    // Guard: ensure we actually found vnums to check (prevents vacuous pass)
+    expect(
+      extractedVnums.length,
+      `${linkName} list should contain at least one vnum in DOM`,
+    ).toBeGreaterThan(0);
+
+    for (const vnum of extractedVnums) {
+      expect(
+        vnum,
+        `${linkName} list rendered out-of-range vnum ${vnum}`,
+      ).toBeGreaterThanOrEqual(100);
+      expect(
+        vnum,
+        `${linkName} list rendered out-of-range vnum ${vnum}`,
+      ).toBeLessThanOrEqual(199);
     }
 
     // API assertion (existing): verify via fetch as well
@@ -57,6 +67,12 @@ test("builder sees no entities outside their vnum blocks", async ({
     }, apiEndpoint);
 
     const items = vnumListSchema.parse(raw);
+
+    // Guard: ensure API returned data (prevents vacuous pass)
+    expect(
+      items.length,
+      `${apiEndpoint} should return at least one item`,
+    ).toBeGreaterThan(0);
 
     for (const { vnum } of items) {
       expect(

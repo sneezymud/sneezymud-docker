@@ -1,12 +1,12 @@
 // Playwright fixtures that provide authenticated pages.
 // - authenticatedPage: logged in as testbuilder (blocks 100-199)
-// - expandedPage: logged in as expandedbuilder (senior builder, blocks 200-299)
+// - seniorPage: logged in as expandedbuilder (senior builder, blocks 200-299)
 
 import { test as base, expect } from "@playwright/test";
 
 export const test = base.extend<{
   authenticatedPage: import("@playwright/test").Page;
-  expandedPage: import("@playwright/test").Page;
+  seniorPage: import("@playwright/test").Page;
 }>({
   authenticatedPage: async ({ page }, use) => {
     await page.goto("/login");
@@ -20,7 +20,7 @@ export const test = base.extend<{
 
     await use(page);
   },
-  expandedPage: async ({ browser }, use) => {
+  seniorPage: async ({ browser }, use) => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto("/login");

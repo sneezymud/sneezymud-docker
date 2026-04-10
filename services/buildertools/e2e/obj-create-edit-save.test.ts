@@ -1,69 +1,76 @@
 // e2e/obj-create-edit-save.test.ts
 import { expect, test } from "./auth-fixture.ts";
 
-test("create, edit, save, and verify object persistence", async ({
-  authenticatedPage: page,
-}) => {
-  // Navigate to Objects via sidebar
-  await page.getByRole("link", { name: "Objects" }).click();
-  await page.waitForURL(/\/objects/);
+test.describe("object create-edit-save", () => {
+  test.afterEach(async ({ authenticatedPage: page }) => {
+    try {
+      await page.request.delete("/api/objects/198", {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+      });
+    } catch {
+      // Entity may not exist, cleanup is best-effort
+    }
+  });
 
-  // Create object at vnum 198
-  await page.getByRole("button", { name: "Add" }).click();
-  await page.getByRole("spinbutton").fill("198");
-  await page.keyboard.press("Enter");
-  await page.waitForURL(/\/objects\/198/);
+  test("create, edit, save, and verify object persistence", async ({
+    authenticatedPage: page,
+  }) => {
+    // Navigate to Objects via sidebar
+    await page.getByRole("link", { name: "Objects" }).click();
+    await page.waitForURL(/\/objects/);
 
-  // Fill fields
-  // NOTE: Object "name" field has label "Keywords" (not "Name") per obj-fields.tsx
-  const nameInput = page.getByLabel("Keywords");
-  await nameInput.fill("test iron sword");
+    // Create object at vnum 198
+    await page.getByRole("button", { name: "Add" }).click();
+    await page.getByRole("spinbutton").fill("198");
+    await page.keyboard.press("Enter");
+    await page.waitForURL(/\/objects\/198/);
 
-  const shortDescInput = page.getByLabel("Short Description");
-  await shortDescInput.fill("a test iron sword");
+    // Fill fields
+    // NOTE: Object "name" field has label "Keywords" (not "Name") per obj-fields.tsx
+    const nameInput = page.getByLabel("Keywords");
+    await nameInput.fill("test iron sword");
 
-  // Select weapon type (type 5) via Combobox (not native select - too many
-  // item types triggers SearchableEnumSelect). Click to open, type to filter,
-  // click option.
-  const typeCombobox = page.getByLabel("Item Type");
-  await typeCombobox.click();
-  await typeCombobox.fill("Weapon");
-  await page.getByRole("option", { name: /Weapon/ }).click();
+    const shortDescInput = page.getByLabel("Short Description");
+    await shortDescInput.fill("a test iron sword");
 
-  // Fill a weapon-specific value field. After selecting Weapon, the form
-  // renders type-specific fields: "Current Sharpness", "Max Sharpness",
-  // "Damage Level", etc. These are number inputs within the same
-  // "Type-Specific Values" section (already expanded).
-  const damageLevelInput = page.getByLabel("Damage Level");
-  await damageLevelInput.fill("50");
+    // Select weapon type (type 5) via Combobox (not native select - too many
+    // item types triggers SearchableEnumSelect). Click to open, type to filter,
+    // click option.
+    const typeCombobox = page.getByLabel("Item Type");
+    await typeCombobox.click();
+    await typeCombobox.fill("Weapon");
+    await page.getByRole("option", { name: /Weapon/ }).click();
 
-  // Fill weight
-  const weightInput = page.getByLabel("Weight");
-  await weightInput.fill("10");
+    // Fill a weapon-specific value field. After selecting Weapon, the form
+    // renders type-specific fields: "Current Sharpness", "Max Sharpness",
+    // "Damage Level", etc. These are number inputs within the same
+    // "Type-Specific Values" section (already expanded).
+    const damageLevelInput = page.getByLabel("Damage Level");
+    await damageLevelInput.fill("50");
 
-  // Save
-  await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("button", { name: "Save" })).toBeDisabled();
+    // Fill weight
+    const weightInput = page.getByLabel("Weight");
+    await weightInput.fill("10");
 
-  // Navigate away and back
-  await page.getByRole("link", { name: "Rooms" }).click();
-  await page.waitForURL(/\/rooms/);
-  await page.getByRole("link", { name: "Objects" }).click();
-  await page.waitForURL(/\/objects$/);
-  await page.getByRole("link", { name: /198/ }).click();
-  await page.waitForURL(/\/objects\/198/);
+    // Save
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByRole("button", { name: "Save" })).toBeDisabled();
 
-  // Verify persistence
-  await expect(page.getByLabel("Keywords")).toHaveValue("test iron sword");
-  await expect(page.getByLabel("Short Description")).toHaveValue(
-    "a test iron sword",
-  );
-  await expect(page.getByLabel("Item Type")).toHaveValue("Weapon (5)");
-  await expect(page.getByLabel("Damage Level")).toHaveValue("50");
-  await expect(page.getByLabel("Weight")).toHaveValue("10");
+    // Navigate away and back
+    await page.getByRole("link", { name: "Rooms" }).click();
+    await page.waitForURL(/\/rooms/);
+    await page.getByRole("link", { name: "Objects" }).click();
+    await page.waitForURL(/\/objects$/);
+    await page.getByRole("link", { name: /198/ }).click();
+    await page.waitForURL(/\/objects\/198/);
 
-  // Delete
-  await page.getByRole("button", { name: "Delete" }).click();
-  await page.getByRole("button", { name: "Yes, delete" }).click();
-  await page.waitForURL(/\/objects$/);
+    // Verify persistence
+    await expect(page.getByLabel("Keywords")).toHaveValue("test iron sword");
+    await expect(page.getByLabel("Short Description")).toHaveValue(
+      "a test iron sword",
+    );
+    await expect(page.getByLabel("Item Type")).toHaveValue("Weapon (5)");
+    await expect(page.getByLabel("Damage Level")).toHaveValue("50");
+    await expect(page.getByLabel("Weight")).toHaveValue("10");
+  });
 });

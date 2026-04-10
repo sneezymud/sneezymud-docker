@@ -2,127 +2,126 @@
 
 import { expect, test } from "./auth-fixture.ts";
 
-test("save failure surfaces error and preserves dirty state", async ({
-  authenticatedPage: page,
-}) => {
-  // Create a room to work with
-  await page.getByRole("link", { name: "Rooms" }).click();
-  await page.waitForURL(/\/rooms/);
-  await page.getByRole("button", { name: "Add" }).click();
-  await page.getByRole("spinbutton").fill("197");
-  await page.keyboard.press("Enter");
-  await page.waitForURL(/\/rooms\/197/);
-
-  // Edit a field so the form becomes dirty
-  const nameInput = page.getByLabel("Name");
-  await nameInput.fill("doomed room");
-
-  // Intercept the PUT to simulate a server error
-  await page.route("**/api/rooms/197", (route) => {
-    if (route.request().method() === "PUT") {
-      return route.fulfill({
-        body: JSON.stringify({ error: "Database connection lost" }),
-        contentType: "application/json",
-        status: 500,
-      });
+test.describe("room create-edit-save", () => {
+  test.afterEach(async ({ authenticatedPage: page }) => {
+    for (const vnum of [197, 198]) {
+      try {
+        await page.request.delete(`/api/rooms/${vnum}`, {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+      } catch {
+        // Entity may not exist, cleanup is best-effort
+      }
     }
-    return route.continue();
   });
 
-  // Click Save
-  const saveButton = page.getByRole("button", { name: "Save" });
-  await saveButton.click();
+  test("save failure surfaces error and preserves dirty state", async ({
+    authenticatedPage: page,
+  }) => {
+    // Create a room to work with
+    await page.getByRole("link", { name: "Rooms" }).click();
+    await page.waitForURL(/\/rooms/);
+    await page.getByRole("button", { name: "Add" }).click();
+    await page.getByRole("spinbutton").fill("197");
+    await page.keyboard.press("Enter");
+    await page.waitForURL(/\/rooms\/197/);
 
-  // Error should be visible to the user (sonner toast)
-  await expect(page.getByText("Database connection lost")).toBeVisible();
+    // Edit a field so the form becomes dirty
+    const nameInput = page.getByLabel("Name");
+    await nameInput.fill("doomed room");
 
-  // Save button should still be enabled (dirty state preserved)
-  await expect(saveButton).toBeEnabled();
+    // Intercept the PUT to simulate a server error
+    await page.route("**/api/rooms/197", (route) => {
+      if (route.request().method() === "PUT") {
+        return route.fulfill({
+          body: JSON.stringify({ error: "Database connection lost" }),
+          contentType: "application/json",
+          status: 500,
+        });
+      }
+      return route.continue();
+    });
 
-  // Remove the route intercept so cleanup works
-  await page.unroute("**/api/rooms/197");
+    // Click Save
+    const saveButton = page.getByRole("button", { name: "Save" });
+    await saveButton.click();
 
-  // Clean up: revert the name and delete the room
-  await nameInput.clear();
-  await nameInput.fill("cleanup");
-  await saveButton.click();
-  await expect(saveButton).toBeDisabled();
-  await page.getByRole("button", { name: "Delete" }).click();
-  await page.getByRole("button", { name: "Yes, delete" }).click();
-  await page.waitForURL(/\/rooms$/);
-});
+    // Error should be visible to the user (sonner toast)
+    await expect(page.getByText("Database connection lost")).toBeVisible();
 
-test("create, edit, save, and verify room persistence", async ({
-  authenticatedPage: page,
-}) => {
-  // Navigate to rooms via the sidebar nav
-  await page.getByRole("link", { name: "Rooms" }).click();
-  await page.waitForURL(/\/rooms/);
+    // Save button should still be enabled (dirty state preserved)
+    await expect(saveButton).toBeEnabled();
 
-  // Open the VnumPicker (triggerLabel="Add")
-  await page.getByRole("button", { name: "Add" }).click();
+    // Remove the route intercept so cleanup works
+    await page.unroute("**/api/rooms/197");
+  });
 
-  // Fill the vnum input. Number inputs have implicit role "spinbutton".
-  await page.getByRole("spinbutton").fill("198");
+  test("create, edit, save, and verify room persistence", async ({
+    authenticatedPage: page,
+  }) => {
+    // Navigate to rooms via the sidebar nav
+    await page.getByRole("link", { name: "Rooms" }).click();
+    await page.waitForURL(/\/rooms/);
 
-  // Submit via Enter - the form's onSubmit handles creation
-  await page.keyboard.press("Enter");
+    // Open the VnumPicker (triggerLabel="Add")
+    await page.getByRole("button", { name: "Add" }).click();
 
-  // Should navigate to the room editor
-  await page.waitForURL(/\/rooms\/198/);
+    // Fill the vnum input. Number inputs have implicit role "spinbutton".
+    await page.getByRole("spinbutton").fill("198");
 
-  // Edit the room name (label "Name" from room-fields.tsx)
-  const nameInput = page.getByLabel("Name");
-  await nameInput.fill("test room hallway");
+    // Submit via Enter - the form's onSubmit handles creation
+    await page.keyboard.press("Enter");
 
-  // Edit the description (label "Description" from room-fields.tsx)
-  const descInput = page.getByLabel("Description");
-  await descInput.fill("A long hallway stretches before you.");
+    // Should navigate to the room editor
+    await page.waitForURL(/\/rooms\/198/);
 
-  // Expand the "Properties" section (collapsed by default)
-  await page.getByRole("button", { name: "Properties" }).click();
+    // Edit the room name (label "Name" from room-fields.tsx)
+    const nameInput = page.getByLabel("Name");
+    await nameInput.fill("test room hallway");
 
-  // Select sector type via searchable combobox (>15 entries = SearchableEnumSelect).
-  // Same interaction pattern as Item Type in the object test.
-  const sectorCombobox = page.getByLabel("Sector Type");
-  await sectorCombobox.click();
-  await sectorCombobox.fill("Temperate Building");
-  await page.getByRole("option", { name: /Temperate Building/ }).click();
+    // Edit the description (label "Description" from room-fields.tsx)
+    const descInput = page.getByLabel("Description");
+    await descInput.fill("A long hallway stretches before you.");
 
-  // Fill Max Capacity (number input)
-  const capacityInput = page.getByLabel("Max Capacity");
-  await capacityInput.fill("5");
+    // Expand the "Properties" section (collapsed by default)
+    await page.getByRole("button", { name: "Properties" }).click();
 
-  // Save
-  await page.getByRole("button", { name: "Save" }).click();
+    // Select sector type via searchable combobox (>15 entries = SearchableEnumSelect).
+    // Same interaction pattern as Item Type in the object test.
+    const sectorCombobox = page.getByLabel("Sector Type");
+    await sectorCombobox.click();
+    await sectorCombobox.fill("Temperate Building");
+    await page.getByRole("option", { name: /Temperate Building/ }).click();
 
-  // Wait for save to complete - Save button is disabled when not dirty
-  await expect(page.getByRole("button", { name: "Save" })).toBeDisabled();
+    // Fill Max Capacity (number input)
+    const capacityInput = page.getByLabel("Max Capacity");
+    await capacityInput.fill("5");
 
-  // Navigate away via nav
-  await page.getByRole("link", { name: "Rooms" }).click();
-  await page.waitForURL(/\/rooms$/);
+    // Save
+    await page.getByRole("button", { name: "Save" }).click();
 
-  // Navigate back to the room by clicking its vnum link in the list
-  await page.getByRole("link", { name: /198/ }).click();
-  await page.waitForURL(/\/rooms\/198/);
+    // Wait for save to complete - Save button is disabled when not dirty
+    await expect(page.getByRole("button", { name: "Save" })).toBeDisabled();
 
-  // Verify values persisted
-  await expect(page.getByLabel("Name")).toHaveValue("test room hallway");
-  await expect(page.getByLabel("Description")).toHaveValue(
-    "A long hallway stretches before you.",
-  );
+    // Navigate away via nav
+    await page.getByRole("link", { name: "Rooms" }).click();
+    await page.waitForURL(/\/rooms$/);
 
-  // Expand Properties to verify enum and number fields
-  await page.getByRole("button", { name: "Properties" }).click();
-  await expect(page.getByLabel("Sector Type")).toHaveValue(
-    "Temperate Building (32)",
-  );
-  await expect(page.getByLabel("Max Capacity")).toHaveValue("5");
+    // Navigate back to the room by clicking its vnum link in the list
+    await page.getByRole("link", { name: /198/ }).click();
+    await page.waitForURL(/\/rooms\/198/);
 
-  // Clean up: delete the room via the icon button (aria-label="Delete")
-  await page.getByRole("button", { name: "Delete" }).click();
-  // Confirm deletion dialog (confirmLabel: "Yes, delete")
-  await page.getByRole("button", { name: "Yes, delete" }).click();
-  await page.waitForURL(/\/rooms$/);
+    // Verify values persisted
+    await expect(page.getByLabel("Name")).toHaveValue("test room hallway");
+    await expect(page.getByLabel("Description")).toHaveValue(
+      "A long hallway stretches before you.",
+    );
+
+    // Expand Properties to verify enum and number fields
+    await page.getByRole("button", { name: "Properties" }).click();
+    await expect(page.getByLabel("Sector Type")).toHaveValue(
+      "Temperate Building (32)",
+    );
+    await expect(page.getByLabel("Max Capacity")).toHaveValue("5");
+  });
 });
