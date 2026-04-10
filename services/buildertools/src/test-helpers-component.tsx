@@ -21,6 +21,7 @@ export interface FetchCall {
 
 interface FetchHandler {
   body: unknown;
+  method?: string;
   status?: number;
   url: string;
 }
@@ -101,7 +102,9 @@ export function mockFetch(handlers: FetchHandler[]) {
         }
       }
       fetchLog.push({ body, method, url });
-      const handler = handlers.find((h) => url.includes(h.url));
+      const handler = handlers.find(
+        (h) => url.includes(h.url) && (!h.method || h.method === method),
+      );
       if (!handler) {
         return Promise.reject(new Error(`Unhandled fetch: ${url}`));
       }

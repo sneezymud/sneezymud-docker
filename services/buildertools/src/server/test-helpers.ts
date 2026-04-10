@@ -236,3 +236,118 @@ export function extractCookie(res: Response): string {
   }
   return cookie;
 }
+
+/**
+ * Factory functions for valid entity payloads. Each returns a complete
+ * payload suitable for PUT requests. Override specific fields as needed.
+ */
+export function validRoomPayload(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    capacity: 0,
+    description: "A nondescript room.",
+    exits: [],
+    extras: [],
+    height: 0,
+    name: "test room",
+    river_dir: 0,
+    river_speed: 0,
+    room_flag: 0,
+    sector: 0,
+    spec: 0,
+    telelook: 0,
+    teletarg: 0,
+    teletime: 0,
+    vnum: 100,
+    x: 0,
+    y: 0,
+    z: 0,
+    zone: 1,
+    ...overrides,
+  };
+}
+
+export function validMobPayload(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    ac: 10,
+    actions: 0,
+    adjacent_sound: "",
+    affects: 0,
+    agi: 0,
+    attacks: 1,
+    bra: 0,
+    can_be_seen: 0,
+    cha: 0,
+    class: 0,
+    con: 0,
+    damage_level: 0,
+    damage_precision: 0,
+    def_position: 9,
+    description: "A test mob.",
+    dex: 0,
+    extras: [],
+    fact_perc: 0,
+    faction: 0,
+    foc: 0,
+    gold: 0,
+    height: 0,
+    hpbonus: 0,
+    immunities: [],
+    intel: 0,
+    kar: 0,
+    level: 1,
+    local_sound: "",
+    long_desc: "A test mob stands here.",
+    max_exist: 0,
+    name: "test mob",
+    per: 0,
+    race: 0,
+    sex: 0,
+    short_desc: "a test mob",
+    skin: 0,
+    spe: 0,
+    spec_proc: 0,
+    str: 0,
+    tohit: 0,
+    vision: 0,
+    vnum: 100,
+    weight: 0,
+    wis: 0,
+    ...overrides,
+  };
+}
+
+export function validObjPayload(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    action_desc: "",
+    action_flag: 0,
+    affects: [],
+    can_be_seen: 0,
+    cur_struct: 0,
+    decay: 0,
+    extras: [],
+    long_desc: "A test object lies here.",
+    material: 0,
+    max_exist: 0,
+    max_struct: 0,
+    name: "test object",
+    price: 0,
+    short_desc: "a test object",
+    spec_proc: 0,
+    type: 0,
+    val0: 0,
+    val1: 0,
+    val2: 0,
+    val3: 0,
+    vnum: 100,
+    volume: 0,
+    wear_flag: 0,
+    weight: 0,
+    ...overrides,
+  };
+}
