@@ -10,21 +10,39 @@ import { authRequest, getAuthCookie } from "../test-helpers.ts";
 let cookie: string;
 
 beforeAll(async () => {
-  cookie = await getAuthCookie(app);
+  cookie = await getAuthCookie(app, "testbuilder");
 });
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 165)`,
+    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 165, 180, 181, 500)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 165)`,
+    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 165, 180, 181)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM obj WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 165)`,
+    sql`DELETE FROM obj WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 165, 180, 181)`,
   );
   await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum IN (5100, 5101)`);
   await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum BETWEEN 6100 AND 6124`);
+});
+
+// -- Auth enforcement --
+
+describe("auth enforcement", () => {
+  test("unauthenticated request returns 401", async () => {
+    const res = await app.request("/api/objects", {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  test("request without X-Requested-With returns 403", async () => {
+    const res = await app.request("/api/objects", {
+      headers: { Cookie: cookie },
+    });
+    expect(res.status).toBe(403);
+  });
 });
 
 const validObjUpdate = {
@@ -53,6 +71,20 @@ const validObjUpdate = {
   wear_flag: 0,
   weight: 0,
 };
+
+// -- Invalid vnum parameters --
+
+describe("invalid vnum parameters", () => {
+  test("GET /api/objects/abc returns 400", async () => {
+    const res = await authRequest(app, "/api/objects/abc", cookie);
+    expect(res.status).toBe(400);
+  });
+
+  test("GET /api/objects/-1 returns 400", async () => {
+    const res = await authRequest(app, "/api/objects/-1", cookie);
+    expect(res.status).toBe(400);
+  });
+});
 
 // -- Create --
 
@@ -154,23 +186,26 @@ describe("object updates", () => {
     });
 
     expect(putRes.status).toBe(200);
-    const result: unknown = await putRes.json();
-    expect(result).toEqual(
-      expect.objectContaining({
-        name: "sword blade",
-        short_desc: "a sharp sword",
-      }),
-    );
-    expect(result).toHaveProperty(
-      "affects",
-      expect.arrayContaining([expect.objectContaining({ mod1: 1, type: 18 })]),
-    );
-    expect(result).toHaveProperty(
-      "extras",
-      expect.arrayContaining([
-        expect.objectContaining({ name: "blade sword" }),
-      ]),
-    );
+    const getRes = await authRequest(app, "/api/objects/110", cookie);
+    const body: unknown = await getRes.json();
+    const parsed = objSchema.parse(body);
+    expect(parsed.name).toBe("sword blade");
+    expect(parsed.short_desc).toBe("a sharp sword");
+    expect(parsed.affects).toHaveLength(1);
+    expect(parsed.affects[0]?.mod1).toBe(1);
+    expect(parsed.affects[0]?.type).toBe(18);
+    expect(parsed.extras).toHaveLength(1);
+    expect(parsed.extras[0]?.name).toBe("blade sword");
+  });
+
+  test("updating a nonexistent object within blocks returns 404", async () => {
+    const res = await authRequest(app, "/api/objects/198", cookie, {
+      body: JSON.stringify({ ...validObjUpdate, vnum: 198 }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    expect(res.status).toBe(404);
   });
 
   test("invalid request body gets rejected", async () => {
@@ -272,6 +307,14 @@ describe("object search", () => {
     expect(body).toEqual(
       expect.arrayContaining([expect.objectContaining({ vnum: 111 })]),
     );
+  });
+
+  test("short query returns empty array", async () => {
+    const res = await authRequest(app, "/api/objects/search?q=x", cookie);
+
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual([]);
   });
 
   test("SQL metacharacters in query are treated literally", async () => {
@@ -453,6 +496,20 @@ describe("bulk object deletion", () => {
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     expect(body).toEqual({ deleted: 0, ok: true });
+  });
+
+  test("bulk delete with owner parameter returns 400", async () => {
+    const res = await authRequest(
+      app,
+      "/api/objects/bulk?owner=99999",
+      cookie,
+      {
+        body: JSON.stringify({ vnums: [110] }),
+        headers: { "Content-Type": "application/json" },
+        method: "DELETE",
+      },
+    );
+    expect(res.status).toBe(400);
   });
 });
 
@@ -644,6 +701,156 @@ describe("response schema validation", () => {
     const parsed = objSchema.parse(body);
     expect(parsed.vnum).toBe(114);
   });
+
+  test("populated object with child rows and non-default type conforms to objSchema", async () => {
+    await authRequest(app, "/api/objects", cookie, {
+      body: JSON.stringify({ vnum: 116 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    await authRequest(app, "/api/objects/116", cookie, {
+      body: JSON.stringify({
+        ...validObjUpdate,
+        affects: [{ mod1: 3, mod2: 0, type: 17, vnum: 116 }],
+        extras: [{ description: "Runes glow.", name: "runes", vnum: 116 }],
+        name: "runic blade",
+        price: 500,
+        type: 5,
+        val0: 100,
+        vnum: 116,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    const res = await authRequest(app, "/api/objects/116", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    const parsed = objSchema.parse(body);
+    expect(parsed.affects).toHaveLength(1);
+    expect(parsed.extras).toHaveLength(1);
+    expect(parsed.type).toBe(5);
+    expect(parsed.price).toBe(500);
+  });
+});
+
+// -- Full-field roundtrip --
+
+describe("full-field roundtrip", () => {
+  test("all fields survive a PUT/GET cycle", async () => {
+    await authRequest(app, "/api/objects", cookie, {
+      body: JSON.stringify({ vnum: 180 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const payload = {
+      action_desc: "It glows.",
+      action_flag: 16,
+      affects: [
+        { mod1: 5, mod2: 0, type: 18, vnum: 180 },
+        { mod1: -2, mod2: 0, type: 1, vnum: 180 },
+      ],
+      can_be_seen: 10,
+      cur_struct: 100,
+      decay: 500,
+      extras: [{ description: "A glowing rune.", name: "rune", vnum: 180 }],
+      long_desc: "A sword lies here.",
+      material: 50,
+      max_exist: 3,
+      max_struct: 200,
+      name: "magical sword",
+      price: 5000,
+      short_desc: "a magical sword",
+      spec_proc: 0,
+      type: 5,
+      val0: 200 | (150 << 8),
+      val1: 50 | (30 << 8),
+      val2: 1 | (2 << 8),
+      val3: 0,
+      vnum: 180,
+      volume: 1000,
+      wear_flag: 8193,
+      weight: 5,
+    };
+
+    const putRes = await authRequest(app, "/api/objects/180", cookie, {
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(putRes.status).toBe(200);
+
+    const getRes = await authRequest(app, "/api/objects/180", cookie);
+    expect(getRes.status).toBe(200);
+    const body: unknown = await getRes.json();
+    const parsed = objSchema.parse(body);
+
+    expect(parsed.action_desc).toBe(payload.action_desc);
+    expect(parsed.action_flag).toBe(payload.action_flag);
+    expect(parsed.can_be_seen).toBe(payload.can_be_seen);
+    expect(parsed.cur_struct).toBe(payload.cur_struct);
+    expect(parsed.decay).toBe(payload.decay);
+    expect(parsed.long_desc).toBe(payload.long_desc);
+    expect(parsed.material).toBe(payload.material);
+    expect(parsed.max_exist).toBe(payload.max_exist);
+    expect(parsed.max_struct).toBe(payload.max_struct);
+    expect(parsed.name).toBe(payload.name);
+    expect(parsed.price).toBe(payload.price);
+    expect(parsed.short_desc).toBe(payload.short_desc);
+    expect(parsed.spec_proc).toBe(payload.spec_proc);
+    expect(parsed.type).toBe(payload.type);
+    expect(parsed.val0).toBe(payload.val0);
+    expect(parsed.val1).toBe(payload.val1);
+    expect(parsed.val2).toBe(payload.val2);
+    expect(parsed.val3).toBe(payload.val3);
+    expect(parsed.vnum).toBe(payload.vnum);
+    expect(parsed.volume).toBe(payload.volume);
+    expect(parsed.wear_flag).toBe(payload.wear_flag);
+    expect(parsed.weight).toBe(payload.weight);
+
+    expect(parsed.affects).toHaveLength(2);
+    const affectTypes = parsed.affects
+      .map((a) => a.type)
+      .toSorted((a, b) => a - b);
+    expect(affectTypes).toEqual([1, 18]);
+    const affect18 = parsed.affects.find((a) => a.type === 18);
+    expect(affect18?.mod1).toBe(5);
+    expect(affect18?.mod2).toBe(0);
+    const affect1 = parsed.affects.find((a) => a.type === 1);
+    expect(affect1?.mod1).toBe(-2);
+    expect(affect1?.mod2).toBe(0);
+
+    expect(parsed.extras).toHaveLength(1);
+    expect(parsed.extras[0]?.name).toBe("rune");
+    expect(parsed.extras[0]?.description).toBe("A glowing rune.");
+  });
+});
+
+// -- Object creation defaults --
+
+describe("object creation defaults", () => {
+  test("newly created object has zero/empty defaults", async () => {
+    await authRequest(app, "/api/objects", cookie, {
+      body: JSON.stringify({ vnum: 181 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const res = await authRequest(app, "/api/objects/181", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    const parsed = objSchema.parse(body);
+
+    expect(parsed.name).toBe("");
+    expect(parsed.short_desc).toBe("");
+    expect(parsed.type).toBe(0);
+    expect(parsed.price).toBe(0);
+    expect(parsed.weight).toBe(0);
+    expect(parsed.affects).toEqual([]);
+    expect(parsed.extras).toEqual([]);
+  });
 });
 
 // -- Search pagination --
@@ -702,5 +909,36 @@ describe("multiple affects", () => {
     // Verify all three types are present (DB may return in any order)
     const types = parsed.affects.map((a) => a.type).toSorted((a, b) => a - b);
     expect(types).toEqual([17, 18, 19]);
+  });
+});
+
+// -- Empty state --
+
+describe("empty state for builder with no objects", () => {
+  let lowCookie: string;
+
+  beforeAll(async () => {
+    lowCookie = await getAuthCookie(app, "lowonlybuilder");
+  });
+
+  test("listing objects returns empty array when none exist", async () => {
+    const res = await authRequest(app, "/api/objects", lowCookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual([]);
+  });
+
+  test("listing objects returns empty array after create-then-delete", async () => {
+    await authRequest(app, "/api/objects", lowCookie, {
+      body: JSON.stringify({ vnum: 500 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(app, "/api/objects/500", lowCookie, { method: "DELETE" });
+
+    const res = await authRequest(app, "/api/objects", lowCookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual([]);
   });
 });

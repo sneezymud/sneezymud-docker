@@ -6,31 +6,45 @@ import { mobSchema } from "@/shared/schemas/mob.ts";
 import { app } from "../app.ts";
 import { immortalDb } from "../db.ts";
 import { mob } from "../schema/immortal.ts";
-import {
-  authRequest,
-  getAuthCookie,
-  getLowOnlyAuthCookie,
-} from "../test-helpers.ts";
+import { authRequest, getAuthCookie } from "../test-helpers.ts";
 
 let cookie: string;
 
 beforeAll(async () => {
-  cookie = await getAuthCookie(app);
+  cookie = await getAuthCookie(app, "testbuilder");
 });
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM mob_extra WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 300)`,
+    sql`DELETE FROM mob_extra WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 300)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mob_imm WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 300)`,
+    sql`DELETE FROM mob_imm WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 300)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mobresponses WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 300)`,
+    sql`DELETE FROM mobresponses WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 300)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM mob WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 300)`,
+    sql`DELETE FROM mob WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 300)`,
   );
+});
+
+// -- Auth enforcement --
+
+describe("auth enforcement", () => {
+  test("unauthenticated request returns 401", async () => {
+    const res = await app.request("/api/mobs", {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  test("request without X-Requested-With returns 403", async () => {
+    const res = await app.request("/api/mobs", {
+      headers: { Cookie: cookie },
+    });
+    expect(res.status).toBe(403);
+  });
 });
 
 const validMobUpdate = {
@@ -79,6 +93,29 @@ const validMobUpdate = {
   weight: 0,
   wis: 0,
 };
+
+// -- Invalid vnum parameters --
+
+describe("invalid vnum parameters", () => {
+  test("GET /api/mobs/abc returns 400", async () => {
+    const res = await authRequest(app, "/api/mobs/abc", cookie);
+    expect(res.status).toBe(400);
+  });
+
+  test("GET /api/mobs/-1 returns 400", async () => {
+    const res = await authRequest(app, "/api/mobs/-1", cookie);
+    expect(res.status).toBe(400);
+  });
+
+  test("PUT /api/mobs/abc returns 400", async () => {
+    const res = await authRequest(app, "/api/mobs/abc", cookie, {
+      body: JSON.stringify(validMobUpdate),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(res.status).toBe(400);
+  });
+});
 
 // -- Create --
 
@@ -180,21 +217,26 @@ describe("mob updates", () => {
     });
 
     expect(putRes.status).toBe(200);
-    const result: unknown = await putRes.json();
-    expect(result).toEqual(
-      expect.objectContaining({
-        name: "guard",
-        short_desc: "a burly guard",
-      }),
-    );
-    expect(result).toHaveProperty(
-      "extras",
-      expect.arrayContaining([expect.objectContaining({ keyword: "bamfin" })]),
-    );
-    expect(result).toHaveProperty(
-      "immunities",
-      expect.arrayContaining([expect.objectContaining({ amt: 100, type: 1 })]),
-    );
+    const getRes = await authRequest(app, "/api/mobs/120", cookie);
+    const body: unknown = await getRes.json();
+    const parsed = mobSchema.parse(body);
+    expect(parsed.name).toBe("guard");
+    expect(parsed.short_desc).toBe("a burly guard");
+    expect(parsed.extras).toHaveLength(1);
+    expect(parsed.extras[0]?.keyword).toBe("bamfin");
+    expect(parsed.immunities).toHaveLength(1);
+    expect(parsed.immunities[0]?.amt).toBe(100);
+    expect(parsed.immunities[0]?.type).toBe(1);
+  });
+
+  test("updating a nonexistent mob within blocks returns 404", async () => {
+    const res = await authRequest(app, "/api/mobs/198", cookie, {
+      body: JSON.stringify({ ...validMobUpdate, vnum: 198 }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    expect(res.status).toBe(404);
   });
 
   test("invalid request body gets rejected", async () => {
@@ -332,6 +374,15 @@ describe("bulk mob deletion", () => {
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     expect(body).toEqual({ deleted: 0, ok: true });
+  });
+
+  test("bulk delete with owner parameter returns 400", async () => {
+    const res = await authRequest(app, "/api/mobs/bulk?owner=99999", cookie, {
+      body: JSON.stringify({ vnums: [120] }),
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    });
+    expect(res.status).toBe(400);
   });
 });
 
@@ -604,7 +655,7 @@ describe("update preserves unchanged fields", () => {
 // -- Idempotency --
 
 describe("save idempotency", () => {
-  test("saving the same payload twice produces correct data", async () => {
+  test("saving the same payload twice produces identical data", async () => {
     await authRequest(app, "/api/mobs", cookie, {
       body: JSON.stringify({ vnum: 181 }),
       headers: { "Content-Type": "application/json" },
@@ -621,33 +672,30 @@ describe("save idempotency", () => {
       vnum: 181,
     };
 
-    // Save twice
+    // First save
     await authRequest(app, "/api/mobs/181", cookie, {
       body: JSON.stringify(payload),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
-    const secondPut = await authRequest(app, "/api/mobs/181", cookie, {
+    const getA = await authRequest(app, "/api/mobs/181", cookie);
+    expect(getA.status).toBe(200);
+    const snapshotA: unknown = await getA.json();
+    const parsedA = mobSchema.parse(snapshotA);
+
+    // Second save (identical payload)
+    await authRequest(app, "/api/mobs/181", cookie, {
       body: JSON.stringify(payload),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
-    expect(secondPut.status).toBe(200);
+    const getB = await authRequest(app, "/api/mobs/181", cookie);
+    expect(getB.status).toBe(200);
+    const snapshotB: unknown = await getB.json();
+    const parsedB = mobSchema.parse(snapshotB);
 
-    const res = await authRequest(app, "/api/mobs/181", cookie);
-    const body: unknown = await res.json();
-    expect(body).toEqual(
-      expect.objectContaining({ name: "scarred warrior", vnum: 181 }),
-    );
-    expect(body).toHaveProperty("extras", [
-      expect.objectContaining({
-        description: "A scarred face.",
-        keyword: "bamfin",
-      }),
-    ]);
-    expect(body).toHaveProperty("immunities", [
-      expect.objectContaining({ amt: 75, type: 3 }),
-    ]);
+    // Full deep equality - no duplicate child rows, no changed values
+    expect(parsedB).toEqual(parsedA);
   });
 });
 
@@ -667,6 +715,188 @@ describe("response schema validation", () => {
     const parsed = mobSchema.parse(body);
     expect(parsed.vnum).toBe(182);
   });
+
+  test("populated mob with child rows and non-default stats conforms to mobSchema", async () => {
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum: 183 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    await authRequest(app, "/api/mobs/183", cookie, {
+      body: JSON.stringify({
+        ...validMobUpdate,
+        ac: 50,
+        extras: [
+          { description: "A glowing aura.", keyword: "bamfin", vnum: 183 },
+        ],
+        immunities: [{ amt: 80, type: 2, vnum: 183 }],
+        level: 30,
+        name: "populated mob",
+        race: 5,
+        str: 20,
+        vnum: 183,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    const res = await authRequest(app, "/api/mobs/183", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    const parsed = mobSchema.parse(body);
+    expect(parsed.extras).toHaveLength(1);
+    expect(parsed.immunities).toHaveLength(1);
+    expect(parsed.level).toBe(30);
+    expect(parsed.str).toBe(20);
+  });
+});
+
+// -- Full-field roundtrip --
+
+describe("full-field roundtrip", () => {
+  test("every field survives a PUT/GET cycle", async () => {
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum: 184 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const fullPayload = {
+      ac: 50,
+      actions: 7,
+      adjacent_sound: "You hear clanking.",
+      affects: 3,
+      agi: 5,
+      attacks: 3,
+      bra: -10,
+      can_be_seen: 100,
+      cha: 15,
+      class: 4,
+      con: -5,
+      damage_level: 80,
+      damage_precision: 50,
+      def_position: 7,
+      description: "A fearsome warrior.",
+      dex: 20,
+      extras: [{ description: "Scarred face.", keyword: "bamfin", vnum: 184 }],
+      fact_perc: 75,
+      faction: 2,
+      foc: 10,
+      gold: 5,
+      height: 200,
+      hpbonus: 50,
+      immunities: [{ amt: 50, type: 3, vnum: 184 }],
+      intel: -15,
+      kar: 8,
+      level: 50,
+      local_sound: "Battle cries.",
+      long_desc: "A warrior stands here.",
+      max_exist: 5,
+      name: "warrior veteran",
+      per: 12,
+      race: 10,
+      sex: 1,
+      short_desc: "a warrior veteran",
+      skin: 50,
+      spe: -3,
+      spec_proc: 0,
+      str: 25,
+      tohit: 30,
+      vision: 50,
+      vnum: 184,
+      weight: 2000,
+      wis: -20,
+    };
+
+    const putRes = await authRequest(app, "/api/mobs/184", cookie, {
+      body: JSON.stringify(fullPayload),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(putRes.status).toBe(200);
+
+    const getRes = await authRequest(app, "/api/mobs/184", cookie);
+    expect(getRes.status).toBe(200);
+    const body: unknown = await getRes.json();
+    const parsed = mobSchema.parse(body);
+
+    expect(parsed.ac).toBe(fullPayload.ac);
+    expect(parsed.actions).toBe(fullPayload.actions);
+    expect(parsed.adjacent_sound).toBe(fullPayload.adjacent_sound);
+    expect(parsed.affects).toBe(fullPayload.affects);
+    expect(parsed.agi).toBe(fullPayload.agi);
+    expect(parsed.attacks).toBe(fullPayload.attacks);
+    expect(parsed.bra).toBe(fullPayload.bra);
+    expect(parsed.can_be_seen).toBe(fullPayload.can_be_seen);
+    expect(parsed.cha).toBe(fullPayload.cha);
+    expect(parsed.class).toBe(fullPayload.class);
+    expect(parsed.con).toBe(fullPayload.con);
+    expect(parsed.damage_level).toBe(fullPayload.damage_level);
+    expect(parsed.damage_precision).toBe(fullPayload.damage_precision);
+    expect(parsed.def_position).toBe(fullPayload.def_position);
+    expect(parsed.description).toBe(fullPayload.description);
+    expect(parsed.dex).toBe(fullPayload.dex);
+    expect(parsed.fact_perc).toBe(fullPayload.fact_perc);
+    expect(parsed.faction).toBe(fullPayload.faction);
+    expect(parsed.foc).toBe(fullPayload.foc);
+    expect(parsed.gold).toBe(fullPayload.gold);
+    expect(parsed.height).toBe(fullPayload.height);
+    expect(parsed.hpbonus).toBe(fullPayload.hpbonus);
+    expect(parsed.intel).toBe(fullPayload.intel);
+    expect(parsed.kar).toBe(fullPayload.kar);
+    expect(parsed.level).toBe(fullPayload.level);
+    expect(parsed.local_sound).toBe(fullPayload.local_sound);
+    expect(parsed.long_desc).toBe(fullPayload.long_desc);
+    expect(parsed.max_exist).toBe(fullPayload.max_exist);
+    expect(parsed.name).toBe(fullPayload.name);
+    expect(parsed.per).toBe(fullPayload.per);
+    expect(parsed.race).toBe(fullPayload.race);
+    expect(parsed.sex).toBe(fullPayload.sex);
+    expect(parsed.short_desc).toBe(fullPayload.short_desc);
+    expect(parsed.skin).toBe(fullPayload.skin);
+    expect(parsed.spe).toBe(fullPayload.spe);
+    expect(parsed.spec_proc).toBe(fullPayload.spec_proc);
+    expect(parsed.str).toBe(fullPayload.str);
+    expect(parsed.tohit).toBe(fullPayload.tohit);
+    expect(parsed.vision).toBe(fullPayload.vision);
+    expect(parsed.vnum).toBe(fullPayload.vnum);
+    expect(parsed.weight).toBe(fullPayload.weight);
+    expect(parsed.wis).toBe(fullPayload.wis);
+
+    expect(parsed.extras).toHaveLength(1);
+    expect(parsed.extras[0]?.description).toBe("Scarred face.");
+    expect(parsed.extras[0]?.keyword).toBe("bamfin");
+    expect(parsed.extras[0]?.vnum).toBe(184);
+
+    expect(parsed.immunities).toHaveLength(1);
+    expect(parsed.immunities[0]?.amt).toBe(50);
+    expect(parsed.immunities[0]?.type).toBe(3);
+    expect(parsed.immunities[0]?.vnum).toBe(184);
+  });
+});
+
+// -- Creation defaults --
+
+describe("mob creation defaults", () => {
+  test("newly created mob has expected default values", async () => {
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum: 185 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const res = await authRequest(app, "/api/mobs/185", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    const parsed = mobSchema.parse(body);
+
+    expect(parsed.name).toBe("");
+    expect(parsed.short_desc).toBe("");
+    expect(parsed.level).toBe(1);
+    expect(parsed.extras).toEqual([]);
+    expect(parsed.immunities).toEqual([]);
+  });
 });
 
 // -- Empty state --
@@ -675,7 +905,7 @@ describe("empty state for builder with no mobs", () => {
   let lowCookie: string;
 
   beforeAll(async () => {
-    lowCookie = await getLowOnlyAuthCookie(app);
+    lowCookie = await getAuthCookie(app, "lowonlybuilder");
   });
 
   test("listing mobs returns empty array when none exist", async () => {

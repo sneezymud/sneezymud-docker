@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import { sessionUserSchema } from "@/shared/schemas/auth.ts";
+
 import { app } from "../app.ts";
 import {
   extractCookie,
@@ -37,6 +39,12 @@ describe("POST /api/auth/login", () => {
         username: testUser.username,
       }),
     );
+    // Parse through sessionUserSchema for structural conformance
+    const parsed = sessionUserSchema.parse(body);
+    expect(parsed.powers.toSorted((a, b) => a - b)).toEqual(
+      testUser.powers.toSorted((a, b) => a - b),
+    );
+    expect(parsed.playerId).toBe(testUser.playerId);
   });
 
   test("wrong password returns 401 with generic message", async () => {
@@ -101,6 +109,18 @@ describe("POST /api/auth/login", () => {
       expect.stringContaining("does not have builder access"),
     );
   });
+
+  test("returns 403 without X-Requested-With header", async () => {
+    const res = await app.request("/api/auth/login", {
+      body: JSON.stringify({
+        password: "testpass",
+        username: "testbuilder",
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    expect(res.status).toBe(403);
+  });
 });
 
 describe("GET /api/auth/me", () => {
@@ -161,6 +181,8 @@ describe("POST /api/auth/logout", () => {
       method: "POST",
     });
     expect(logoutRes.status).toBe(200);
+    const logoutBody: unknown = await logoutRes.json();
+    expect(logoutBody).toEqual({ ok: true });
 
     // The logout response should have a Set-Cookie that clears the session
     const clearCookie = extractCookie(logoutRes);
@@ -169,6 +191,27 @@ describe("POST /api/auth/logout", () => {
       headers: { Cookie: clearCookie, "X-Requested-With": "XMLHttpRequest" },
     });
     expect(meRes.status).toBe(401);
+  });
+
+  test("returns 403 without X-Requested-With header", async () => {
+    const loginRes = await loginRequest({
+      password: "testpass",
+      username: "testbuilder",
+    });
+    const cookie = extractCookie(loginRes);
+    const res = await app.request("/api/auth/logout", {
+      headers: { Cookie: cookie },
+      method: "POST",
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test("logout without session returns 401", async () => {
+    const res = await app.request("/api/auth/logout", {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      method: "POST",
+    });
+    expect(res.status).toBe(401);
   });
 });
 

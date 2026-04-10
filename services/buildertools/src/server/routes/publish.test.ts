@@ -1,6 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { eq, sql } from "drizzle-orm";
 
+import { mobSchema } from "@/shared/schemas/mob.ts";
+import { objSchema } from "@/shared/schemas/obj.ts";
+import { roomSchema } from "@/shared/schemas/room.ts";
+
 import { app } from "../app.ts";
 import { immortalDb, sneezyDb } from "../db.ts";
 import {
@@ -17,12 +21,6 @@ import {
   authRequest,
   expandedUser,
   getAuthCookie,
-  getExpandedAuthCookie,
-  getLowOnlyAuthCookie,
-  getNoBlocksAuthCookie,
-  getNoLimitsOnlyAuthCookie,
-  getOtherAuthCookie,
-  getViewOnlyAuthCookie,
   lowOnlyUser,
   otherUser,
   testUser,
@@ -41,11 +39,11 @@ let viewOnlyCookie: string;
 beforeAll(async () => {
   [testCookie, expandedCookie, lowOnlyCookie, noBlocksCookie, viewOnlyCookie] =
     await Promise.all([
-      getAuthCookie(app),
-      getExpandedAuthCookie(app),
-      getLowOnlyAuthCookie(app),
-      getNoBlocksAuthCookie(app),
-      getViewOnlyAuthCookie(app),
+      getAuthCookie(app, "testbuilder"),
+      getAuthCookie(app, "expandedbuilder"),
+      getAuthCookie(app, "lowonlybuilder"),
+      getAuthCookie(app, "noblocks"),
+      getAuthCookie(app, "viewonly"),
     ]);
 });
 
@@ -399,6 +397,36 @@ describe("publish permission model", () => {
   });
 });
 
+describe("publish auth enforcement", () => {
+  test("unauthenticated POST /api/publish/rooms/:vnum returns 401", async () => {
+    const res = await app.request("/api/publish/rooms/100", {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      method: "POST",
+    });
+    expect(res.status).toBe(401);
+  });
+
+  test("unauthenticated POST /api/publish/bulk returns 401", async () => {
+    const res = await app.request("/api/publish/bulk", {
+      body: JSON.stringify({ entities: [] }),
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      method: "POST",
+    });
+    expect(res.status).toBe(401);
+  });
+
+  test("unauthenticated POST /api/publish/mob-responses/:vnum returns 401", async () => {
+    const res = await app.request("/api/publish/mob-responses/100", {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      method: "POST",
+    });
+    expect(res.status).toBe(401);
+  });
+});
+
 // ===========================================================================
 // Step 2: Diff endpoints
 // ===========================================================================
@@ -437,6 +465,15 @@ describe("diff endpoints", () => {
       "immortal",
       expect.objectContaining({ name: "Diff Test Room" }),
     );
+    // Parse the immortal sub-object through roomSchema for structural conformance
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "immortal" in body &&
+      body.immortal !== null
+    ) {
+      roomSchema.parse(body.immortal);
+    }
   });
 
   test("returns both versions after publishing", async () => {
@@ -495,6 +532,14 @@ describe("diff endpoints", () => {
       expect.objectContaining({ name: "diff mob" }),
     );
     expect(body).toHaveProperty("production", null);
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "immortal" in body &&
+      body.immortal !== null
+    ) {
+      mobSchema.parse(body.immortal);
+    }
   });
 
   test("object diff returns correct data", async () => {
@@ -511,6 +556,14 @@ describe("diff endpoints", () => {
       expect.objectContaining({ name: "diff object" }),
     );
     expect(body).toHaveProperty("production", null);
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "immortal" in body &&
+      body.immortal !== null
+    ) {
+      objSchema.parse(body.immortal);
+    }
   });
 });
 
@@ -1067,6 +1120,13 @@ describe("dashboard", () => {
         }),
       ]),
     );
+
+    // Verify dashboard entries include resolved owner and name fields
+    if (!Array.isArray(body)) throw new Error("expected array");
+    for (const entry of body) {
+      expect(entry).toHaveProperty("owner");
+      expect(entry).toHaveProperty("name");
+    }
   });
 
   test("expandedUser can view all owners' entities", async () => {
@@ -1317,7 +1377,7 @@ describe("cross-owner publish", () => {
       ...validRoomUpdate,
       name: "for no-limits",
     });
-    const noLimitsCookie = await getNoLimitsOnlyAuthCookie(app);
+    const noLimitsCookie = await getAuthCookie(app, "nolimitsonly");
     const pubRes = await authRequest(
       app,
       `/api/publish/rooms/${vnum}?owner=${testUser.playerId}`,
@@ -2049,7 +2109,7 @@ describe("deep round-trip with children", () => {
 
 test("TEST-OWNER-2: dashboard multi-owner same-vnum keyed by (playerId, vnum)", async () => {
   const vnum = 150;
-  const otherCookie = await getOtherAuthCookie(app);
+  const otherCookie = await getAuthCookie(app, "otherbuilder");
   await createAndUpdate("rooms", vnum, testCookie, {
     ...validRoomUpdate,
     name: "canonical",

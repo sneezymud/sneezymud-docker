@@ -6,23 +6,16 @@ import { roomSchema } from "@/shared/schemas/room.ts";
 import { app } from "../app.ts";
 import { immortalDb, sneezyDb } from "../db.ts";
 import { room } from "../schema/immortal.ts";
-import {
-  authRequest,
-  getAuthCookie,
-  getExpandedAuthCookie,
-  getLowOnlyAuthCookie,
-  getOtherAuthCookie,
-  testUser,
-} from "../test-helpers.ts";
+import { authRequest, getAuthCookie, testUser } from "../test-helpers.ts";
 
 let cookie: string;
 
 beforeAll(async () => {
-  cookie = await getAuthCookie(app);
+  cookie = await getAuthCookie(app, "testbuilder");
 });
 
 afterAll(async () => {
-  const testVnums = sql`(100, 101, 102, 103, 104, 105, 106, 107, 110, 111, 140, 150, 151, 152, 155, 162, 180, 181)`;
+  const testVnums = sql`(100, 101, 102, 103, 104, 105, 106, 107, 110, 111, 130, 140, 150, 151, 152, 155, 160, 162, 180, 181, 183)`;
   await immortalDb.execute(
     sql`DELETE FROM roomextra WHERE vnum IN ${testVnums}`,
   );
@@ -223,28 +216,30 @@ describe("room updates", () => {
     });
 
     expect(putRes.status).toBe(200);
-    const result: unknown = await putRes.json();
-    expect(result).toEqual(
-      expect.objectContaining({
-        description: "A test room with updated description",
-        name: "Updated Test Room",
-      }),
-    );
-    expect(result).toHaveProperty(
-      "exits",
-      expect.arrayContaining([
-        expect.objectContaining({
-          description: "A door leads north.",
-          destination: 101,
-        }),
-      ]),
-    );
-    expect(result).toHaveProperty(
-      "extras",
-      expect.arrayContaining([
-        expect.objectContaining({ name: "wall writing" }),
-      ]),
-    );
+    const getRes = await authRequest(app, "/api/rooms/100", cookie);
+    const body: unknown = await getRes.json();
+    const parsed = roomSchema.parse(body);
+    expect(parsed.name).toBe("Updated Test Room");
+    expect(parsed.description).toBe("A test room with updated description");
+    expect(parsed.sector).toBe(60);
+    expect(parsed.room_flag).toBe(1 << 17);
+    expect(parsed.exits).toHaveLength(1);
+    expect(parsed.exits[0]?.description).toBe("A door leads north.");
+    expect(parsed.exits[0]?.destination).toBe(101);
+    expect(parsed.exits[0]?.direction).toBe(0);
+    expect(parsed.exits[0]?.type).toBe(1);
+    expect(parsed.extras).toHaveLength(1);
+    expect(parsed.extras[0]?.name).toBe("wall writing");
+  });
+
+  test("updating a nonexistent room within blocks returns 404", async () => {
+    const res = await authRequest(app, "/api/rooms/198", cookie, {
+      body: JSON.stringify({ ...validRoomUpdate, vnum: 198 }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    expect(res.status).toBe(404);
   });
 
   test("invalid request body gets rejected", async () => {
@@ -386,6 +381,21 @@ describe("room search", () => {
     const body: unknown = await res.json();
     expect(body).toEqual(
       expect.arrayContaining([expect.objectContaining({ vnum: 101 })]),
+    );
+  });
+
+  test("search results exclude non-matching rooms", async () => {
+    const res = await authRequest(
+      app,
+      "/api/rooms/search?q=Searchable+Test",
+      cookie,
+    );
+
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    // Rooms that don't match the query should be absent
+    expect(body).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ vnum: 100 })]),
     );
   });
 
@@ -572,6 +582,15 @@ describe("bulk room deletion", () => {
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     expect(body).toEqual({ deleted: 0, ok: true });
+  });
+
+  test("bulk delete with owner parameter returns 400", async () => {
+    const res = await authRequest(app, "/api/rooms/bulk?owner=99999", cookie, {
+      body: JSON.stringify({ vnums: [100] }),
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    });
+    expect(res.status).toBe(400);
   });
 });
 
@@ -838,6 +857,185 @@ describe("response schema validation", () => {
     const parsed = roomSchema.parse(body);
     expect(parsed.vnum).toBe(104);
   });
+
+  test("populated room with exits and extras conforms to roomSchema", async () => {
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: 130 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    await authRequest(app, "/api/rooms/130", cookie, {
+      body: JSON.stringify({
+        ...validRoomUpdate,
+        description: "A populated room.",
+        exits: [
+          {
+            block: 0,
+            condition_flag: 0,
+            description: "",
+            destination: 100,
+            direction: 0,
+            key_num: -1,
+            lock_difficulty: 0,
+            name: "",
+            type: 0,
+            vnum: 130,
+            weight: 0,
+          },
+        ],
+        extras: [{ description: "A scratched wall.", name: "wall", vnum: 130 }],
+        name: "Populated Test Room",
+        sector: 3,
+        vnum: 130,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    const res = await authRequest(app, "/api/rooms/130", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    const parsed = roomSchema.parse(body);
+    expect(parsed.exits).toHaveLength(1);
+    expect(parsed.extras).toHaveLength(1);
+    expect(parsed.sector).toBe(3);
+  });
+});
+
+// -- Full-field roundtrip --
+
+describe("full-field roundtrip", () => {
+  test("every field survives a PUT/GET cycle", async () => {
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: 160 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const fullPayload = {
+      capacity: 50,
+      description: "A vast chamber with echoing walls.",
+      exits: [
+        {
+          block: 1,
+          condition_flag: 42,
+          description: "A heavy iron door.",
+          destination: 100,
+          direction: 0,
+          key_num: 500,
+          lock_difficulty: 75,
+          name: "iron door",
+          type: 1,
+          vnum: 160,
+          weight: 30,
+        },
+        {
+          block: 1,
+          condition_flag: 0,
+          description: "A narrow passage.",
+          destination: 101,
+          direction: 2,
+          key_num: -1,
+          lock_difficulty: 0,
+          name: "",
+          type: 0,
+          vnum: 160,
+          weight: 0,
+        },
+      ],
+      extras: [
+        {
+          description: "Ancient runes carved into the stone.",
+          name: "runes stone",
+          vnum: 160,
+        },
+        {
+          description: "A faded tapestry hangs on the wall.",
+          name: "tapestry wall",
+          vnum: 160,
+        },
+      ],
+      height: 100,
+      name: "Grand Chamber",
+      river_dir: 3,
+      river_speed: 50,
+      room_flag: (1 << 3) | (1 << 17),
+      sector: 5,
+      spec: 33,
+      telelook: 1,
+      teletarg: 100,
+      teletime: 500,
+      vnum: 160,
+      x: 42,
+      y: -15,
+      z: 7,
+      zone: 1,
+    };
+
+    const putRes = await authRequest(app, "/api/rooms/160", cookie, {
+      body: JSON.stringify(fullPayload),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(putRes.status).toBe(200);
+
+    const getRes = await authRequest(app, "/api/rooms/160", cookie);
+    expect(getRes.status).toBe(200);
+    const body: unknown = await getRes.json();
+    const parsed = roomSchema.parse(body);
+
+    // Parent fields
+    expect(parsed.capacity).toBe(fullPayload.capacity);
+    expect(parsed.description).toBe(fullPayload.description);
+    expect(parsed.height).toBe(fullPayload.height);
+    expect(parsed.name).toBe(fullPayload.name);
+    expect(parsed.river_dir).toBe(fullPayload.river_dir);
+    expect(parsed.river_speed).toBe(fullPayload.river_speed);
+    expect(parsed.room_flag).toBe(fullPayload.room_flag);
+    expect(parsed.sector).toBe(fullPayload.sector);
+    expect(parsed.spec).toBe(fullPayload.spec);
+    expect(parsed.telelook).toBe(fullPayload.telelook);
+    expect(parsed.teletarg).toBe(fullPayload.teletarg);
+    expect(parsed.teletime).toBe(fullPayload.teletime);
+    expect(parsed.vnum).toBe(fullPayload.vnum);
+    expect(parsed.x).toBe(fullPayload.x);
+    expect(parsed.y).toBe(fullPayload.y);
+    expect(parsed.z).toBe(fullPayload.z);
+    expect(parsed.zone).toBe(fullPayload.zone);
+
+    // Exits
+    expect(parsed.exits).toHaveLength(2);
+    const northExit = parsed.exits.find((e) => e.direction === 0);
+    expect(northExit?.block).toBe(1);
+    expect(northExit?.condition_flag).toBe(42);
+    expect(northExit?.description).toBe("A heavy iron door.");
+    expect(northExit?.destination).toBe(100);
+    expect(northExit?.key_num).toBe(500);
+    expect(northExit?.lock_difficulty).toBe(75);
+    expect(northExit?.name).toBe("iron door");
+    expect(northExit?.type).toBe(1);
+    expect(northExit?.weight).toBe(30);
+
+    const southExit = parsed.exits.find((e) => e.direction === 2);
+    expect(southExit?.condition_flag).toBe(0);
+    expect(southExit?.description).toBe("A narrow passage.");
+    expect(southExit?.destination).toBe(101);
+    expect(southExit?.key_num).toBe(-1);
+    expect(southExit?.lock_difficulty).toBe(0);
+    expect(southExit?.name).toBe("");
+    expect(southExit?.type).toBe(0);
+    expect(southExit?.weight).toBe(0);
+
+    // Extras
+    expect(parsed.extras).toHaveLength(2);
+    const runeExtra = parsed.extras.find((e) => e.name === "runes stone");
+    expect(runeExtra?.description).toBe("Ancient runes carved into the stone.");
+    const tapestryExtra = parsed.extras.find((e) => e.name === "tapestry wall");
+    expect(tapestryExtra?.description).toBe(
+      "A faded tapestry hangs on the wall.",
+    );
+  });
 });
 
 // -- Coordinate derivation --
@@ -1000,7 +1198,7 @@ describe("Block B room creation", () => {
   let lowOnlyCookie: string;
 
   beforeAll(async () => {
-    lowOnlyCookie = await getLowOnlyAuthCookie(app);
+    lowOnlyCookie = await getAuthCookie(app, "lowonlybuilder");
   });
 
   afterAll(async () => {
@@ -1066,8 +1264,8 @@ describe("owner scoping", () => {
   let otherCookie: string;
 
   beforeAll(async () => {
-    expandedCookie = await getExpandedAuthCookie(app);
-    otherCookie = await getOtherAuthCookie(app);
+    expandedCookie = await getAuthCookie(app, "expandedbuilder");
+    otherCookie = await getAuthCookie(app, "otherbuilder");
   });
 
   test("TEST-OWNER-1: GET /api/rooms?owner=mine excludes other owners' entities", async () => {
@@ -1105,6 +1303,45 @@ describe("owner scoping", () => {
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     expect(body).toHaveProperty("name", "test user content");
+  });
+
+  test("TEST-OWNER-4a: senior cross-owner PUT persists changes", async () => {
+    // expandedUser (senior) edits testUser's room 180 - already created in TEST-OWNER-3
+    const getRes = await authRequest(
+      app,
+      `/api/rooms/180?owner=${testUser.playerId}`,
+      expandedCookie,
+    );
+    expect(getRes.status).toBe(200);
+    const original: unknown = await getRes.json();
+    if (typeof original !== "object" || original === null) {
+      throw new Error("expected room object");
+    }
+
+    const putRes = await authRequest(
+      app,
+      `/api/rooms/180?owner=${testUser.playerId}`,
+      expandedCookie,
+      {
+        body: JSON.stringify({
+          ...original,
+          name: "senior edited content",
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+    );
+    expect(putRes.status).toBe(200);
+
+    // Verify via GET that the change was actually saved
+    const verifyRes = await authRequest(
+      app,
+      `/api/rooms/180?owner=${testUser.playerId}`,
+      expandedCookie,
+    );
+    expect(verifyRes.status).toBe(200);
+    const verifyBody: unknown = await verifyRes.json();
+    expect(verifyBody).toHaveProperty("name", "senior edited content");
   });
 
   test("TEST-OWNER-5: cross-owner DELETE removes target's row", async () => {
@@ -1205,5 +1442,95 @@ describe("owner scoping", () => {
       { method: "DELETE" },
     );
     expect(res.status).toBe(403);
+  });
+});
+
+// -- Exit field roundtrip --
+
+describe("exit field roundtrip", () => {
+  test("all exit fields survive save and reload", async () => {
+    const vnum = 183;
+
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const putRes = await authRequest(app, `/api/rooms/${vnum}`, cookie, {
+      body: JSON.stringify({
+        ...validRoomUpdate,
+        exits: [
+          {
+            // block on exits is ignored by the server - exits inherit the parent room's block
+            block: 1,
+            condition_flag: 42,
+            description: "A heavy iron door.",
+            destination: 181,
+            direction: 0,
+            key_num: 500,
+            lock_difficulty: 75,
+            name: "iron door",
+            type: 1,
+            vnum,
+            weight: 30,
+          },
+        ],
+        vnum,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(putRes.status).toBe(200);
+
+    const getRes = await authRequest(app, `/api/rooms/${vnum}`, cookie);
+    expect(getRes.status).toBe(200);
+    const body: unknown = await getRes.json();
+    const parsed = roomSchema.parse(body);
+
+    expect(parsed.exits).toHaveLength(1);
+    const exit = parsed.exits[0];
+    // block is inherited from the parent room, not independently stored per-exit
+    expect(exit?.block).toBe(1);
+    expect(exit?.condition_flag).toBe(42);
+    expect(exit?.description).toBe("A heavy iron door.");
+    expect(exit?.destination).toBe(181);
+    expect(exit?.direction).toBe(0);
+    expect(exit?.key_num).toBe(500);
+    expect(exit?.lock_difficulty).toBe(75);
+    expect(exit?.name).toBe("iron door");
+    expect(exit?.type).toBe(1);
+    expect(exit?.weight).toBe(30);
+  });
+});
+
+// -- Empty state --
+
+describe("empty state for builder with no rooms", () => {
+  let lowCookie: string;
+
+  beforeAll(async () => {
+    lowCookie = await getAuthCookie(app, "lowonlybuilder");
+  });
+
+  test("listing rooms returns empty array when none exist", async () => {
+    const res = await authRequest(app, "/api/rooms", lowCookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual([]);
+  });
+
+  test("listing rooms returns empty array after create-then-delete", async () => {
+    await authRequest(app, "/api/rooms", lowCookie, {
+      body: JSON.stringify({ vnum: 500 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(app, "/api/rooms/500", lowCookie, { method: "DELETE" });
+
+    const res = await authRequest(app, "/api/rooms", lowCookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual([]);
   });
 });

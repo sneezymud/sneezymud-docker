@@ -3,11 +3,7 @@ import { sql } from "drizzle-orm";
 
 import { app } from "../app.ts";
 import { immortalDb } from "../db.ts";
-import {
-  authRequest,
-  getAuthCookie,
-  getOtherAuthCookie,
-} from "../test-helpers.ts";
+import { authRequest, getAuthCookie } from "../test-helpers.ts";
 
 // Vnums 180-189 reserved for this test file
 const MOB_SHARED = 180;
@@ -23,8 +19,8 @@ let cookieA: string;
 let cookieB: string;
 
 beforeAll(async () => {
-  cookieA = await getAuthCookie(app);
-  cookieB = await getOtherAuthCookie(app);
+  cookieA = await getAuthCookie(app, "testbuilder");
+  cookieB = await getAuthCookie(app, "otherbuilder");
 });
 
 afterAll(async () => {
@@ -186,6 +182,158 @@ describe("mob owner isolation", () => {
 
     const check = await authRequest(app, `/api/mobs/${MOB_B_ONLY}`, cookieB);
     expect(check.status).toBe(200);
+  });
+
+  test("updating own entity does not affect other builder's copy", async () => {
+    // Both builders already have MOB_SHARED (180) from earlier tests.
+    // Set distinct data for each builder.
+    await put(`/api/mobs/${MOB_SHARED}`, cookieA, {
+      ac: 0,
+      actions: 0,
+      adjacent_sound: "",
+      affects: 0,
+      agi: 0,
+      attacks: 1,
+      bra: 0,
+      can_be_seen: 0,
+      cha: 0,
+      class: 0,
+      con: 0,
+      damage_level: 0,
+      damage_precision: 0,
+      def_position: 9,
+      description: "A's mob.",
+      dex: 0,
+      extras: [],
+      fact_perc: 0,
+      faction: 0,
+      foc: 0,
+      gold: 0,
+      height: 0,
+      hpbonus: 0,
+      immunities: [],
+      intel: 0,
+      kar: 0,
+      level: 1,
+      local_sound: "",
+      long_desc: "A stands here.",
+      max_exist: 0,
+      name: "builder A mob",
+      per: 0,
+      race: 0,
+      sex: 0,
+      short_desc: "a builder A mob",
+      skin: 0,
+      spe: 0,
+      spec_proc: 0,
+      str: 0,
+      tohit: 0,
+      vision: 0,
+      vnum: MOB_SHARED,
+      weight: 0,
+      wis: 0,
+    });
+    await put(`/api/mobs/${MOB_SHARED}`, cookieB, {
+      ac: 0,
+      actions: 0,
+      adjacent_sound: "",
+      affects: 0,
+      agi: 0,
+      attacks: 1,
+      bra: 0,
+      can_be_seen: 0,
+      cha: 0,
+      class: 0,
+      con: 0,
+      damage_level: 0,
+      damage_precision: 0,
+      def_position: 9,
+      description: "B's mob.",
+      dex: 0,
+      extras: [],
+      fact_perc: 0,
+      faction: 0,
+      foc: 0,
+      gold: 0,
+      height: 0,
+      hpbonus: 0,
+      immunities: [],
+      intel: 0,
+      kar: 0,
+      level: 1,
+      local_sound: "",
+      long_desc: "B stands here.",
+      max_exist: 0,
+      name: "builder B mob",
+      per: 0,
+      race: 0,
+      sex: 0,
+      short_desc: "a builder B mob",
+      skin: 0,
+      spe: 0,
+      spec_proc: 0,
+      str: 0,
+      tohit: 0,
+      vision: 0,
+      vnum: MOB_SHARED,
+      weight: 0,
+      wis: 0,
+    });
+
+    // Builder A updates their mob
+    await put(`/api/mobs/${MOB_SHARED}`, cookieA, {
+      ac: 0,
+      actions: 0,
+      adjacent_sound: "",
+      affects: 0,
+      agi: 0,
+      attacks: 1,
+      bra: 0,
+      can_be_seen: 0,
+      cha: 0,
+      class: 0,
+      con: 0,
+      damage_level: 0,
+      damage_precision: 0,
+      def_position: 9,
+      description: "A's mob.",
+      dex: 0,
+      extras: [],
+      fact_perc: 0,
+      faction: 0,
+      foc: 0,
+      gold: 0,
+      height: 0,
+      hpbonus: 0,
+      immunities: [],
+      intel: 0,
+      kar: 0,
+      level: 1,
+      local_sound: "",
+      long_desc: "A stands here.",
+      max_exist: 0,
+      name: "builder A mob UPDATED",
+      per: 0,
+      race: 0,
+      sex: 0,
+      short_desc: "a builder A mob updated",
+      skin: 0,
+      spe: 0,
+      spec_proc: 0,
+      str: 0,
+      tohit: 0,
+      vision: 0,
+      vnum: MOB_SHARED,
+      weight: 0,
+      wis: 0,
+    });
+
+    // GET as builder B - B's data should be unchanged
+    const bRes = await authRequest(app, `/api/mobs/${MOB_SHARED}`, cookieB);
+    expect(bRes.status).toBe(200);
+    const bBody: unknown = await bRes.json();
+    expect(bBody).toHaveProperty("name", "builder B mob");
+    expect(bBody).toHaveProperty("short_desc", "a builder B mob");
   });
 
   test("bulk delete only affects own entities", async () => {

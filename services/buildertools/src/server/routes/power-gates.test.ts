@@ -3,23 +3,22 @@ import { sql } from "drizzle-orm";
 
 import { app } from "../app.ts";
 import { immortalDb } from "../db.ts";
-import {
-  authRequest,
-  getAuthCookie,
-  getOtherAuthCookie,
-} from "../test-helpers.ts";
+import { authRequest, getAuthCookie } from "../test-helpers.ts";
 
-// Vnums 190-199 reserved for power gate tests
+// Vnums 190-199 reserved for power gate tests (otherbuilder/testbuilder)
+// Vnums 200-203 reserved for senior bypass tests (expandedbuilder)
 let testCookie: string; // testbuilder - all powers
 let otherCookie: string; // otherbuilder - partial powers (no OEDIT_COST, OEDIT_APPLYS, OEDIT_WEAPONS, OEDIT_NOPROTOS, OEDIT_IMP_POWER, MEDIT_IMP_POWER, REDIT_ENABLED)
+let seniorCookie: string; // expandedbuilder - senior (isSenior=true), lacks OEDIT_COST, OEDIT_WEAPONS, OEDIT_IMP_POWER, MEDIT_IMP_POWER, REDIT_ENABLED
 
 beforeAll(async () => {
-  testCookie = await getAuthCookie(app);
-  otherCookie = await getOtherAuthCookie(app);
+  testCookie = await getAuthCookie(app, "testbuilder");
+  otherCookie = await getAuthCookie(app, "otherbuilder");
+  seniorCookie = await getAuthCookie(app, "expandedbuilder");
 });
 
 afterAll(async () => {
-  const vnums = sql`(190, 191, 192, 193, 194, 195, 196, 197)`;
+  const vnums = sql`(190, 191, 192, 193, 194, 195, 196, 197, 200, 201, 202, 203)`;
   await immortalDb.execute(sql`DELETE FROM objaffect WHERE vnum IN ${vnums}`);
   await immortalDb.execute(sql`DELETE FROM objextra WHERE vnum IN ${vnums}`);
   await immortalDb.execute(sql`DELETE FROM obj WHERE vnum IN ${vnums}`);
@@ -172,7 +171,7 @@ describe("object power gates", () => {
     }
   });
 
-  test("without OEDIT_COST: price change is silently reverted", async () => {
+  test("without OEDIT_COST: changing price is rejected", async () => {
     // otherbuilder's object at 190 has price=0 (default from creation)
     // otherbuilder lacks OEDIT_COST, so the request is rejected with 403
     const putRes = await put("/api/objects/190", otherCookie, {
@@ -189,7 +188,7 @@ describe("object power gates", () => {
     );
   });
 
-  test("without OEDIT_APPLYS: affects change is silently reverted", async () => {
+  test("without OEDIT_APPLYS: changing affects is rejected", async () => {
     // Object 191 has empty affects by default - otherbuilder tries to add one
     const putRes = await put("/api/objects/191", otherCookie, {
       ...baseObjPayload,
@@ -205,7 +204,7 @@ describe("object power gates", () => {
     );
   });
 
-  test("without OEDIT_WEAPONS: weapon val0-val3 changes are silently reverted", async () => {
+  test("without OEDIT_WEAPONS: changing weapon val0-val3 is rejected", async () => {
     const ITEM_WEAPON = 5;
 
     // First set the object type to weapon (non-gated field)
@@ -276,7 +275,7 @@ describe("object power gates", () => {
     );
   });
 
-  test("without OEDIT_IMP_POWER: unassignable spec_proc is silently reverted", async () => {
+  test("without OEDIT_IMP_POWER: setting unassignable spec_proc is rejected", async () => {
     // spec_proc 5 is unassignable for objects - should be rejected with 403
     const putRes = await put("/api/objects/195", otherCookie, {
       ...baseObjPayload,
@@ -290,6 +289,57 @@ describe("object power gates", () => {
         error:
           'Changing "spec_proc" to an unassignable value requires POWER_OEDIT_IMP_POWER',
       }),
+    );
+  });
+});
+
+describe("object power gates - unchanged value passes through", () => {
+  test("without OEDIT_COST: saving with unchanged price succeeds", async () => {
+    // Object 190 was created by otherbuilder in the existing tests with price=0.
+    // Saving with price still 0 should NOT trigger the gate - the value hasn't changed.
+    const putRes = await put("/api/objects/190", otherCookie, {
+      ...baseObjPayload,
+      name: "renamed object",
+      price: 0,
+      vnum: 190,
+    });
+    expect(putRes.status).toBe(200);
+
+    // Verify the rename persisted (gate didn't block the entire save)
+    const getRes = await get("/api/objects/190", otherCookie);
+    expect(getRes.status).toBe(200);
+    const body: unknown = await getRes.json();
+    expect(body).toEqual(
+      expect.objectContaining({ name: "renamed object", price: 0, vnum: 190 }),
+    );
+  });
+});
+
+describe("object power gates - type-specific bypass", () => {
+  beforeAll(async () => {
+    // Set object 194 to a non-weapon type
+    await put("/api/objects/194", otherCookie, {
+      ...baseObjPayload,
+      type: 1, // ITEM_LIGHT, not a weapon
+      vnum: 194,
+    });
+  });
+
+  test("without OEDIT_WEAPONS: changing val0 on non-weapon type succeeds", async () => {
+    // otherbuilder lacks OEDIT_WEAPONS, but the gate should only fire for weapons (type=5)
+    const putRes = await put("/api/objects/194", otherCookie, {
+      ...baseObjPayload,
+      type: 1,
+      val0: 99,
+      vnum: 194,
+    });
+    expect(putRes.status).toBe(200);
+
+    const getRes = await get("/api/objects/194", otherCookie);
+    expect(getRes.status).toBe(200);
+    const body: unknown = await getRes.json();
+    expect(body).toEqual(
+      expect.objectContaining({ type: 1, val0: 99, vnum: 194 }),
     );
   });
 });
@@ -353,7 +403,7 @@ describe("mob power gates", () => {
     await post("/api/mobs", otherCookie, { vnum: 196 });
   });
 
-  test("without MEDIT_IMP_POWER: unassignable spec_proc is silently reverted", async () => {
+  test("without MEDIT_IMP_POWER: setting unassignable spec_proc is rejected", async () => {
     // spec_proc 3 is unassignable for mobs - should be rejected with 403
     const putRes = await put("/api/mobs/196", otherCookie, {
       ...baseMobPayload,
@@ -400,7 +450,7 @@ describe("room power gates", () => {
     await post("/api/rooms", otherCookie, { vnum: 197 });
   });
 
-  test("without REDIT_ENABLED: unassignable room spec is silently reverted", async () => {
+  test("without REDIT_ENABLED: setting unassignable room spec is rejected", async () => {
     // spec 1 is unassignable - should be rejected with 403
     const putRes = await put("/api/rooms/197", otherCookie, {
       ...baseRoomPayload,
@@ -450,5 +500,79 @@ describe("room power gates - full powers", () => {
     expect(getRes.status).toBe(200);
     const body: unknown = await getRes.json();
     expect(body).toEqual(expect.objectContaining({ spec: 1, vnum: 197 }));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Senior users bypass power gates (expandedbuilder: isSenior=true, blocks 200-299)
+// lacks OEDIT_COST, OEDIT_WEAPONS, OEDIT_IMP_POWER, MEDIT_IMP_POWER, REDIT_ENABLED
+// ---------------------------------------------------------------------------
+
+describe("senior users bypass power gates", () => {
+  beforeAll(async () => {
+    await post("/api/objects", seniorCookie, { vnum: 200 });
+    await post("/api/objects", seniorCookie, { vnum: 201 });
+    await post("/api/mobs", seniorCookie, { vnum: 202 });
+    await post("/api/rooms", seniorCookie, { vnum: 203 });
+  });
+
+  test("senior can change object price without OEDIT_COST", async () => {
+    const putRes = await put("/api/objects/200", seniorCookie, {
+      ...baseObjPayload,
+      price: 999,
+      vnum: 200,
+    });
+    expect(putRes.status).toBe(200);
+
+    const getRes = await get("/api/objects/200", seniorCookie);
+    expect(getRes.status).toBe(200);
+    const body: unknown = await getRes.json();
+    expect(body).toEqual(expect.objectContaining({ price: 999, vnum: 200 }));
+  });
+
+  test("senior can change weapon values without OEDIT_WEAPONS", async () => {
+    const ITEM_WEAPON = 5;
+    const putRes = await put("/api/objects/201", seniorCookie, {
+      ...baseObjPayload,
+      type: ITEM_WEAPON,
+      val0: 42,
+      vnum: 201,
+    });
+    expect(putRes.status).toBe(200);
+
+    const getRes = await get("/api/objects/201", seniorCookie);
+    expect(getRes.status).toBe(200);
+    const body: unknown = await getRes.json();
+    expect(body).toEqual(
+      expect.objectContaining({ type: ITEM_WEAPON, val0: 42, vnum: 201 }),
+    );
+  });
+
+  test("senior can set unassignable mob spec_proc without MEDIT_IMP_POWER", async () => {
+    const putRes = await put("/api/mobs/202", seniorCookie, {
+      ...baseMobPayload,
+      spec_proc: 3,
+      vnum: 202,
+    });
+    expect(putRes.status).toBe(200);
+
+    const getRes = await get("/api/mobs/202", seniorCookie);
+    expect(getRes.status).toBe(200);
+    const body: unknown = await getRes.json();
+    expect(body).toEqual(expect.objectContaining({ spec_proc: 3, vnum: 202 }));
+  });
+
+  test("senior can set unassignable room spec without REDIT_ENABLED", async () => {
+    const putRes = await put("/api/rooms/203", seniorCookie, {
+      ...baseRoomPayload,
+      spec: 1,
+      vnum: 203,
+    });
+    expect(putRes.status).toBe(200);
+
+    const getRes = await get("/api/rooms/203", seniorCookie);
+    expect(getRes.status).toBe(200);
+    const body: unknown = await getRes.json();
+    expect(body).toEqual(expect.objectContaining({ spec: 1, vnum: 203 }));
   });
 });

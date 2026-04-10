@@ -5,7 +5,7 @@ import { authRequest, getAuthCookie } from "../test-helpers.ts";
 
 describe("zone listing", () => {
   test("lists all zones", async () => {
-    const cookie = await getAuthCookie(app);
+    const cookie = await getAuthCookie(app, "testbuilder");
     const res = await authRequest(app, "/api/zones", cookie);
 
     expect(res.status).toBe(200);
@@ -25,5 +25,13 @@ describe("zone listing", () => {
     });
 
     expect(res.status).toBe(401);
+  });
+
+  test("request without X-Requested-With returns 403", async () => {
+    const cookie = await getAuthCookie(app, "testbuilder");
+    const res = await app.request("/api/zones", {
+      headers: { Cookie: cookie },
+    });
+    expect(res.status).toBe(403);
   });
 });

@@ -4,11 +4,7 @@ import { sql } from "drizzle-orm";
 
 import { app } from "../app.ts";
 import { immortalDb } from "../db.ts";
-import {
-  authRequest,
-  getAuthCookie,
-  getNoBlocksAuthCookie,
-} from "../test-helpers.ts";
+import { authRequest, getAuthCookie } from "../test-helpers.ts";
 
 // noBlocksUser has POWER_BUILDER only - no MEDIT, OEDIT, REDIT, RSAVE, EDIT.
 // testUser has all powers (used for control tests).
@@ -16,8 +12,8 @@ let noBlocksCookie: string;
 let testCookie: string;
 
 beforeAll(async () => {
-  noBlocksCookie = await getNoBlocksAuthCookie(app);
-  testCookie = await getAuthCookie(app);
+  noBlocksCookie = await getAuthCookie(app, "noblocks");
+  testCookie = await getAuthCookie(app, "testbuilder");
 });
 
 afterAll(async () => {
