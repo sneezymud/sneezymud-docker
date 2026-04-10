@@ -46,7 +46,7 @@ function requireSpec(itemType: number) {
 }
 
 describe("applyObjFieldChange", () => {
-  test("spec field packs into correct val slot via setBits", () => {
+  test("editing a spec field updates the packed value correctly", () => {
     const typeSpec = requireSpec(5); // Weapon
     // curSharp is in val0, bits 0-7 (highBit=7, numBits=8)
     const result = applyObjFieldChange(
@@ -65,7 +65,7 @@ describe("applyObjFieldChange", () => {
     expect(getBits(val0, 7, 8)).toBe(150);
   });
 
-  test("spec field preserves adjacent packed fields", () => {
+  test("editing one packed field preserves adjacent fields in the same slot", () => {
     const typeSpec = requireSpec(5); // Weapon
     // First set maxSharp (bits 8-15 of val0) to 100
     const afterMaxSharp = applyObjFieldChange(
@@ -92,10 +92,9 @@ describe("applyObjFieldChange", () => {
     expect(getBits(val0, 15, 8)).toBe(100);
   });
 
-  test("type switch initializes val0-val3 with field minimums", () => {
+  test("switching item type resets value fields to the new type's defaults", () => {
     // Switch from weapon (type=5) to scroll (type=2).
     // Scroll has magicLevel (min=1) and magicLearnedness (min=1) packed in val0.
-    // A plain type=2 switch with val0=0 would yield both fields at 0, below min.
     const typeSpec = requireSpec(5); // current type
     const result = applyObjFieldChange("type", 2, baseObj, typeSpec, null);
 
@@ -113,12 +112,34 @@ describe("applyObjFieldChange", () => {
     ];
     const expanded = expandTypeValues(scrollSpec, rawVals);
 
-    // Scroll fields with minimums: magicLevel >= 1, magicLearnedness >= 1
-    expect(expanded["magicLevel"]).toBeGreaterThanOrEqual(1);
-    expect(expanded["magicLearnedness"]).toBeGreaterThanOrEqual(1);
+    // Scroll fields with minimums: magicLevel=1 in bits 0-7, magicLearnedness=1 in bits 8-15
+    // Expected packed val0: 1 | (1 << 8) = 257
+    expect(expanded["magicLevel"]).toBe(1);
+    expect(expanded["magicLearnedness"]).toBe(1);
+    expect(result.val0).toBe(1 | (1 << 8));
   });
 
-  test("regular field change returns simple diff", () => {
+  test("whole-val spec field sets the entire val slot directly", () => {
+    // Type 17 (fountain) uses baseCupFields - all whole-val (no highBit/numBits)
+    const fountainObj: Obj = { ...baseObj, type: 17 };
+    const typeSpec = requireSpec(17);
+
+    // maxDrinks occupies all of val0
+    const result = applyObjFieldChange(
+      "maxDrinks",
+      500,
+      fountainObj,
+      typeSpec,
+      null,
+    );
+
+    expect(result).not.toBeNull();
+    if (result === null) throw new Error("expected non-null result");
+
+    expect(result).toHaveProperty("val0", 500);
+  });
+
+  test("changing a regular field produces a simple diff", () => {
     const typeSpec = requireSpec(5);
     const result = applyObjFieldChange(
       "name",
@@ -131,7 +152,7 @@ describe("applyObjFieldChange", () => {
     expect(result).toEqual({ name: "sword" });
   });
 
-  test("regular field unchanged from original returns null", () => {
+  test("unchanged regular field is not dirty", () => {
     const typeSpec = requireSpec(5);
     const result = applyObjFieldChange("name", "", baseObj, typeSpec, null);
 
@@ -139,7 +160,45 @@ describe("applyObjFieldChange", () => {
     expect(result).toBeNull();
   });
 
-  test("cross-slot edits preserve changes in both slots", () => {
+  test("switching to unknown type zeros all value fields", () => {
+    // Start with non-zero val0 so the diff reflects the reset.
+    // diffEdits omits fields whose value matches the original, so only
+    // fields that actually change appear in the result.
+    const weaponWithVals: Obj = { ...baseObj, val0: 200 | (100 << 8) };
+    const typeSpec = requireSpec(5); // current type: Weapon
+    const result = applyObjFieldChange(
+      "type",
+      0,
+      weaponWithVals,
+      typeSpec,
+      null,
+    );
+
+    expect(result).not.toBeNull();
+    if (result === null) throw new Error("expected non-null result");
+
+    expect(result).toHaveProperty("type", 0);
+    // val0 changed from non-zero to 0 - present in diff
+    expect(result).toHaveProperty("val0", 0);
+    // val1-val3 were already 0 - correctly absent from diff
+    expect(result).not.toHaveProperty("val1");
+    expect(result).not.toHaveProperty("val2");
+    expect(result).not.toHaveProperty("val3");
+  });
+
+  test("switching type preserves prior non-value edits", () => {
+    const typeSpec = requireSpec(5); // current type: Weapon
+    const prevEdits: Partial<Obj> = { name: "sword" };
+    const result = applyObjFieldChange("type", 0, baseObj, typeSpec, prevEdits);
+
+    expect(result).not.toBeNull();
+    if (result === null) throw new Error("expected non-null result");
+
+    expect(result).toHaveProperty("name", "sword");
+    expect(result).toHaveProperty("type", 0);
+  });
+
+  test("edits across different val slots are independently preserved", () => {
     const typeSpec = requireSpec(5); // Weapon
     // Edit a val0 field: maxSharp (bits 8-15 of val0)
     const afterVal0Edit = applyObjFieldChange(
@@ -172,10 +231,62 @@ describe("applyObjFieldChange", () => {
     const val2 = afterVal2Edit.val2 ?? 0;
     expect(getBits(val2, 7, 8)).toBe(42);
   });
+
+  test("string value for a spec field is coerced to number for packing", () => {
+    const typeSpec = requireSpec(5); // Weapon
+    // Pass a string "150" instead of number 150 for curSharp
+    const result = applyObjFieldChange(
+      "curSharp",
+      "150",
+      baseObj,
+      typeSpec,
+      null,
+    );
+
+    expect(result).not.toBeNull();
+    if (result === null) throw new Error("expected non-null result");
+
+    const val0 = result.val0 ?? 0;
+    expect(getBits(val0, 7, 8)).toBe(150);
+  });
+
+  test("non-numeric string for a spec field coerces to NaN and packs as zero", () => {
+    const typeSpec = requireSpec(5); // Weapon
+    // "abc" coerces to NaN; setBits masks NaN with ((1 << numBits) - 1)
+    // NaN & anything = 0, so the field packs as 0
+    const result = applyObjFieldChange(
+      "curSharp",
+      "abc",
+      baseObj,
+      typeSpec,
+      null,
+    );
+
+    // NaN packed into val0 - setBits will mask it to 0
+    // Since baseObj.val0 is already 0, and NaN packs to 0, diffEdits returns null
+    expect(result).toBeNull();
+  });
+
+  test("type switch overwrites prior val edits while preserving non-val edits", () => {
+    const typeSpec = requireSpec(5); // current type: Weapon
+    // Simulate prior edits that include both val0 and a non-val field
+    const prevEdits: Partial<Obj> = { name: "test", val0: 999 };
+    const result = applyObjFieldChange("type", 2, baseObj, typeSpec, prevEdits);
+
+    expect(result).not.toBeNull();
+    if (result === null) throw new Error("expected non-null result");
+
+    // name survives the type switch
+    expect(result).toHaveProperty("name", "test");
+    expect(result).toHaveProperty("type", 2);
+    // val0 is overwritten by scroll's defaults (magicLevel=1, magicLearnedness=1),
+    // not the prior edit's 999
+    expect(result.val0).toBe(1 | (1 << 8));
+  });
 });
 
 describe("expandObjFormValues", () => {
-  test("expands type-specific fields from raw vals", () => {
+  test("type-specific fields are expanded from packed values", () => {
     const typeSpec = requireSpec(5); // Weapon
     // val0: curSharp=200 (bits 0-7), maxSharp=100 (bits 8-15)
     const values = {
@@ -193,7 +304,7 @@ describe("expandObjFormValues", () => {
     expect(expandedValues).toHaveProperty("maxSharp", 100);
   });
 
-  test("no-spec type returns values unchanged", () => {
+  test("type with no spec returns values unchanged", () => {
     // Undefined type (0) has an empty fields array - no expansion
     const typeSpec = requireSpec(0);
     const values = { type: 0, val0: 42, val1: 0, val2: 0, val3: 0 };
@@ -212,5 +323,75 @@ describe("expandObjFormValues", () => {
     const { expandedValues } = expandObjFormValues(values, original, undefined);
 
     expect(expandedValues).toEqual(values);
+  });
+
+  test("original and current values are expanded independently", () => {
+    const typeSpec = requireSpec(5); // Weapon
+    // current: curSharp=200 (bits 0-7), maxSharp=100 (bits 8-15)
+    const values = {
+      type: 5,
+      val0: 200 | (100 << 8),
+      val1: 0,
+      val2: 0,
+      val3: 0,
+    };
+    // original: curSharp=50 (bits 0-7), maxSharp=80 (bits 8-15)
+    const original = {
+      type: 5,
+      val0: 50 | (80 << 8),
+      val1: 0,
+      val2: 0,
+      val3: 0,
+    };
+
+    const { expandedOriginal, expandedValues } = expandObjFormValues(
+      values,
+      original,
+      typeSpec,
+    );
+
+    expect(expandedValues).toHaveProperty("curSharp", 200);
+    expect(expandedValues).toHaveProperty("maxSharp", 100);
+    expect(expandedOriginal).toHaveProperty("curSharp", 50);
+    expect(expandedOriginal).toHaveProperty("maxSharp", 80);
+  });
+
+  test("type with no spec returns both values unchanged", () => {
+    // Undefined type (0) has an empty fields array - no expansion
+    const typeSpec = requireSpec(0);
+    const values = { type: 0, val0: 42, val1: 0, val2: 0, val3: 0 };
+    const original = { type: 0, val0: 7, val1: 0, val2: 0, val3: 0 };
+
+    const { expandedOriginal, expandedValues } = expandObjFormValues(
+      values,
+      original,
+      typeSpec,
+    );
+
+    expect(expandedValues).toEqual(values);
+    expect(expandedOriginal).toEqual(original);
+  });
+
+  test("expanded values preserve raw val keys alongside named fields", () => {
+    const typeSpec = requireSpec(5); // Weapon
+    const values = {
+      type: 5,
+      val0: 200 | (100 << 8),
+      val1: 50 | (30 << 8),
+      val2: 0,
+      val3: 0,
+    };
+    const original = { ...values };
+
+    const { expandedValues } = expandObjFormValues(values, original, typeSpec);
+
+    // Named fields are present
+    expect(expandedValues).toHaveProperty("curSharp", 200);
+    expect(expandedValues).toHaveProperty("maxSharp", 100);
+    // Raw val keys are also preserved (form rendering depends on both)
+    expect(expandedValues).toHaveProperty("val0", 200 | (100 << 8));
+    expect(expandedValues).toHaveProperty("val1", 50 | (30 << 8));
+    expect(expandedValues).toHaveProperty("val2", 0);
+    expect(expandedValues).toHaveProperty("val3", 0);
   });
 });

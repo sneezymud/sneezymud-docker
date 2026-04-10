@@ -5,13 +5,13 @@ import { describe, expect, test } from "bun:test";
 import { diffEdits } from "./diff-edits.ts";
 
 describe("diffEdits", () => {
-  test("identical scalars return null", () => {
+  test("form with no edits is not dirty", () => {
     const original = { a: 1, b: "hello", c: 0 };
     const next = { a: 1, b: "hello", c: 0 };
     expect(diffEdits(next, original)).toBeNull();
   });
 
-  test("changed scalar returns partial with only changed key", () => {
+  test("form tracks only the fields that changed", () => {
     const original = { a: 1, b: "hello", c: 0 };
     const next = { a: 1, b: "world" };
     const result = diffEdits(next, original);
@@ -20,12 +20,12 @@ describe("diffEdits", () => {
     expect(result).not.toHaveProperty("a");
   });
 
-  test("empty edits object returns null", () => {
+  test("empty edits partial is not dirty", () => {
     const original = { a: 1, b: "hello" };
     expect(diffEdits({}, original)).toBeNull();
   });
 
-  test("array values always diff due to reference inequality", () => {
+  test("array fields are always treated as changed", () => {
     const arr = [1, 2, 3];
     const original = { data: arr };
     // Same content but new reference
@@ -35,14 +35,14 @@ describe("diffEdits", () => {
     expect(result).toEqual({ data: [1, 2, 3] });
   });
 
-  test("same array reference returns null", () => {
+  test("same array reference is not treated as changed", () => {
     const arr = [1, 2, 3];
     const original = { data: arr };
     const next = { data: arr }; // same reference
     expect(diffEdits(next, original)).toBeNull();
   });
 
-  test("numeric 0 vs string '0' are different (strict !== semantics)", () => {
+  test("type-mismatched values are detected as changes", () => {
     const original: Record<string, unknown> = { val: 0 };
     // Intentional type subversion: simulates a value that passes through as the wrong runtime type
     const next: Record<string, unknown> = { val: "0" };
@@ -51,24 +51,35 @@ describe("diffEdits", () => {
     expect(result).toEqual({ val: "0" });
   });
 
-  test("keys not in original are included in diff", () => {
+  test("new fields not in original are included in the diff", () => {
     const original = { a: 1 };
+    // Widen to Partial so 'b' (absent from original's type) is accepted by diffEdits
     const next = { a: 1, b: "new" } as Partial<{ a: number; b: string }>;
+    // Widen original to match diffEdits' parameter type
     const result = diffEdits(next, original as Record<string, unknown>);
     expect(result).toEqual({ b: "new" });
   });
 
-  test("multiple changes returns all changed keys", () => {
+  test("multiple changed fields are all captured", () => {
     const original = { a: 1, b: "hello", c: true };
     const next = { a: 2, b: "hello", c: false };
     const result = diffEdits(next, original);
     expect(result).toEqual({ a: 2, c: false });
   });
 
-  test("undefined value in next differs from defined value in original", () => {
+  test("explicitly undefined value differs from a defined value", () => {
     const original = { a: 1 } as Record<string, unknown>;
     const next = { a: undefined };
     const result = diffEdits(next, original);
     expect(result).toEqual({ a: undefined });
+  });
+
+  test("keys absent from next are not treated as deletions", () => {
+    // diffEdits only iterates over keys in `next`, so keys present in
+    // original but missing from next are silently ignored - this is the
+    // "diffing a partial" contract that dirty detection relies on.
+    const original = { a: 1, b: 2 };
+    const next = { a: 1 };
+    expect(diffEdits(next, original)).toBeNull();
   });
 });
