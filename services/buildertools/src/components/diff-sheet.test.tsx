@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Room } from "@/shared/schemas/room.ts";
 import type { Zone } from "@/shared/schemas/zone.ts";
 
+import { Toaster } from "@/components/ui/sonner.tsx";
 import { POWER } from "@/shared/powers.ts";
 import { useAuthStore } from "@/state/auth.ts";
 import {
@@ -100,7 +101,7 @@ describe("DiffSheet (via RoomEditor)", () => {
     useAuthStore.setState({ user: null });
   });
 
-  test("TEST-DIFFSHEET-1: Loading spinner visible while diff is fetching", async () => {
+  test("Loading spinner visible while diff is fetching", async () => {
     // Use a manually-controlled promise for the diff endpoint so we can
     // assert the loading state before it resolves.
     let resolveDiff!: (value: Response) => void;
@@ -154,7 +155,7 @@ describe("DiffSheet (via RoomEditor)", () => {
     );
   });
 
-  test("TEST-DIFFSHEET-2: Error state when diff fetch fails", async () => {
+  test("Error state when diff fetch fails", async () => {
     mockFetch([
       { body: makeRoom(), url: `/api/rooms/${VNUM}` },
       { body: mockZones, url: "/api/zones" },
@@ -179,7 +180,7 @@ describe("DiffSheet (via RoomEditor)", () => {
     });
   });
 
-  test("TEST-DIFFSHEET-3: EntityDiff renders field rows when diff data arrives", async () => {
+  test("EntityDiff renders field rows when diff data arrives", async () => {
     const immortalRoom = makeRoom({ name: "Modified Room" });
     const productionRoom = makeRoom({ name: "Original Room" });
 
@@ -209,7 +210,7 @@ describe("DiffSheet (via RoomEditor)", () => {
     expect(screen.getByText("Original Room")).toBeDefined();
   });
 
-  test("TEST-DIFFSHEET-4: Publish button hidden when canPublish === false", async () => {
+  test("Publish button hidden when canPublish === false", async () => {
     // No POWER.LOW, no isSenior - canPublish is false
     setAuth([POWER.BUILDER, POWER.REDIT, POWER.RSAVE, POWER.EDIT]);
 
@@ -246,7 +247,7 @@ describe("DiffSheet (via RoomEditor)", () => {
     expect(screen.queryByText("Publish to Production")).toBeNull();
   });
 
-  test("TEST-DIFFSHEET-5: Publish button hidden when immortal == null", async () => {
+  test("Publish button hidden when immortal == null", async () => {
     // Grant publish permission so we can isolate the null-immortal condition
     setAuth([...BASE_POWERS, POWER.LOW], { isSenior: true });
 
@@ -279,7 +280,7 @@ describe("DiffSheet (via RoomEditor)", () => {
     expect(screen.queryByText("Publish to Production")).toBeNull();
   });
 
-  test("TEST-DIFFSHEET-6: Confirm dialog opens on Publish click and closes on Cancel", async () => {
+  test("Confirm dialog opens on Publish click and closes on Cancel", async () => {
     // Grant publish permission
     setAuth([...BASE_POWERS, POWER.LOW], { isSenior: true });
 
@@ -329,10 +330,11 @@ describe("DiffSheet (via RoomEditor)", () => {
     });
   });
 
-  test("TEST-DIFFSHEET-7: After successful publish, diff endpoint is refetched", async () => {
+  test("After successful publish, diff endpoint is refetched and post-publish data returned", async () => {
     setAuth([...BASE_POWERS, POWER.LOW], { isSenior: true });
 
-    const fetchLog: string[] = [];
+    let publishDone = false;
+    const fetchLog: Array<{ publishDone: boolean; url: string }> = [];
     globalThis.fetch = Object.assign(
       (input: RequestInfo | URL): Promise<Response> => {
         const url =
@@ -341,11 +343,20 @@ describe("DiffSheet (via RoomEditor)", () => {
             : input instanceof URL
               ? input.href
               : input.url;
-        fetchLog.push(url);
+        fetchLog.push({ publishDone, url });
         if (url.includes("/api/publish/rooms/")) {
+          publishDone = true;
           return Promise.resolve(Response.json({ ok: true }));
         }
         if (url.includes("/api/publish/diff/rooms/")) {
+          if (publishDone) {
+            return Promise.resolve(
+              Response.json({
+                immortal: makeRoom({ name: "Synced Room" }),
+                production: makeRoom({ name: "Synced Room" }),
+              }),
+            );
+          }
           return Promise.resolve(
             Response.json({
               immortal: makeRoom({ name: "Draft" }),
@@ -359,7 +370,8 @@ describe("DiffSheet (via RoomEditor)", () => {
         if (url.includes("/api/zones")) {
           return Promise.resolve(Response.json(mockZones));
         }
-        return Promise.reject(new Error(`Unhandled fetch: ${url}`));
+        // Catch-all for cache invalidation refetches
+        return Promise.resolve(Response.json([]));
       },
       { preconnect: originalFetch.preconnect },
     );
@@ -373,12 +385,17 @@ describe("DiffSheet (via RoomEditor)", () => {
 
       fireEvent.click(getDiffButton());
 
+      // Verify pre-publish diff shows different names
+      await waitFor(() => {
+        expect(screen.getByText("Draft")).toBeDefined();
+      });
+      expect(screen.getByText("Live")).toBeDefined();
+
       const publishButton = await screen.findByRole("button", {
         name: /publish to production/i,
       });
       fireEvent.click(publishButton);
 
-      // Wait for the confirm dialog, then click Publish
       await waitFor(() => {
         expect(
           screen.getByText(/this will overwrite the production version/i),
@@ -387,20 +404,26 @@ describe("DiffSheet (via RoomEditor)", () => {
       const confirmButton = screen.getByRole("button", { name: "Publish" });
       fireEvent.click(confirmButton);
 
-      // Wait until the diff endpoint has been fetched at least twice
-      // (initial open + refetch after successful publish)
+      // Verify the diff endpoint was refetched after publish with post-publish data
       await waitFor(() => {
-        const diffHits = fetchLog.filter((u) =>
-          u.includes("/api/publish/diff/rooms/"),
+        const postPublishDiffHits = fetchLog.filter(
+          (entry) =>
+            entry.url.includes("/api/publish/diff/rooms/") && entry.publishDone,
         );
-        expect(diffHits.length).toBeGreaterThanOrEqual(2);
+        expect(postPublishDiffHits.length).toBeGreaterThanOrEqual(1);
       });
+
+      // Also verify the publish endpoint was called
+      const publishHit = fetchLog.find((entry) =>
+        entry.url.includes("/api/publish/rooms/"),
+      );
+      expect(publishHit).toBeDefined();
     } finally {
       globalThis.fetch = originalFetch;
     }
   });
 
-  test("TEST-DIFFSHEET-8: After publish failure (500), diff endpoint is also refetched", async () => {
+  test("After publish failure (500), error is displayed and diff is refetched", async () => {
     setAuth([...BASE_POWERS, POWER.LOW], { isSenior: true });
 
     const fetchLog: string[] = [];
@@ -438,7 +461,12 @@ describe("DiffSheet (via RoomEditor)", () => {
     );
 
     try {
-      renderWithProviders(<RoomEditor vnumParam={VNUM} />);
+      renderWithProviders(
+        <>
+          <RoomEditor vnumParam={VNUM} />
+          <Toaster />
+        </>,
+      );
 
       await waitFor(() => {
         expect(screen.getByText("Name")).toBeDefined();
@@ -459,7 +487,12 @@ describe("DiffSheet (via RoomEditor)", () => {
       const confirmButton = screen.getByRole("button", { name: "Publish" });
       fireEvent.click(confirmButton);
 
-      // Even on failure, onError should refetch the diff endpoint
+      // Verify the error message is displayed to the user via toast
+      await waitFor(() => {
+        expect(screen.getByText("Server error")).toBeDefined();
+      });
+
+      // Also verify diff endpoint was refetched
       await waitFor(() => {
         const diffHits = fetchLog.filter((u) =>
           u.includes("/api/publish/diff/rooms/"),

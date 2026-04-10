@@ -6,9 +6,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Room } from "@/shared/schemas/room.ts";
 import type { Zone } from "@/shared/schemas/zone.ts";
 
+import { Toaster } from "@/components/ui/sonner.tsx";
 import { POWER } from "@/shared/powers.ts";
 import { useAuthStore } from "@/state/auth.ts";
 import {
+  getFetchLog,
   mockFetch,
   renderWithProviders,
   resetFetchMock,
@@ -231,6 +233,316 @@ describe("RoomEditor", () => {
     await waitFor(() => {
       const input = screen.getByRole("textbox", { name: /name/i });
       expect(input.getAttribute("value")).toBe("owner2 room");
+    });
+  });
+
+  describe("save flow", () => {
+    test("successful save clears dirty state", async () => {
+      mockRoomEndpoints();
+      renderWithProviders(<RoomEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Name")).toBeDefined();
+      });
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      expect(saveButton.hasAttribute("disabled")).toBe(true);
+
+      const nameInput = screen.getByRole("textbox", { name: /name/i });
+      await user.clear(nameInput);
+      await user.type(nameInput, "edited room name");
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(true);
+      });
+    });
+
+    test("server validation error keeps dirty state", async () => {
+      mockRoomEndpoints();
+      renderWithProviders(<RoomEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Name")).toBeDefined();
+      });
+
+      const nameInput = screen.getByRole("textbox", { name: /name/i });
+      await user.clear(nameInput);
+      await user.type(nameInput, "bad room name");
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      // Swap mock so the PUT returns 400
+      resetFetchMock();
+      mockFetch([
+        {
+          body: { error: "Some validation error" },
+          status: 400,
+          url: `/api/rooms/${VNUM}`,
+        },
+        { body: mockZones, url: "/api/zones" },
+      ]);
+
+      await user.click(saveButton);
+
+      // Save button should remain enabled - dirty state not cleared on error
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+    });
+
+    test("server validation error is surfaced", async () => {
+      mockRoomEndpoints();
+      renderWithProviders(
+        <>
+          <RoomEditor vnumParam={VNUM} />
+          <Toaster />
+        </>,
+      );
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Name")).toBeDefined();
+      });
+
+      const nameInput = screen.getByRole("textbox", { name: /name/i });
+      await user.clear(nameInput);
+      await user.type(nameInput, "bad room name");
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      resetFetchMock();
+      mockFetch([
+        {
+          body: { error: "Some validation error" },
+          status: 400,
+          url: `/api/rooms/${VNUM}`,
+        },
+        { body: mockZones, url: "/api/zones" },
+      ]);
+
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Some validation error")).toBeDefined();
+      });
+    });
+
+    test("save sends correct payload shape", async () => {
+      mockRoomEndpoints();
+      renderWithProviders(<RoomEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Name")).toBeDefined();
+      });
+
+      const nameInput = screen.getByRole("textbox", { name: /name/i });
+      await user.clear(nameInput);
+      await user.type(nameInput, "payload test room");
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(true);
+      });
+
+      const putCall = getFetchLog().find((c) => c.method === "PUT");
+      if (!putCall) throw new Error("expected PUT call in fetch log");
+      expect(putCall.url).toContain(`/api/rooms/${VNUM}`);
+
+      expect(putCall.body).toHaveProperty("name", "payload test room");
+      expect(putCall.body).toHaveProperty("vnum", 1000);
+      expect(putCall.body).toHaveProperty("sector");
+      expect(putCall.body).toHaveProperty("description");
+      expect(putCall.body).toHaveProperty("exits");
+      expect(putCall.body).toHaveProperty("zone");
+    });
+  });
+
+  describe("sub-component integration", () => {
+    test("adding an exit includes it in save payload", async () => {
+      mockRoomEndpoints();
+      renderWithProviders(<RoomEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Name")).toBeDefined();
+      });
+
+      // Click "Add exit" button to add an exit row
+      const addButton = screen.getByRole("button", { name: /add exit/i });
+      await user.click(addButton);
+
+      // A new exit row appears. Fill in the destination field.
+      // Destination is an EntityPicker (text input), not a spinbutton.
+      const destInput = await screen.findByLabelText("Destination");
+      await user.clear(destInput);
+      await user.type(destInput, "1001");
+      // Blur to commit the EntityPicker value
+      await user.tab();
+
+      // Save button should be enabled (dirty state from exits change)
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(true);
+      });
+
+      const putCall = getFetchLog().find((c) => c.method === "PUT");
+      if (!putCall) throw new Error("expected PUT call in fetch log");
+      expect(putCall.url).toContain(`/api/rooms/${VNUM}`);
+      expect(putCall.body).toEqual(
+        expect.objectContaining({
+          exits: [expect.objectContaining({ destination: 1001 })],
+        }),
+      );
+    });
+
+    test("adding an extra description includes it in save payload", async () => {
+      mockRoomEndpoints();
+      renderWithProviders(<RoomEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Name")).toBeDefined();
+      });
+
+      // Click "Add extra description" button
+      const addButton = screen.getByRole("button", {
+        name: /add extra description/i,
+      });
+      await user.click(addButton);
+
+      // A new extra row appears with Keywords and Description fields.
+      // Find the extra's Keywords input (room form has "Name", not "Keywords")
+      const extraKeywords = await screen.findByRole("textbox", {
+        name: /keywords/i,
+      });
+      await user.type(extraKeywords, "wall painting");
+
+      // Save button should be enabled (dirty state from extras change)
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(true);
+      });
+
+      const putCall = getFetchLog().find((c) => c.method === "PUT");
+      if (!putCall) throw new Error("expected PUT call in fetch log");
+      expect(putCall.url).toContain(`/api/rooms/${VNUM}`);
+      expect(putCall.body).toEqual(
+        expect.objectContaining({
+          extras: [expect.objectContaining({ name: "wall painting" })],
+        }),
+      );
+    });
+  });
+
+  describe("delete flow", () => {
+    test("delete button triggers confirmation dialog", async () => {
+      mockRoomEndpoints();
+      renderWithProviders(<RoomEditor vnumParam={VNUM} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Name")).toBeDefined();
+      });
+
+      const deleteButton = screen.getByRole("button", { name: "Delete" });
+      const user = userEvent.setup();
+      await user.click(deleteButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(
+            `Are you sure you want to delete room ${VNUM}? This also removes all exits.`,
+          ),
+        ).toBeDefined();
+      });
+    });
+
+    test("confirming delete calls the API", async () => {
+      mockFetch([
+        { body: makeRoom(), url: `/api/rooms/${VNUM}` },
+        { body: mockZones, url: "/api/zones" },
+      ]);
+      renderWithProviders(<RoomEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Name")).toBeDefined();
+      });
+
+      // Swap mock so DELETE returns success
+      resetFetchMock();
+      mockFetch([
+        { body: { ok: true }, url: `/api/rooms/${VNUM}` },
+        { body: mockZones, url: "/api/zones" },
+      ]);
+
+      const deleteButton = screen.getByRole("button", { name: "Delete" });
+      await user.click(deleteButton);
+
+      const confirmButton = await screen.findByRole("button", {
+        name: "Yes, delete",
+      });
+      await user.click(confirmButton);
+
+      // After delete, the component navigates away. The confirmation dialog
+      // should be gone.
+      await waitFor(() => {
+        expect(
+          screen.queryByText(
+            `Are you sure you want to delete room ${VNUM}? This also removes all exits.`,
+          ),
+        ).toBeNull();
+      });
+    });
+  });
+
+  describe("network errors", () => {
+    test("failed entity fetch shows error state", async () => {
+      mockFetch([
+        {
+          body: { error: "Internal server error" },
+          status: 500,
+          url: `/api/rooms/${VNUM}`,
+        },
+        { body: mockZones, url: "/api/zones" },
+      ]);
+      renderWithProviders(<RoomEditor vnumParam={VNUM} />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Internal server error/)).toBeDefined();
+      });
     });
   });
 

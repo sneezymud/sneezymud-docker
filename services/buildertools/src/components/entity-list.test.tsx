@@ -9,6 +9,7 @@ import type { RoomListItem } from "@/shared/schemas/room.ts";
 import { POWER } from "@/shared/powers.ts";
 import { useAuthStore } from "@/state/auth.ts";
 import {
+  getFetchLog,
   mockFetch,
   renderWithProviders,
   resetFetchMock,
@@ -147,7 +148,7 @@ describe("RoomList (EntityList)", () => {
     });
   });
 
-  test("card view renders entity names", async () => {
+  test("card view toggle switches view mode", async () => {
     mockFetch([{ body: mockRooms, url: "/api/rooms" }]);
     renderWithProviders(
       <RoomList
@@ -157,19 +158,85 @@ describe("RoomList (EntityList)", () => {
     );
     const user = userEvent.setup();
 
-    // Wait for data, then switch to card view
+    // Wait for data to load in table view
     await screen.findByRole("table");
+
+    // Toggle button should indicate we can switch to card view
     const toggleButton = screen.getByRole("button", {
       name: /switch to card view/i,
     });
     await user.click(toggleButton);
 
-    // Card view should show all room names
-    const names = screen.getAllByText("Dusty Corridor");
-    // At least one instance should be in the now-visible card view
-    expect(names.length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Town Square").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Dark Cave").length).toBeGreaterThanOrEqual(1);
+    // After toggle: button text switches to "Switch to table view",
+    // confirming viewMode state changed from "table" to "card".
+    // The className swap (block/hidden) is driven by this same state variable,
+    // so verifying the state changed verifies the visibility swap.
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /switch to table view/i }),
+      ).toBeDefined();
+    });
+
+    // Toggling back restores the original button label, confirming
+    // the view mode toggles bidirectionally.
+    await user.click(
+      screen.getByRole("button", { name: /switch to table view/i }),
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /switch to card view/i }),
+      ).toBeDefined();
+    });
+  });
+
+  test("select-all and bulk delete sends correct vnums", async () => {
+    mockFetch([{ body: mockRooms, url: "/api/rooms" }]);
+    renderWithProviders(
+      <RoomList
+        from={undefined}
+        to={undefined}
+      />,
+    );
+    const user = userEvent.setup();
+
+    const table = await screen.findByRole("table");
+
+    // Select all via header checkbox ("Select all on this page")
+    const headerCheckbox = within(table).getByRole("checkbox", {
+      name: /select all on this page/i,
+    });
+    await user.click(headerCheckbox);
+
+    // DeleteSelectionBar renders "Delete 3" when all 3 are selected
+    const deleteButton = await screen.findByRole("button", {
+      name: /delete 3/i,
+    });
+    await user.click(deleteButton);
+
+    // ConfirmDialog opens - set up mock before clicking confirm so the
+    // DELETE fetch is handled when the mutation fires immediately on click
+    resetFetchMock();
+    mockFetch([
+      { body: { deleted: 3, ok: true }, url: "/api/rooms/bulk" },
+      { body: mockRooms, url: "/api/rooms" },
+    ]);
+
+    // Confirm button label is "Delete" (confirmLabel prop on ConfirmDialog)
+    const confirmButton = await screen.findByRole("button", {
+      name: /^delete$/i,
+    });
+    await user.click(confirmButton);
+
+    // Verify DELETE /api/rooms/bulk was called with all three vnums.
+    // Wait for the call to appear in the log, then assert the payload shape.
+    await waitFor(() => {
+      expect(getFetchLog().some((c) => c.method === "DELETE")).toBe(true);
+    });
+    const deleteCall = getFetchLog().find((c) => c.method === "DELETE");
+    if (!deleteCall) throw new Error("DELETE call not found");
+    expect(deleteCall.url).toContain("/api/rooms/bulk");
+    expect(deleteCall.body).toHaveProperty("vnums");
+    expect(deleteCall.body).toEqual({ vnums: [1000, 1001, 1002] });
   });
 });
 
@@ -197,7 +264,7 @@ describe("RoomList cross-owner", () => {
     useAuthStore.setState({ user: null });
   });
 
-  test("TEST-CROSS-OWNER-LIST-1: senior All view shows owner column", async () => {
+  test("senior All view shows owner column", async () => {
     setAuthSenior();
     // Default "mine" fetch for initial render
     mockFetch([
@@ -262,7 +329,7 @@ describe("RoomList cross-owner", () => {
     ).toBeDefined();
   });
 
-  test("TEST-CROSS-OWNER-LIST-2: non-senior sees no owner toggle", async () => {
+  test("non-senior sees no owner toggle", async () => {
     setAuthRooms();
     mockFetch([{ body: mockRooms, url: "/api/rooms" }]);
     renderWithProviders(
@@ -275,7 +342,7 @@ describe("RoomList cross-owner", () => {
     expect(screen.queryByRole("button", { name: /^All$/i })).toBeNull();
   });
 
-  test("TEST-CROSS-OWNER-LIST-3: New button hidden when toggle is All", async () => {
+  test("New button hidden when toggle is All", async () => {
     setAuthSenior();
     mockFetch([
       {
@@ -325,7 +392,7 @@ describe("RoomList cross-owner", () => {
     });
   });
 
-  test("TEST-CROSS-OWNER-LIST-5: row click URL varies by owner", async () => {
+  test("row click URL varies by owner", async () => {
     setAuthSenior();
     // Serve initial "mine" data
     mockFetch([

@@ -5,9 +5,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import type { DashboardEntity } from "@/shared/schemas/publish.ts";
 
+import { Toaster } from "@/components/ui/sonner.tsx";
 import { POWER } from "@/shared/powers.ts";
 import { useAuthStore } from "@/state/auth.ts";
 import {
+  getFetchLog,
   mockFetch,
   renderWithProviders,
   resetFetchMock,
@@ -78,7 +80,21 @@ describe("PublishDashboard", () => {
     }
   });
 
-  test("TEST-DASHBOARD-1: Row selection toggle via checkbox click", async () => {
+  test("renders permission denied message when canPublish is false", async () => {
+    setAuth([POWER.BUILDER], { isSenior: false });
+    renderWithProviders(<PublishDashboard />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("You do not have permission to publish."),
+      ).toBeDefined();
+    });
+
+    // Publish UI should not be rendered
+    expect(screen.queryByText("Publish to Production")).toBeNull();
+  });
+
+  test("Row selection toggle via checkbox click", async () => {
     mockFetch([{ body: mockEntities, url: "/api/publish/dashboard" }]);
     renderWithProviders(<PublishDashboard />);
     const user = userEvent.setup();
@@ -103,7 +119,7 @@ describe("PublishDashboard", () => {
     });
   });
 
-  test("TEST-DASHBOARD-2: Header checkbox shows indeterminate state when some-but-not-all selected", async () => {
+  test("Header checkbox shows indeterminate state when some-but-not-all selected", async () => {
     mockFetch([{ body: mockEntities, url: "/api/publish/dashboard" }]);
     renderWithProviders(<PublishDashboard />);
     const user = userEvent.setup();
@@ -132,7 +148,7 @@ describe("PublishDashboard", () => {
     expect(indeterminateCheckboxes).toHaveLength(1);
   });
 
-  test("TEST-DASHBOARD-3: Switching owner filter clears selection", async () => {
+  test("Switching owner filter clears selection", async () => {
     mockFetch([{ body: mockEntities, url: "/api/publish/dashboard" }]);
     renderWithProviders(<PublishDashboard />);
     const user = userEvent.setup();
@@ -160,7 +176,7 @@ describe("PublishDashboard", () => {
     });
   });
 
-  test("TEST-DASHBOARD-4: Bulk publish opens confirm dialog", async () => {
+  test("Bulk publish opens confirm dialog", async () => {
     mockFetch([
       { body: mockEntities, url: "/api/publish/dashboard" },
       { body: { ok: true }, url: "/api/publish/bulk" },
@@ -197,7 +213,110 @@ describe("PublishDashboard", () => {
     });
   });
 
-  test("TEST-DASHBOARD-5: Empty state message when no entities", async () => {
+  test("confirming bulk publish triggers publish and closes dialog", async () => {
+    mockFetch([
+      { body: mockEntities, url: "/api/publish/dashboard" },
+      { body: { ok: true }, url: "/api/publish/bulk" },
+    ]);
+    renderWithProviders(<PublishDashboard />);
+    const user = userEvent.setup();
+
+    // Wait for entities to load, then select a row
+    const row = await screen.findByRole("row", { name: /room 1000/i });
+    const rowCheckbox = within(row).getByRole("checkbox");
+    await user.click(rowCheckbox);
+
+    // Click the "Publish Selected" button
+    const publishButton = await screen.findByRole("button", {
+      name: /publish selected/i,
+    });
+    await user.click(publishButton);
+
+    // Confirm dialog should appear
+    await waitFor(() => {
+      expect(
+        screen.getByText(/this will publish .* to production/i),
+      ).toBeDefined();
+    });
+
+    // Click the "Publish" confirm button
+    const confirmButton = screen.getByRole("button", { name: "Publish" });
+    await user.click(confirmButton);
+
+    // Dialog should close after successful publish
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/this will publish .* to production/i),
+      ).toBeNull();
+    });
+
+    // No error alerts should be present
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    // Verify the bulk publish request was sent with correct payload shape
+    const postCall = getFetchLog().find(
+      (c) => c.method === "POST" && c.url.includes("/api/publish/bulk"),
+    );
+    if (!postCall) throw new Error("expected POST to /api/publish/bulk");
+    expect(postCall.body).toEqual(
+      expect.objectContaining({
+        entities: [
+          expect.objectContaining({
+            ownerPlayerId: 99_999,
+            type: "room",
+            vnum: 1000,
+          }),
+        ],
+      }),
+    );
+  });
+
+  test("bulk publish error is surfaced to the user", async () => {
+    mockFetch([
+      { body: mockEntities, url: "/api/publish/dashboard" },
+      {
+        body: { error: "Publish failed unexpectedly" },
+        status: 500,
+        url: "/api/publish/bulk",
+      },
+    ]);
+    renderWithProviders(
+      <>
+        <PublishDashboard />
+        <Toaster />
+      </>,
+    );
+    const user = userEvent.setup();
+
+    // Wait for entities to load, then select a row
+    const row = await screen.findByRole("row", { name: /room 1000/i });
+    const rowCheckbox = within(row).getByRole("checkbox");
+    await user.click(rowCheckbox);
+
+    // Click the "Publish Selected" button
+    const publishButton = await screen.findByRole("button", {
+      name: /publish selected/i,
+    });
+    await user.click(publishButton);
+
+    // Confirm dialog should appear
+    await waitFor(() => {
+      expect(
+        screen.getByText(/this will publish .* to production/i),
+      ).toBeDefined();
+    });
+
+    // Click the "Publish" confirm button
+    const confirmButton = screen.getByRole("button", { name: "Publish" });
+    await user.click(confirmButton);
+
+    // Error should be surfaced via toast
+    await waitFor(() => {
+      expect(screen.getByText("Publish failed unexpectedly")).toBeDefined();
+    });
+  });
+
+  test("Empty state message when no entities", async () => {
     mockFetch([{ body: [], url: "/api/publish/dashboard" }]);
     renderWithProviders(<PublishDashboard />);
 
@@ -208,7 +327,7 @@ describe("PublishDashboard", () => {
     });
   });
 
-  test("TEST-DASHBOARD-6: Error state when dashboard fetch fails", async () => {
+  test("Error state when dashboard fetch fails", async () => {
     mockFetch([
       {
         body: { error: "Internal server error" },
@@ -224,7 +343,7 @@ describe("PublishDashboard", () => {
     });
   });
 
-  test("TEST-DASHBOARD-7: multi-owner same-vnum rendered as two rows with distinct selection", async () => {
+  test("multi-owner same-vnum rendered as two rows with distinct selection", async () => {
     setAuth([POWER.BUILDER, POWER.LOW], { isSenior: true });
     mockFetch([
       {
@@ -278,7 +397,7 @@ describe("PublishDashboard", () => {
     expect(secondCheckbox.dataset["state"]).toBe("unchecked");
   });
 
-  test("TEST-DASHBOARD-LS-FALLBACK: non-senior with stored 'all' normalizes to 'mine'", async () => {
+  test("non-senior with stored 'all' normalizes to 'mine'", async () => {
     localStorage.setItem(
       "buildertools-publish-dashboard-owner-filter-99999",
       "all",
@@ -303,7 +422,7 @@ describe("PublishDashboard", () => {
     );
   });
 
-  test("TEST-DASHBOARD-LS-PRESERVE-SENIOR: senior with stored 'all' is preserved", async () => {
+  test("senior with stored 'all' is preserved", async () => {
     localStorage.setItem(
       "buildertools-publish-dashboard-owner-filter-99998",
       "all",

@@ -5,9 +5,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import type { Obj } from "@/shared/schemas/obj.ts";
 
+import { Toaster } from "@/components/ui/sonner.tsx";
 import { POWER } from "@/shared/powers.ts";
 import { useAuthStore } from "@/state/auth.ts";
 import {
+  getFetchLog,
   mockFetch,
   renderWithProviders,
   resetFetchMock,
@@ -75,20 +77,20 @@ describe("ObjectEditor", () => {
       setAuth([POWER.BUILDER]);
     });
 
-    test("TEST-RO-1: renders ReadOnlyBanner when user lacks OEDIT", async () => {
+    test("renders ReadOnlyBanner when user lacks OEDIT", async () => {
       mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
       renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
       expect(await screen.findByText(/read[-\s]?only/i)).toBeDefined();
     });
 
-    test("TEST-RO-2: Save button absent in read-only mode", async () => {
+    test("Save button absent in read-only mode", async () => {
       mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
       renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
       await screen.findByText(/read[-\s]?only/i);
       expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
     });
 
-    test("TEST-RO-3: form inputs disabled in read-only mode", async () => {
+    test("form inputs disabled in read-only mode", async () => {
       mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
       renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
       await screen.findByText(/read[-\s]?only/i);
@@ -99,7 +101,7 @@ describe("ObjectEditor", () => {
       ).toBe(true);
     });
 
-    test("TEST-RO-4: Applies sub-table Add/Remove buttons hidden when readOnly", async () => {
+    test("Applies sub-table Add/Remove buttons hidden when readOnly", async () => {
       const obj = makeObj({
         affects: [{ mod1: 0, mod2: 0, type: 0, vnum: 1000 }],
       });
@@ -112,7 +114,7 @@ describe("ObjectEditor", () => {
       expect(screen.queryByRole("button", { name: /remove row/i })).toBeNull();
     });
 
-    test("TEST-RO-5: Diff button still accessible in read-only mode", async () => {
+    test("Diff button still accessible in read-only mode", async () => {
       mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
       renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
       await screen.findByText(/read[-\s]?only/i);
@@ -241,6 +243,427 @@ describe("ObjectEditor", () => {
 
       const priceInput = screen.getByRole("spinbutton", { name: "Price" });
       expect(priceInput.hasAttribute("disabled")).toBe(false);
+    });
+  });
+
+  describe("dirty state tracking", () => {
+    test("editing a field enables the Save button", async () => {
+      setAuth(BASE_POWERS);
+      mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      expect(saveButton.hasAttribute("disabled")).toBe(true);
+
+      const nameInput = screen.getByRole("textbox", { name: /keywords/i });
+      await user.clear(nameInput);
+      await user.type(nameInput, "changed object keywords");
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+    });
+
+    test("reverting field to original value disables the Save button", async () => {
+      setAuth(BASE_POWERS);
+      const obj = makeObj({ name: "original keywords" });
+      mockFetch([{ body: obj, url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      const nameInput = screen.getByRole("textbox", { name: /keywords/i });
+
+      await user.clear(nameInput);
+      await user.type(nameInput, "something different");
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      await user.clear(nameInput);
+      await user.type(nameInput, "original keywords");
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(true);
+      });
+    });
+  });
+
+  describe("client-side validation", () => {
+    test("clearing a required field and saving shows validation error", async () => {
+      setAuth(BASE_POWERS);
+      mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      const nameInput = screen.getByRole("textbox", { name: /keywords/i });
+
+      await user.clear(nameInput);
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords is required")).toBeDefined();
+      });
+    });
+  });
+
+  describe("save flow", () => {
+    test("successful save clears dirty state", async () => {
+      setAuth(BASE_POWERS);
+      const obj = makeObj();
+      mockFetch([{ body: obj, url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      const nameInput = screen.getByRole("textbox", { name: /keywords/i });
+
+      await user.clear(nameInput);
+      await user.type(nameInput, "changed keywords");
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      // PUT hits the same URL - the mock returns the obj, which satisfies objSchema
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(true);
+      });
+    });
+
+    test("server validation error keeps form dirty", async () => {
+      setAuth(BASE_POWERS);
+      mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      const nameInput = screen.getByRole("textbox", { name: /keywords/i });
+
+      await user.clear(nameInput);
+      await user.type(nameInput, "changed keywords");
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      // Re-mock so the PUT returns a 400 error
+      resetFetchMock();
+      mockFetch([
+        {
+          body: { error: "Invalid object data" },
+          status: 400,
+          url: `/api/objects/${VNUM}`,
+        },
+      ]);
+
+      await user.click(saveButton);
+
+      // Save button should remain enabled - dirty state was not cleared
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+    });
+
+    test("server validation error is surfaced", async () => {
+      setAuth(BASE_POWERS);
+      mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(
+        <>
+          <ObjectEditor vnumParam={VNUM} />
+          <Toaster />
+        </>,
+      );
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      const nameInput = screen.getByRole("textbox", { name: /keywords/i });
+      await user.clear(nameInput);
+      await user.type(nameInput, "bad keywords");
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      resetFetchMock();
+      mockFetch([
+        {
+          body: { error: "Invalid object data" },
+          status: 400,
+          url: `/api/objects/${VNUM}`,
+        },
+      ]);
+
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Invalid object data")).toBeDefined();
+      });
+    });
+
+    test("save sends correct payload shape", async () => {
+      setAuth(BASE_POWERS);
+      mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      const nameInput = screen.getByRole("textbox", { name: /keywords/i });
+      await user.clear(nameInput);
+      await user.type(nameInput, "payload test object");
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(true);
+      });
+
+      const putCall = getFetchLog().find((c) => c.method === "PUT");
+      if (!putCall) throw new Error("expected PUT call in fetch log");
+      expect(putCall.url).toContain(`/api/objects/${VNUM}`);
+
+      expect(putCall.body).toHaveProperty("name", "payload test object");
+      expect(putCall.body).toHaveProperty("vnum", 1000);
+      expect(putCall.body).toHaveProperty("type");
+      expect(putCall.body).toHaveProperty("weight");
+      expect(putCall.body).toHaveProperty("short_desc");
+      expect(putCall.body).toHaveProperty("affects");
+    });
+  });
+
+  describe("sub-component integration", () => {
+    test("adding an apply includes it in save payload", async () => {
+      setAuth([...BASE_POWERS, POWER.OEDIT_APPLYS]);
+      mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      // Click "Add applies" button to add an applies row
+      const addButton = screen.getByRole("button", {
+        name: /add applies/i,
+      });
+      await user.click(addButton);
+
+      // A new row appears with Apply Type, Modifier fields.
+      // The default type is 0 and mod values are 0 - just verify
+      // the row was added by finding the new label, then save.
+      await screen.findByLabelText("Apply Type");
+
+      // Save button should be enabled (dirty state from applies change)
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(true);
+      });
+
+      const putCall = getFetchLog().find((c) => c.method === "PUT");
+      if (!putCall) throw new Error("expected PUT call in fetch log");
+      expect(putCall.url).toContain(`/api/objects/${VNUM}`);
+      expect(putCall.body).toEqual(
+        expect.objectContaining({
+          affects: [expect.objectContaining({ mod1: 0, mod2: 0, type: 0 })],
+        }),
+      );
+    });
+  });
+
+  describe("OEDIT_WEAPONS power gates weapon value fields", () => {
+    test("user without OEDIT_WEAPONS sees weapon fields as disabled", async () => {
+      setAuth(BASE_POWERS);
+      const weaponObj = makeObj({ type: 5, val0: 0x80_50 });
+      mockFetch([{ body: weaponObj, url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      // Weapon-specific fields should render but be disabled
+      await waitFor(() => {
+        expect(screen.getByText("Damage Level")).toBeDefined();
+      });
+      const damageInput = screen.getByRole("spinbutton", {
+        name: "Damage Level",
+      });
+      expect(
+        damageInput.hasAttribute("disabled") ||
+          damageInput.hasAttribute("readonly"),
+      ).toBe(true);
+    });
+
+    test("user with OEDIT_WEAPONS sees weapon fields as enabled", async () => {
+      setAuth([...BASE_POWERS, POWER.OEDIT_WEAPONS]);
+      const weaponObj = makeObj({ type: 5, val0: 0x80_50 });
+      mockFetch([{ body: weaponObj, url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Damage Level")).toBeDefined();
+      });
+      const damageInput = screen.getByRole("spinbutton", {
+        name: "Damage Level",
+      });
+      expect(damageInput.hasAttribute("disabled")).toBe(false);
+    });
+  });
+
+  describe("OEDIT_APPLYS power gates applies editing", () => {
+    test("user without OEDIT_APPLYS cannot add applies", async () => {
+      setAuth(BASE_POWERS);
+      mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      // The Applies section renders but Add button should not be present
+      // because readOnly is passed to SubTable when !canEditObjectApplys
+      expect(screen.queryByRole("button", { name: /add applies/i })).toBeNull();
+
+      // But the rest of the form is editable - name input is not disabled
+      const nameInput = screen.getByRole("textbox", { name: /keywords/i });
+      expect(nameInput.hasAttribute("disabled")).toBe(false);
+    });
+
+    test("user with OEDIT_APPLYS can add applies", async () => {
+      setAuth([...BASE_POWERS, POWER.OEDIT_APPLYS]);
+      mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      // Add button for applies should be present
+      expect(
+        screen.getByRole("button", { name: /add applies/i }),
+      ).toBeDefined();
+    });
+  });
+
+  describe("delete flow", () => {
+    test("delete button triggers confirmation dialog", async () => {
+      setAuth(BASE_POWERS);
+      mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      const deleteButton = screen.getByRole("button", { name: "Delete" });
+      await user.click(deleteButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/are you sure you want to delete/i),
+        ).toBeDefined();
+      });
+      expect(screen.getByRole("button", { name: "Yes, delete" })).toBeDefined();
+    });
+
+    test("confirming delete calls the API", async () => {
+      setAuth(BASE_POWERS);
+      mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      // Open the confirmation dialog
+      const deleteButton = screen.getByRole("button", { name: "Delete" });
+      await user.click(deleteButton);
+
+      const confirmButton = await screen.findByRole("button", {
+        name: "Yes, delete",
+      });
+
+      // Re-mock for the DELETE response
+      resetFetchMock();
+      mockFetch([{ body: { ok: true }, url: `/api/objects/${VNUM}` }]);
+
+      await user.click(confirmButton);
+
+      // After successful delete, the dialog should close
+      await waitFor(() => {
+        expect(
+          screen.queryByText(/are you sure you want to delete/i),
+        ).toBeNull();
+      });
+    });
+  });
+
+  describe("network errors", () => {
+    test("failed entity fetch shows error state", async () => {
+      setAuth(BASE_POWERS);
+      mockFetch([
+        {
+          body: { error: "Internal server error" },
+          status: 500,
+          url: `/api/objects/${VNUM}`,
+        },
+      ]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+
+      await waitFor(() => {
+        expect(screen.getByRole("alert")).toBeDefined();
+      });
     });
   });
 });
