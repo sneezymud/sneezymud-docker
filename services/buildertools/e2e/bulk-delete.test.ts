@@ -11,7 +11,7 @@ test("bulk delete removes selected rooms from list", async ({
   // Create 3 rooms
   for (const vnum of [140, 141, 142]) {
     await page.getByRole("button", { name: "Add" }).click();
-    await page.locator('input[type="number"]').fill(String(vnum));
+    await page.getByRole("spinbutton").fill(String(vnum));
     await page.keyboard.press("Enter");
     await page.waitForURL(new RegExp(`/rooms/${vnum}`));
     await page.getByRole("link", { name: "Rooms" }).click();

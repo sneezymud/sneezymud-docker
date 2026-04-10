@@ -10,7 +10,7 @@ test("create, edit, save, and verify object persistence", async ({
 
   // Create object at vnum 198
   await page.getByRole("button", { name: "Add" }).click();
-  await page.locator('input[type="number"]').fill("198");
+  await page.getByRole("spinbutton").fill("198");
   await page.keyboard.press("Enter");
   await page.waitForURL(/\/objects\/198/);
 
@@ -29,6 +29,13 @@ test("create, edit, save, and verify object persistence", async ({
   await typeCombobox.click();
   await typeCombobox.fill("Weapon");
   await page.getByRole("option", { name: /Weapon/ }).click();
+
+  // Fill a weapon-specific value field. After selecting Weapon, the form
+  // renders type-specific fields: "Current Sharpness", "Max Sharpness",
+  // "Damage Level", etc. These are number inputs within the same
+  // "Type-Specific Values" section (already expanded).
+  const damageLevelInput = page.getByLabel("Damage Level");
+  await damageLevelInput.fill("50");
 
   // Fill weight
   const weightInput = page.getByLabel("Weight");
@@ -51,6 +58,8 @@ test("create, edit, save, and verify object persistence", async ({
   await expect(page.getByLabel("Short Description")).toHaveValue(
     "a test iron sword",
   );
+  await expect(page.getByLabel("Item Type")).toHaveValue("Weapon (5)");
+  await expect(page.getByLabel("Damage Level")).toHaveValue("50");
   await expect(page.getByLabel("Weight")).toHaveValue("10");
 
   // Delete
