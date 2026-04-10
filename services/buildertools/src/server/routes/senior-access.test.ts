@@ -3,12 +3,7 @@ import { sql } from "drizzle-orm";
 
 import { app } from "../app.ts";
 import { immortalDb } from "../db.ts";
-import {
-  authRequest,
-  getAuthCookie,
-  getExpandedAuthCookie,
-  getLowOnlyAuthCookie,
-} from "../test-helpers.ts";
+import { authRequest, getAuthCookie } from "../test-helpers.ts";
 
 /**
  * Tests for senior user vnum access (POWER_LOW / POWER_NO_LIMITS).
@@ -45,9 +40,9 @@ let testCookie: string;
 let lowOnlyCookie: string;
 
 beforeAll(async () => {
-  expandedCookie = await getExpandedAuthCookie(app);
-  testCookie = await getAuthCookie(app);
-  lowOnlyCookie = await getLowOnlyAuthCookie(app);
+  expandedCookie = await getAuthCookie(app, "expandedbuilder");
+  testCookie = await getAuthCookie(app, "testbuilder");
+  lowOnlyCookie = await getAuthCookie(app, "lowonlybuilder");
 });
 
 afterAll(async () => {
