@@ -65,6 +65,14 @@ function setAuth(powers: number[]) {
 const VNUM = "1000";
 const BASE_POWERS = [POWER.BUILDER, POWER.OEDIT];
 
+function mockObjEndpoints(overrides: Partial<Obj> = {}) {
+  const obj = makeObj(overrides);
+  mockFetch([
+    { body: obj, method: "GET", url: `/api/objects/${VNUM}` },
+    { body: obj, method: "PUT", url: `/api/objects/${VNUM}` },
+  ]);
+}
+
 describe("ObjectEditor", () => {
   afterEach(() => {
     cleanup();
@@ -438,7 +446,7 @@ describe("ObjectEditor", () => {
 
     test("save sends correct payload shape", async () => {
       setAuth(BASE_POWERS);
-      mockFetch([{ body: makeObj(), url: `/api/objects/${VNUM}` }]);
+      mockObjEndpoints();
       renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
@@ -465,12 +473,16 @@ describe("ObjectEditor", () => {
       if (!putCall) throw new Error("expected PUT call in fetch log");
       expect(putCall.url).toContain(`/api/objects/${VNUM}`);
 
-      expect(putCall.body).toHaveProperty("name", "payload test object");
-      expect(putCall.body).toHaveProperty("vnum", 1000);
-      expect(putCall.body).toHaveProperty("type");
-      expect(putCall.body).toHaveProperty("weight");
-      expect(putCall.body).toHaveProperty("short_desc");
-      expect(putCall.body).toHaveProperty("affects");
+      expect(putCall.body).toEqual(
+        expect.objectContaining({
+          affects: [],
+          name: "payload test object",
+          short_desc: "a test object",
+          type: 0,
+          vnum: 1000,
+          weight: 5,
+        }),
+      );
     });
   });
 
@@ -594,6 +606,90 @@ describe("ObjectEditor", () => {
     });
   });
 
+  describe("undo button", () => {
+    test("clicking Undo reverts form and disables Save", async () => {
+      setAuth(BASE_POWERS);
+      const obj = makeObj({ name: "original object name" });
+      mockFetch([{ body: obj, url: `/api/objects/${VNUM}` }]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      const nameInput = screen.getByRole("textbox", { name: /keywords/i });
+
+      // Make the form dirty
+      await user.clear(nameInput);
+      await user.type(nameInput, "changed object name");
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      // Click the Undo button
+      const undoButton = screen.getByRole("button", { name: "Undo" });
+      await user.click(undoButton);
+
+      // Form reverts to original value
+      await waitFor(() => {
+        expect(nameInput.getAttribute("value")).toBe("original object name");
+      });
+
+      // Save button becomes disabled again
+      expect(saveButton.hasAttribute("disabled")).toBe(true);
+    });
+  });
+
+  describe("sub-table row removal", () => {
+    test("removing an affects row excludes it from save payload", async () => {
+      setAuth([...BASE_POWERS, POWER.OEDIT_APPLYS]);
+      const obj = makeObj({
+        affects: [{ mod1: 5, mod2: 0, type: 1, vnum: 1000 }],
+      });
+      mockFetch([
+        { body: obj, method: "GET", url: `/api/objects/${VNUM}` },
+        { body: obj, method: "PUT", url: `/api/objects/${VNUM}` },
+      ]);
+      renderWithProviders(<ObjectEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      // Verify the affects row is displayed
+      await waitFor(() => {
+        expect(screen.getByLabelText("Apply Type")).toBeDefined();
+      });
+
+      // Click the remove button for the first row
+      const removeButton = screen.getByRole("button", {
+        name: /remove row 1/i,
+      });
+      await user.click(removeButton);
+
+      // Save button should be enabled (dirty state from row removal)
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(true);
+      });
+
+      const putCall = getFetchLog().find((c) => c.method === "PUT");
+      if (!putCall) throw new Error("expected PUT call in fetch log");
+      expect(putCall.url).toContain(`/api/objects/${VNUM}`);
+      expect(putCall.body).toEqual(expect.objectContaining({ affects: [] }));
+    });
+  });
+
   describe("delete flow", () => {
     test("delete button triggers confirmation dialog", async () => {
       setAuth(BASE_POWERS);
@@ -646,6 +742,11 @@ describe("ObjectEditor", () => {
           screen.queryByText(/are you sure you want to delete/i),
         ).toBeNull();
       });
+
+      // Verify the DELETE request was sent to the correct URL
+      const deleteCall = getFetchLog().find((c) => c.method === "DELETE");
+      expect(deleteCall).toBeDefined();
+      expect(deleteCall?.url).toContain(`/api/objects/${VNUM}`);
     });
   });
 

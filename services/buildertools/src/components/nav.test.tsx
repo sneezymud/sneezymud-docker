@@ -7,6 +7,7 @@ import { POWER } from "@/shared/powers.ts";
 import { useAuthStore } from "@/state/auth.ts";
 import { useDirtyStore } from "@/state/dirty.ts";
 import {
+  getFetchLog,
   mockFetch,
   renderWithProviders,
   resetFetchMock,
@@ -180,5 +181,36 @@ describe("Nav", () => {
     await waitFor(() => {
       expect(screen.queryByText("Unsaved Changes")).toBeNull();
     });
+  });
+
+  test("logout proceeds client-side even when API call fails", async () => {
+    setAuth([POWER.BUILDER]);
+    mockFetch([
+      {
+        body: { error: "Internal server error" },
+        status: 500,
+        url: "/api/auth/logout",
+      },
+    ]);
+    renderWithProviders(<Nav />);
+
+    const user = userEvent.setup();
+
+    await waitFor(() => {
+      expect(screen.getByText("Log out")).toBeDefined();
+    });
+
+    await user.click(screen.getByText("Log out"));
+
+    // Auth store should still be cleared despite the API failure
+    await waitFor(() => {
+      expect(useAuthStore.getState().user).toBeNull();
+    });
+
+    // Verify the logout API call was attempted
+    const logoutCall = getFetchLog().find((c) =>
+      c.url.includes("/api/auth/logout"),
+    );
+    expect(logoutCall).toBeDefined();
   });
 });

@@ -76,8 +76,10 @@ const VNUM = "1000";
 const BASE_POWERS = [POWER.BUILDER, POWER.REDIT, POWER.RSAVE, POWER.EDIT];
 
 function mockRoomEndpoints(room?: Room, zones?: Zone[]) {
+  const r = room ?? makeRoom();
   mockFetch([
-    { body: room ?? makeRoom(), url: `/api/rooms/${VNUM}` },
+    { body: r, method: "GET", url: `/api/rooms/${VNUM}` },
+    { body: r, method: "PUT", url: `/api/rooms/${VNUM}` },
     { body: zones ?? mockZones, url: "/api/zones" },
   ]);
 }
@@ -153,6 +155,33 @@ describe("RoomEditor", () => {
 
       await waitFor(() => {
         expect(saveButton.hasAttribute("disabled")).toBe(true);
+      });
+    });
+  });
+
+  describe("client-side validation", () => {
+    test("clearing name shows validation error", async () => {
+      mockRoomEndpoints();
+      renderWithProviders(<RoomEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Name")).toBeDefined();
+      });
+
+      const nameInput = screen.getByRole("textbox", { name: /name/i });
+      await user.clear(nameInput);
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/required/i)).toBeDefined();
       });
     });
   });
@@ -369,12 +398,16 @@ describe("RoomEditor", () => {
       if (!putCall) throw new Error("expected PUT call in fetch log");
       expect(putCall.url).toContain(`/api/rooms/${VNUM}`);
 
-      expect(putCall.body).toHaveProperty("name", "payload test room");
-      expect(putCall.body).toHaveProperty("vnum", 1000);
-      expect(putCall.body).toHaveProperty("sector");
-      expect(putCall.body).toHaveProperty("description");
-      expect(putCall.body).toHaveProperty("exits");
-      expect(putCall.body).toHaveProperty("zone");
+      expect(putCall.body).toEqual(
+        expect.objectContaining({
+          description: "A simple test room.",
+          exits: [],
+          name: "payload test room",
+          sector: 60,
+          vnum: 1000,
+          zone: 1,
+        }),
+      );
     });
   });
 
@@ -464,6 +497,107 @@ describe("RoomEditor", () => {
           extras: [expect.objectContaining({ name: "wall painting" })],
         }),
       );
+    });
+  });
+
+  describe("undo button", () => {
+    test("clicking Undo reverts form and disables Save", async () => {
+      const room = makeRoom({ name: "original room name" });
+      mockRoomEndpoints(room);
+      renderWithProviders(<RoomEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Name")).toBeDefined();
+      });
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      const nameInput = screen.getByRole("textbox", { name: /name/i });
+
+      // Make the form dirty
+      await user.clear(nameInput);
+      await user.type(nameInput, "changed room name");
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      // Click the Undo button
+      const undoButton = screen.getByRole("button", { name: "Undo" });
+      await user.click(undoButton);
+
+      // Form reverts to original value
+      await waitFor(() => {
+        expect(nameInput.getAttribute("value")).toBe("original room name");
+      });
+
+      // Save button becomes disabled again
+      expect(saveButton.hasAttribute("disabled")).toBe(true);
+    });
+  });
+
+  describe("sub-table row removal", () => {
+    test("removing an exit excludes it from save payload", async () => {
+      const room = makeRoom({
+        exits: [
+          {
+            block: null,
+            condition_flag: 0,
+            description: "",
+            destination: 100,
+            direction: 0,
+            key_num: -1,
+            lock_difficulty: 0,
+            name: "",
+            type: 0,
+            vnum: 1000,
+            weight: 0,
+          },
+        ],
+      });
+      mockRoomEndpoints(room);
+      renderWithProviders(<RoomEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Name")).toBeDefined();
+      });
+
+      // Verify the exit row is displayed (North direction is the default for direction 0)
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: /remove north exit/i }),
+        ).toBeDefined();
+      });
+
+      // Click the remove button for the north exit
+      const removeButton = screen.getByRole("button", {
+        name: /remove north exit/i,
+      });
+      await user.click(removeButton);
+
+      // Since the exit has destination data, a confirmation dialog appears
+      const confirmButton = await screen.findByRole("button", {
+        name: /confirm/i,
+      });
+      await user.click(confirmButton);
+
+      // Save button should be enabled (dirty state from exit removal)
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(true);
+      });
+
+      const putCall = getFetchLog().find((c) => c.method === "PUT");
+      if (!putCall) throw new Error("expected PUT call in fetch log");
+      expect(putCall.url).toContain(`/api/rooms/${VNUM}`);
+      expect(putCall.body).toEqual(expect.objectContaining({ exits: [] }));
     });
   });
 

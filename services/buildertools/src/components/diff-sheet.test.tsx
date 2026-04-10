@@ -87,7 +87,8 @@ function getDiffButton(): HTMLElement {
   return first;
 }
 
-const originalFetch = globalThis.fetch;
+// Capture preconnect before any mock overwrites fetch (needed for custom fetch impls)
+const fetchPreconnect = globalThis.fetch.preconnect;
 
 describe("DiffSheet (via RoomEditor)", () => {
   beforeEach(() => {
@@ -96,7 +97,6 @@ describe("DiffSheet (via RoomEditor)", () => {
 
   afterEach(() => {
     cleanup();
-    globalThis.fetch = originalFetch;
     resetFetchMock();
     useAuthStore.setState({ user: null });
   });
@@ -128,7 +128,7 @@ describe("DiffSheet (via RoomEditor)", () => {
         }
         return Promise.reject(new Error(`Unhandled fetch: ${url}`));
       },
-      { preconnect: originalFetch.preconnect },
+      { preconnect: fetchPreconnect },
     );
 
     renderWithProviders(<RoomEditor vnumParam={VNUM} />);
@@ -373,54 +373,50 @@ describe("DiffSheet (via RoomEditor)", () => {
         // Catch-all for cache invalidation refetches
         return Promise.resolve(Response.json([]));
       },
-      { preconnect: originalFetch.preconnect },
+      { preconnect: fetchPreconnect },
     );
 
-    try {
-      renderWithProviders(<RoomEditor vnumParam={VNUM} />);
+    renderWithProviders(<RoomEditor vnumParam={VNUM} />);
 
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
+    await waitFor(() => {
+      expect(screen.getByText("Name")).toBeDefined();
+    });
 
-      fireEvent.click(getDiffButton());
+    fireEvent.click(getDiffButton());
 
-      // Verify pre-publish diff shows different names
-      await waitFor(() => {
-        expect(screen.getByText("Draft")).toBeDefined();
-      });
-      expect(screen.getByText("Live")).toBeDefined();
+    // Verify pre-publish diff shows different names
+    await waitFor(() => {
+      expect(screen.getByText("Draft")).toBeDefined();
+    });
+    expect(screen.getByText("Live")).toBeDefined();
 
-      const publishButton = await screen.findByRole("button", {
-        name: /publish to production/i,
-      });
-      fireEvent.click(publishButton);
+    const publishButton = await screen.findByRole("button", {
+      name: /publish to production/i,
+    });
+    fireEvent.click(publishButton);
 
-      await waitFor(() => {
-        expect(
-          screen.getByText(/this will overwrite the production version/i),
-        ).toBeDefined();
-      });
-      const confirmButton = screen.getByRole("button", { name: "Publish" });
-      fireEvent.click(confirmButton);
+    await waitFor(() => {
+      expect(
+        screen.getByText(/this will overwrite the production version/i),
+      ).toBeDefined();
+    });
+    const confirmButton = screen.getByRole("button", { name: "Publish" });
+    fireEvent.click(confirmButton);
 
-      // Verify the diff endpoint was refetched after publish with post-publish data
-      await waitFor(() => {
-        const postPublishDiffHits = fetchLog.filter(
-          (entry) =>
-            entry.url.includes("/api/publish/diff/rooms/") && entry.publishDone,
-        );
-        expect(postPublishDiffHits.length).toBeGreaterThanOrEqual(1);
-      });
-
-      // Also verify the publish endpoint was called
-      const publishHit = fetchLog.find((entry) =>
-        entry.url.includes("/api/publish/rooms/"),
+    // Verify the diff endpoint was refetched after publish with post-publish data
+    await waitFor(() => {
+      const postPublishDiffHits = fetchLog.filter(
+        (entry) =>
+          entry.url.includes("/api/publish/diff/rooms/") && entry.publishDone,
       );
-      expect(publishHit).toBeDefined();
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+      expect(postPublishDiffHits.length).toBeGreaterThanOrEqual(1);
+    });
+
+    // Also verify the publish endpoint was called
+    const publishHit = fetchLog.find((entry) =>
+      entry.url.includes("/api/publish/rooms/"),
+    );
+    expect(publishHit).toBeDefined();
   });
 
   test("After publish failure (500), error is displayed and diff is refetched", async () => {
@@ -457,50 +453,46 @@ describe("DiffSheet (via RoomEditor)", () => {
         }
         return Promise.reject(new Error(`Unhandled fetch: ${url}`));
       },
-      { preconnect: originalFetch.preconnect },
+      { preconnect: fetchPreconnect },
     );
 
-    try {
-      renderWithProviders(
-        <>
-          <RoomEditor vnumParam={VNUM} />
-          <Toaster />
-        </>,
+    renderWithProviders(
+      <>
+        <RoomEditor vnumParam={VNUM} />
+        <Toaster />
+      </>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Name")).toBeDefined();
+    });
+
+    fireEvent.click(getDiffButton());
+
+    const publishButton = await screen.findByRole("button", {
+      name: /publish to production/i,
+    });
+    fireEvent.click(publishButton);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/this will overwrite the production version/i),
+      ).toBeDefined();
+    });
+    const confirmButton = screen.getByRole("button", { name: "Publish" });
+    fireEvent.click(confirmButton);
+
+    // Verify the error message is displayed to the user via toast
+    await waitFor(() => {
+      expect(screen.getByText("Server error")).toBeDefined();
+    });
+
+    // Also verify diff endpoint was refetched
+    await waitFor(() => {
+      const diffHits = fetchLog.filter((u) =>
+        u.includes("/api/publish/diff/rooms/"),
       );
-
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
-
-      fireEvent.click(getDiffButton());
-
-      const publishButton = await screen.findByRole("button", {
-        name: /publish to production/i,
-      });
-      fireEvent.click(publishButton);
-
-      await waitFor(() => {
-        expect(
-          screen.getByText(/this will overwrite the production version/i),
-        ).toBeDefined();
-      });
-      const confirmButton = screen.getByRole("button", { name: "Publish" });
-      fireEvent.click(confirmButton);
-
-      // Verify the error message is displayed to the user via toast
-      await waitFor(() => {
-        expect(screen.getByText("Server error")).toBeDefined();
-      });
-
-      // Also verify diff endpoint was refetched
-      await waitFor(() => {
-        const diffHits = fetchLog.filter((u) =>
-          u.includes("/api/publish/diff/rooms/"),
-        );
-        expect(diffHits.length).toBeGreaterThanOrEqual(2);
-      });
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+      expect(diffHits.length).toBeGreaterThanOrEqual(2);
+    });
   });
 });

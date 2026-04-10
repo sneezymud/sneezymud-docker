@@ -91,9 +91,13 @@ const VNUM = "1000";
 const BASE_POWERS = [POWER.BUILDER, POWER.MEDIT];
 
 function mockMobEndpoints(mob?: Mob, response?: MobResponse) {
+  const m = mob ?? makeMob();
+  const r = response ?? makeMobResponse();
   mockFetch([
-    { body: mob ?? makeMob(), url: `/api/mobs/${VNUM}` },
-    { body: response ?? makeMobResponse(), url: `/api/mob-responses/${VNUM}` },
+    { body: m, method: "GET", url: `/api/mobs/${VNUM}` },
+    { body: m, method: "PUT", url: `/api/mobs/${VNUM}` },
+    { body: r, method: "GET", url: `/api/mob-responses/${VNUM}` },
+    { body: r, method: "PUT", url: `/api/mob-responses/${VNUM}` },
   ]);
 }
 
@@ -397,13 +401,17 @@ describe("MobEditor", () => {
       if (!putCall) throw new Error("expected PUT call in fetch log");
       expect(putCall.url).toContain(`/api/mobs/${VNUM}`);
 
-      expect(putCall.body).toHaveProperty("name", "payload test mob");
-      expect(putCall.body).toHaveProperty("vnum", 1000);
-      expect(putCall.body).toHaveProperty("level");
-      expect(putCall.body).toHaveProperty("short_desc");
-      expect(putCall.body).toHaveProperty("race");
-      expect(putCall.body).toHaveProperty("extras");
-      expect(putCall.body).toHaveProperty("immunities");
+      expect(putCall.body).toEqual(
+        expect.objectContaining({
+          extras: [],
+          immunities: [],
+          level: 10,
+          name: "payload test mob",
+          race: 0,
+          short_desc: "a test mob",
+          vnum: 1000,
+        }),
+      );
     });
 
     test("adding a mobile string includes it in save payload", async () => {
@@ -492,6 +500,97 @@ describe("MobEditor", () => {
           immunities: [expect.objectContaining({ amt: 50, type: 0 })],
         }),
       );
+    });
+  });
+
+  describe("undo button", () => {
+    test("clicking Undo reverts form and disables Save", async () => {
+      const mob = makeMob({ name: "original mob name" });
+      mockMobEndpoints(mob);
+      renderWithProviders(<MobEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      const nameInput = screen.getByRole("textbox", { name: /keywords/i });
+
+      // Make the form dirty
+      await user.clear(nameInput);
+      await user.type(nameInput, "changed mob name");
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      // Click the Undo button
+      const undoButton = screen.getByRole("button", { name: "Undo" });
+      await user.click(undoButton);
+
+      // Form reverts to original value
+      await waitFor(() => {
+        expect(nameInput.getAttribute("value")).toBe("original mob name");
+      });
+
+      // Save button becomes disabled again
+      expect(saveButton.hasAttribute("disabled")).toBe(true);
+    });
+  });
+
+  describe("sub-table row removal", () => {
+    test("removing an extras row excludes it from save payload", async () => {
+      const mob = makeMob({
+        extras: [
+          {
+            description: "A flash of light.",
+            keyword: "bamfin" as const,
+            vnum: 1000,
+          },
+        ],
+      });
+      mockMobEndpoints(mob);
+      renderWithProviders(<MobEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      // Verify the extras row is displayed
+      await waitFor(() => {
+        expect(screen.getByDisplayValue("A flash of light.")).toBeDefined();
+      });
+
+      // Click the remove button for the Enter World string
+      const removeButton = screen.getByRole("button", {
+        name: /remove enter world string/i,
+      });
+      await user.click(removeButton);
+
+      // Confirm the removal in the dialog
+      const confirmButton = await screen.findByRole("button", {
+        name: "Remove",
+      });
+      await user.click(confirmButton);
+
+      // Save button should be enabled (dirty state from row removal)
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(true);
+      });
+
+      const putCall = getFetchLog().find((c) => c.method === "PUT");
+      if (!putCall) throw new Error("expected PUT call in fetch log");
+      expect(putCall.url).toContain(`/api/mobs/${VNUM}`);
+      expect(putCall.body).toEqual(expect.objectContaining({ extras: [] }));
     });
   });
 

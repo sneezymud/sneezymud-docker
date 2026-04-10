@@ -98,7 +98,7 @@ describe("RoomList (EntityList)", () => {
     // Vnums appear as links in the table rows
     const rows = within(table).getAllByRole("row");
     // Header row + 3 data rows
-    expect(rows.length).toBeGreaterThanOrEqual(4);
+    expect(rows).toHaveLength(4);
 
     // Vnum links point to the correct room
     expect(within(table).getByRole("link", { name: "1000" })).toBeDefined();
@@ -237,6 +237,118 @@ describe("RoomList (EntityList)", () => {
     expect(deleteCall.url).toContain("/api/rooms/bulk");
     expect(deleteCall.body).toHaveProperty("vnums");
     expect(deleteCall.body).toEqual({ vnums: [1000, 1001, 1002] });
+  });
+});
+
+/** Generate N rooms for pagination tests. */
+function generateRooms(count: number): RoomListItem[] {
+  return Array.from({ length: count }, (_, i) => ({
+    name: `Room ${i}`,
+    sector: 0,
+    vnum: 1000 + i,
+  }));
+}
+
+describe("RoomList error and pagination", () => {
+  beforeEach(() => {
+    setAuthRooms();
+  });
+
+  afterEach(() => {
+    cleanup();
+    resetFetchMock();
+    useAuthStore.setState({ user: null });
+  });
+
+  test("fetch error displays error message", async () => {
+    mockFetch([
+      { body: { error: "Server error" }, status: 500, url: "/api/rooms" },
+    ]);
+    renderWithProviders(
+      <RoomList
+        from={undefined}
+        to={undefined}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/server error/i)).toBeDefined();
+    });
+  });
+
+  test("pagination controls appear and navigate pages", async () => {
+    // Default page size is 50, so 55 items produce 2 pages
+    const manyRooms = generateRooms(55);
+    mockFetch([{ body: manyRooms, url: "/api/rooms" }]);
+    renderWithProviders(
+      <RoomList
+        from={undefined}
+        to={undefined}
+      />,
+    );
+    const user = userEvent.setup();
+
+    // Wait for table and pagination to render
+    await screen.findByRole("table");
+    await waitFor(() => {
+      expect(screen.getByText("Page 1 of 2")).toBeDefined();
+    });
+
+    // Next button should be enabled
+    const nextButton = screen.getByRole("button", {
+      name: /go to next page/i,
+    });
+    await user.click(nextButton);
+
+    // After navigating, we should be on page 2
+    await waitFor(() => {
+      expect(screen.getByText("Page 2 of 2")).toBeDefined();
+    });
+
+    // Previous button should now work
+    const prevButton = screen.getByRole("button", {
+      name: /go to previous page/i,
+    });
+    await user.click(prevButton);
+
+    await waitFor(() => {
+      expect(screen.getByText("Page 1 of 2")).toBeDefined();
+    });
+  });
+
+  test("clicking sortable column header toggles sort indicator", async () => {
+    mockFetch([{ body: mockRooms, url: "/api/rooms" }]);
+    renderWithProviders(
+      <RoomList
+        from={undefined}
+        to={undefined}
+      />,
+    );
+    const user = userEvent.setup();
+
+    await screen.findByRole("table");
+
+    // Default sort is vnum ascending - the Vnum header should show ascending indicator
+    const vnumHeader = screen.getByRole("button", { name: /vnum/i });
+    expect(vnumHeader.textContent).toContain("\u25B2");
+
+    // Click Name header to sort by name ascending
+    const nameHeader = screen.getByRole("button", { name: /name/i });
+    await user.click(nameHeader);
+
+    await waitFor(() => {
+      // Name header should now show ascending indicator
+      expect(nameHeader.textContent).toContain("\u25B2");
+      // Vnum header should no longer have an indicator
+      expect(vnumHeader.textContent).not.toContain("\u25B2");
+      expect(vnumHeader.textContent).not.toContain("\u25BC");
+    });
+
+    // Click Name header again to toggle to descending
+    await user.click(nameHeader);
+
+    await waitFor(() => {
+      expect(nameHeader.textContent).toContain("\u25BC");
+    });
   });
 });
 
