@@ -166,13 +166,16 @@ export const nonBuilderUser = {
 const TEST_PASSWORD = "testpass";
 
 /**
- * Log in as the test builder and return the session cookie string.
+ * Log in as the given user and return the session cookie string.
  */
-export async function getAuthCookie(app: Hono): Promise<string> {
+export async function getAuthCookie(
+  app: Hono,
+  username: string,
+): Promise<string> {
   const res = await app.request("/api/auth/login", {
     body: JSON.stringify({
       password: TEST_PASSWORD,
-      username: testUser.username,
+      username,
     }),
     headers: {
       "Content-Type": "application/json",
@@ -182,133 +185,9 @@ export async function getAuthCookie(app: Hono): Promise<string> {
   });
   const cookie = res.headers.get("Set-Cookie");
   if (!cookie) {
-    throw new Error(`Login failed (${res.status}): ${await res.text()}`);
-  }
-  return cookie;
-}
-
-/**
- * Log in as the other builder and return the session cookie string.
- */
-export async function getOtherAuthCookie(app: Hono): Promise<string> {
-  const res = await app.request("/api/auth/login", {
-    body: JSON.stringify({
-      password: TEST_PASSWORD,
-      username: otherUser.username,
-    }),
-    headers: {
-      "Content-Type": "application/json",
-      "X-Requested-With": "XMLHttpRequest",
-    },
-    method: "POST",
-  });
-  const cookie = res.headers.get("Set-Cookie");
-  if (!cookie) {
-    throw new Error(`Login failed (${res.status}): ${await res.text()}`);
-  }
-  return cookie;
-}
-
-/**
- * Log in as the expanded-access builder and return the session cookie string.
- */
-export async function getExpandedAuthCookie(app: Hono): Promise<string> {
-  const res = await app.request("/api/auth/login", {
-    body: JSON.stringify({
-      password: TEST_PASSWORD,
-      username: expandedUser.username,
-    }),
-    headers: {
-      "Content-Type": "application/json",
-      "X-Requested-With": "XMLHttpRequest",
-    },
-    method: "POST",
-  });
-  const cookie = res.headers.get("Set-Cookie");
-  if (!cookie) {
-    throw new Error(`Login failed (${res.status}): ${await res.text()}`);
-  }
-  return cookie;
-}
-
-/**
- * Log in as the LOW-only builder and return the session cookie string.
- */
-export async function getLowOnlyAuthCookie(app: Hono): Promise<string> {
-  const res = await app.request("/api/auth/login", {
-    body: JSON.stringify({
-      password: TEST_PASSWORD,
-      username: lowOnlyUser.username,
-    }),
-    headers: {
-      "Content-Type": "application/json",
-      "X-Requested-With": "XMLHttpRequest",
-    },
-    method: "POST",
-  });
-  const cookie = res.headers.get("Set-Cookie");
-  if (!cookie) {
-    throw new Error(`Login failed (${res.status}): ${await res.text()}`);
-  }
-  return cookie;
-}
-
-/**
- * Log in as the no-blocks user and return the session cookie string.
- */
-export async function getNoBlocksAuthCookie(app: Hono): Promise<string> {
-  const res = await app.request("/api/auth/login", {
-    body: JSON.stringify({
-      password: TEST_PASSWORD,
-      username: noBlocksUser.username,
-    }),
-    headers: {
-      "Content-Type": "application/json",
-      "X-Requested-With": "XMLHttpRequest",
-    },
-    method: "POST",
-  });
-  const cookie = res.headers.get("Set-Cookie");
-  if (!cookie) {
-    throw new Error(`Login failed (${res.status}): ${await res.text()}`);
-  }
-  return cookie;
-}
-
-export async function getViewOnlyAuthCookie(app: Hono): Promise<string> {
-  const res = await app.request("/api/auth/login", {
-    body: JSON.stringify({
-      password: TEST_PASSWORD,
-      username: viewOnlyUser.username,
-    }),
-    headers: {
-      "Content-Type": "application/json",
-      "X-Requested-With": "XMLHttpRequest",
-    },
-    method: "POST",
-  });
-  const cookie = res.headers.get("Set-Cookie");
-  if (!cookie) {
-    throw new Error(`Login failed (${res.status}): ${await res.text()}`);
-  }
-  return cookie;
-}
-
-export async function getNoLimitsOnlyAuthCookie(app: Hono): Promise<string> {
-  const res = await app.request("/api/auth/login", {
-    body: JSON.stringify({
-      password: TEST_PASSWORD,
-      username: noLimitsOnlyUser.username,
-    }),
-    headers: {
-      "Content-Type": "application/json",
-      "X-Requested-With": "XMLHttpRequest",
-    },
-    method: "POST",
-  });
-  const cookie = res.headers.get("Set-Cookie");
-  if (!cookie) {
-    throw new Error(`Login failed (${res.status}): ${await res.text()}`);
+    throw new Error(
+      `Login failed for ${username} (${res.status}): ${await res.text()}`,
+    );
   }
   return cookie;
 }

@@ -13,10 +13,22 @@ import {
 } from "@tanstack/react-router";
 import { render } from "@testing-library/react";
 
+export interface FetchCall {
+  body: unknown;
+  method: string;
+  url: string;
+}
+
 interface FetchHandler {
   body: unknown;
   status?: number;
   url: string;
+}
+
+let fetchLog: FetchCall[] = [];
+
+export function getFetchLog(): FetchCall[] {
+  return fetchLog;
 }
 
 /**
@@ -70,14 +82,25 @@ const originalFetch = globalThis.fetch;
  * substring - first matching handler wins. Unmatched URLs throw.
  */
 export function mockFetch(handlers: FetchHandler[]) {
+  fetchLog = [];
   globalThis.fetch = Object.assign(
-    (input: RequestInfo | URL): Promise<Response> => {
+    (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       const url =
         typeof input === "string"
           ? input
           : input instanceof URL
             ? input.href
             : input.url;
+      const method = init?.method ?? "GET";
+      let body: unknown = undefined;
+      if (init?.body !== undefined && init.body !== null) {
+        try {
+          body = JSON.parse(typeof init.body === "string" ? init.body : "");
+        } catch {
+          body = init.body;
+        }
+      }
+      fetchLog.push({ body, method, url });
       const handler = handlers.find((h) => url.includes(h.url));
       if (!handler) {
         return Promise.reject(new Error(`Unhandled fetch: ${url}`));
@@ -95,4 +118,5 @@ export function mockFetch(handlers: FetchHandler[]) {
 /** Restore the original fetch after tests. */
 export function resetFetchMock() {
   globalThis.fetch = originalFetch;
+  fetchLog = [];
 }
