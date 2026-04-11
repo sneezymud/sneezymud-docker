@@ -96,7 +96,7 @@
     "lint": "bun --bun eslint .",
     "lint:fix": "bun --bun eslint . --fix",
     "start": "NODE_ENV=production bun src/server/index.ts",
-    "test": "bun test --preload ./src/server/test-preload.ts src/server/ src/shared/ src/lib/ src/hooks/",
+    "test": "bun test --preload ./src/server/test-preload.ts src/server/ src/shared/ src/lib/ src/hooks/ src/components/code-editor/",
     "test:all": "bun run test && bun run test:components",
     "test:components": "bun test --preload ./src/test-preload-dom.ts .test.tsx",
     "test:e2e": "playwright test",

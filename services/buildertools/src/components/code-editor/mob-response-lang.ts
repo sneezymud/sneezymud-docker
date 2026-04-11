@@ -1,4 +1,4 @@
-import { StreamLanguage } from "@codemirror/language";
+import { StreamLanguage, type StreamParser } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 
 /**
@@ -12,7 +12,7 @@ import { tags } from "@lezer/highlight";
  *   }                       — closing brace
  */
 
-interface MobResponseState {
+export interface MobResponseState {
   lineStart: boolean;
 }
 
@@ -36,7 +36,7 @@ const COLOR_LETTERS = new Set([
   "z",
 ]);
 
-export const mobResponseLanguage = StreamLanguage.define<MobResponseState>({
+export const mobResponseParser: StreamParser<MobResponseState> = {
   copyState(state) {
     return { lineStart: state.lineStart };
   },
@@ -137,4 +137,6 @@ export const mobResponseLanguage = StreamLanguage.define<MobResponseState>({
     brace: tags.brace,
     color: tags.special(tags.string),
   },
-});
+};
+
+export const mobResponseLanguage = StreamLanguage.define(mobResponseParser);
