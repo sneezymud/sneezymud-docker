@@ -1,11 +1,18 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { objSchema } from "@/shared/schemas/obj.ts";
 
 import { app } from "../app.ts";
 import { immortalDb, sneezyDb } from "../db.ts";
-import { authRequest, getAuthCookie, testUser } from "../test-helpers.ts";
+import { obj } from "../schema/immortal.ts";
+import {
+  authRequest,
+  expandedUser,
+  getAuthCookie,
+  otherUser,
+  testUser,
+} from "../test-helpers.ts";
 
 let cookie: string;
 
@@ -15,13 +22,13 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await immortalDb.execute(
-    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 180, 181, 500)`,
+    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 117, 143, 144, 145, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 180, 181, 500)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 180, 181)`,
+    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 117, 143, 144, 145, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 180, 181)`,
   );
   await immortalDb.execute(
-    sql`DELETE FROM obj WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 144, 145, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 180, 181)`,
+    sql`DELETE FROM obj WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 117, 143, 144, 145, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 180, 181)`,
   );
   await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum IN (5100, 5101, 5102)`);
   await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum BETWEEN 6100 AND 6124`);
@@ -442,6 +449,28 @@ describe("object name lookup", () => {
     const body: unknown = await res.json();
     expect(body).toEqual(expect.objectContaining({ name: null, vnum: 49_999 }));
   });
+
+  test("does not leak another builder's immortal draft name", async () => {
+    // Insert a draft row at the same vnum owned by otherUser, bypassing
+    // block access checks via raw SQL (the API would reject a create outside
+    // otherUser's blocks). Caller's scoped query must not match this row -
+    // it falls through to sneezy and returns the production short_desc.
+    await immortalDb.execute(sql`
+      INSERT IGNORE INTO obj (vnum, name, short_desc, long_desc, action_desc, player_id)
+      VALUES (5101, 'other', 'other builder draft', '', '', ${otherUser.playerId})
+    `);
+    const res = await authRequest(app, "/api/objects/name/5101", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual(
+      expect.objectContaining({ name: "a cross-block shield", vnum: 5101 }),
+    );
+    // Clean up the cross-owner row; afterAll deletes by vnum but another
+    // test in this file might race with the production-row test above.
+    await immortalDb.execute(
+      sql`DELETE FROM obj WHERE vnum = 5101 AND player_id = ${otherUser.playerId}`,
+    );
+  });
 });
 
 describe("bulk object deletion", () => {
@@ -556,6 +585,29 @@ describe("out-of-range data readable from DB", () => {
       method: "PUT",
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("schema boundary round-trips", () => {
+  test("price round-trips at 0 and 1_000_000", async () => {
+    const vnum = 117;
+    await authRequest(app, "/api/objects", cookie, {
+      body: JSON.stringify({ vnum }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    for (const price of [0, 1_000_000]) {
+      const putRes = await authRequest(app, `/api/objects/${vnum}`, cookie, {
+        body: JSON.stringify({ ...validObjUpdate, price, vnum }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      });
+      expect(putRes.status).toBe(200);
+      const getRes = await authRequest(app, `/api/objects/${vnum}`, cookie);
+      expect(getRes.status).toBe(200);
+      const body: unknown = await getRes.json();
+      expect(body).toEqual(expect.objectContaining({ price, vnum }));
+    }
   });
 });
 
@@ -1083,6 +1135,38 @@ describe("owner scoping", () => {
     expect(verifyRes.status).toBe(200);
     const verifyBody: unknown = await verifyRes.json();
     expect(verifyBody).toHaveProperty("name", "senior edited object");
+  });
+
+  test("senior cross-owner PUT preserves target's player_id", async () => {
+    // Regression lock on the NOTE in updateObject ("player_id is deliberately
+    // NOT in the .set() clause"). Reads the column directly since the API
+    // never exposes player_id in responses.
+    const vnum = 143;
+    await authRequest(app, "/api/objects", cookie, {
+      body: JSON.stringify({ vnum }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(
+      app,
+      `/api/objects/${vnum}?owner=${testUser.playerId}`,
+      expandedCookie,
+      {
+        body: JSON.stringify({
+          ...validObjUpdate,
+          name: "senior renamed object",
+          vnum,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+    );
+    const [row] = await immortalDb
+      .select({ player_id: obj.player_id })
+      .from(obj)
+      .where(eq(obj.vnum, vnum));
+    expect(row?.player_id).toBe(testUser.playerId);
+    expect(row?.player_id).not.toBe(expandedUser.playerId);
   });
 
   test("senior cross-owner DELETE removes target's row", async () => {

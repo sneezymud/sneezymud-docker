@@ -6,7 +6,13 @@ import { roomSchema } from "@/shared/schemas/room.ts";
 import { app } from "../app.ts";
 import { immortalDb, sneezyDb } from "../db.ts";
 import { room } from "../schema/immortal.ts";
-import { authRequest, getAuthCookie, testUser } from "../test-helpers.ts";
+import {
+  authRequest,
+  expandedUser,
+  getAuthCookie,
+  otherUser,
+  testUser,
+} from "../test-helpers.ts";
 
 let cookie: string;
 
@@ -15,7 +21,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  const testVnums = sql`(100, 101, 102, 103, 104, 105, 106, 107, 110, 111, 130, 140, 150, 151, 152, 155, 160, 162, 180, 181, 183)`;
+  const testVnums = sql`(100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 130, 133, 134, 140, 150, 151, 152, 155, 160, 162, 180, 181, 183, 184)`;
   await immortalDb.execute(
     sql`DELETE FROM roomextra WHERE vnum IN ${testVnums}`,
   );
@@ -532,6 +538,26 @@ describe("room name lookup", () => {
     const body: unknown = await res.json();
     expect(body).toEqual(expect.objectContaining({ name: null, vnum: 49_999 }));
   });
+
+  test("does not leak another builder's immortal draft name", async () => {
+    // Insert an immortal draft row at the same vnum owned by otherUser.
+    // Caller's scoped query must not match it - fall through to sneezy.
+    await immortalDb.execute(sql`
+      INSERT IGNORE INTO room
+        (vnum, name, x, y, z, description, zone, room_flag, sector, teletime, teletarg, telelook, river_speed, river_dir, capacity, height, spec, player_id, block)
+      VALUES
+        (5001, 'other builder draft', 0, 0, 0, '', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ${otherUser.playerId}, NULL)
+    `);
+    const res = await authRequest(app, "/api/rooms/name/5001", cookie);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual(
+      expect.objectContaining({ name: "Cross Block Room", vnum: 5001 }),
+    );
+    await immortalDb.execute(
+      sql`DELETE FROM room WHERE vnum = 5001 AND player_id = ${otherUser.playerId}`,
+    );
+  });
 });
 
 describe("bulk room deletion", () => {
@@ -659,6 +685,31 @@ describe("out-of-range data readable from DB", () => {
       method: "PUT",
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("schema boundary round-trips", () => {
+  test("room_flag round-trips at INT32_MIN and INT32_MAX", async () => {
+    // The schema allows INT32_MIN..INT32_MAX for room_flag; the DB column
+    // must accept and return the full range without truncation or sign-flip.
+    const vnum = 118;
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    for (const room_flag of [-2_147_483_648, 2_147_483_647]) {
+      const putRes = await authRequest(app, `/api/rooms/${vnum}`, cookie, {
+        body: JSON.stringify({ ...validRoomUpdate, room_flag, vnum }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      });
+      expect(putRes.status).toBe(200);
+      const getRes = await authRequest(app, `/api/rooms/${vnum}`, cookie);
+      expect(getRes.status).toBe(200);
+      const body: unknown = await getRes.json();
+      expect(body).toEqual(expect.objectContaining({ room_flag, vnum }));
+    }
   });
 });
 
@@ -1061,6 +1112,63 @@ describe("full-field roundtrip", () => {
 // -- Coordinate derivation --
 
 describe("room coordinate derivation from exit source", () => {
+  // Known coords for the source room in every direction test. Each sub-test
+  // first updates the source to reference a single exit pointing at its own
+  // target vnum (replace-not-append on the roomexit table), then creates the
+  // target. The source's coords stay stable because the PUT payload sets the
+  // same x/y/z each time.
+  const SOURCE_VNUM = 108;
+  const SOURCE_COORDS = { x: 10, y: 20, z: 5 };
+
+  async function createWithIncomingExit(
+    destination: number,
+    direction: number,
+  ): Promise<{ x: number; y: number; z: number }> {
+    await authRequest(app, `/api/rooms/${SOURCE_VNUM}`, cookie, {
+      body: JSON.stringify({
+        ...validRoomUpdate,
+        description: "source room",
+        exits: [
+          {
+            block: 1,
+            condition_flag: 0,
+            description: "",
+            destination,
+            direction,
+            key_num: -1,
+            lock_difficulty: 0,
+            name: "",
+            type: 0,
+            vnum: SOURCE_VNUM,
+            weight: 0,
+          },
+        ],
+        vnum: SOURCE_VNUM,
+        ...SOURCE_COORDS,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: destination }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    const res = await authRequest(app, `/api/rooms/${destination}`, cookie);
+    const parsed = roomSchema.parse(await res.json());
+    return { x: parsed.x, y: parsed.y, z: parsed.z };
+  }
+
+  beforeAll(async () => {
+    // Create the shared source room once. It gets re-PUT in each test to flip
+    // its single exit to the relevant direction, but the row itself persists.
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: SOURCE_VNUM }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+  });
+
   test("new room derives coordinates from incoming exit", async () => {
     // Set room 104's coordinates to a known value
     await authRequest(app, "/api/rooms/104", cookie, {
@@ -1108,6 +1216,115 @@ describe("room coordinate derivation from exit source", () => {
         z: 5,
       }),
     );
+  });
+
+  test("direction 4 (up) adds 1 to z", async () => {
+    const coords = await createWithIncomingExit(109, 4);
+    expect(coords).toEqual({
+      x: SOURCE_COORDS.x,
+      y: SOURCE_COORDS.y,
+      z: SOURCE_COORDS.z + 1,
+    });
+  });
+
+  test("direction 5 (down) subtracts 1 from z", async () => {
+    const coords = await createWithIncomingExit(112, 5);
+    expect(coords).toEqual({
+      x: SOURCE_COORDS.x,
+      y: SOURCE_COORDS.y,
+      z: SOURCE_COORDS.z - 1,
+    });
+  });
+
+  test("direction 6 (NE) adds 1 to x and y", async () => {
+    const coords = await createWithIncomingExit(113, 6);
+    expect(coords).toEqual({
+      x: SOURCE_COORDS.x + 1,
+      y: SOURCE_COORDS.y + 1,
+      z: SOURCE_COORDS.z,
+    });
+  });
+
+  test("direction 7 (NW) subtracts 1 from x, adds 1 to y", async () => {
+    const coords = await createWithIncomingExit(114, 7);
+    expect(coords).toEqual({
+      x: SOURCE_COORDS.x - 1,
+      y: SOURCE_COORDS.y + 1,
+      z: SOURCE_COORDS.z,
+    });
+  });
+
+  test("direction 8 (SE) adds 1 to x, subtracts 1 from y", async () => {
+    const coords = await createWithIncomingExit(115, 8);
+    expect(coords).toEqual({
+      x: SOURCE_COORDS.x + 1,
+      y: SOURCE_COORDS.y - 1,
+      z: SOURCE_COORDS.z,
+    });
+  });
+
+  test("direction 9 (SW) subtracts 1 from x and y", async () => {
+    const coords = await createWithIncomingExit(116, 9);
+    expect(coords).toEqual({
+      x: SOURCE_COORDS.x - 1,
+      y: SOURCE_COORDS.y - 1,
+      z: SOURCE_COORDS.z,
+    });
+  });
+
+  test("falls back to {0,0,0} when the incoming exit's direction has no offset", async () => {
+    // Create source room 117 with known non-zero coords, then bypass Zod by
+    // inserting a roomexit row with direction=10 (outside DIRECTION_OFFSETS)
+    // directly via SQL. This exercises the defensive fallback branch in
+    // deriveCoords. If the branch were removed, the derivation would either
+    // crash or return (10 + undefined, 20 + undefined, 5 + undefined) = NaNs.
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: 117 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(app, "/api/rooms/117", cookie, {
+      body: JSON.stringify({
+        ...validRoomUpdate,
+        exits: [],
+        vnum: 117,
+        x: 10,
+        y: 20,
+        z: 5,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    await immortalDb.execute(sql`
+      INSERT INTO roomexit
+        (vnum, player_id, direction, destination, name, condition_flag, type, key_num, lock_difficulty, weight, description, block)
+      VALUES
+        (117, ${testUser.playerId}, 10, 134, '', 0, 0, -1, 0, 0, '', 1)
+    `);
+
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: 134 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const res = await authRequest(app, "/api/rooms/134", cookie);
+    const body: unknown = await res.json();
+    expect(body).toEqual(expect.objectContaining({ x: 0, y: 0, z: 0 }));
+  });
+
+  test("creates a room at {0,0,0} when no incoming exit points to it", async () => {
+    // Complement to the derivation tests: with no exit pointing at vnum 133,
+    // deriveCoords's first lookup returns no row and the function returns the
+    // defaults immediately. This pins the "no incoming exit" early-return.
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum: 133 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    const res = await authRequest(app, "/api/rooms/133", cookie);
+    const body: unknown = await res.json();
+    expect(body).toEqual(expect.objectContaining({ x: 0, y: 0, z: 0 }));
   });
 });
 
@@ -1362,6 +1579,38 @@ describe("owner scoping", () => {
     expect(verifyRes.status).toBe(200);
     const verifyBody: unknown = await verifyRes.json();
     expect(verifyBody).toHaveProperty("name", "senior edited content");
+  });
+
+  test("TEST-OWNER-4c: senior cross-owner PUT preserves target's player_id", async () => {
+    // Regression lock on the NOTE in updateRoom ("player_id is deliberately
+    // NOT in the .set() clause"). Reads the column directly since the API
+    // never exposes player_id in responses.
+    const vnum = 184;
+    await authRequest(app, "/api/rooms", cookie, {
+      body: JSON.stringify({ vnum }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(
+      app,
+      `/api/rooms/${vnum}?owner=${testUser.playerId}`,
+      expandedCookie,
+      {
+        body: JSON.stringify({
+          ...validRoomUpdate,
+          name: "senior renamed room",
+          vnum,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+    );
+    const [row] = await immortalDb
+      .select({ player_id: room.player_id })
+      .from(room)
+      .where(eq(room.vnum, vnum));
+    expect(row?.player_id).toBe(testUser.playerId);
+    expect(row?.player_id).not.toBe(expandedUser.playerId);
   });
 
   test("TEST-OWNER-5: cross-owner DELETE removes target's row", async () => {

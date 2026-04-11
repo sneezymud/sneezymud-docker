@@ -149,6 +149,35 @@ describe("mob responses", () => {
     expect(body).toHaveProperty("vnum", 130);
   });
 
+  test("updating an existing response replaces the old text", async () => {
+    // Regression lock on upsertMobResponse's delete-then-insert: a bug that
+    // short-circuited the insert after the delete would leave the old row,
+    // silently falling back to the prior state. The existing "set response
+    // via PUT and retrieve it" test only creates + reads, so an update path
+    // regression would have no coverage.
+    const original = 'say {"A";}';
+    const updated = 'say {"B";}';
+
+    await authRequest(app, "/api/mob-responses/130", cookie, {
+      body: JSON.stringify({ response: original, vnum: 130 }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    const putRes = await authRequest(app, "/api/mob-responses/130", cookie, {
+      body: JSON.stringify({ response: updated, vnum: 130 }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+    expect(putRes.status).toBe(200);
+
+    const getRes = await authRequest(app, "/api/mob-responses/130", cookie);
+    expect(getRes.status).toBe(200);
+    const body: unknown = await getRes.json();
+    expect(body).toHaveProperty("response", updated);
+    expect(body).not.toHaveProperty("response", original);
+  });
+
   test("response for nonexistent mob returns 404", async () => {
     const res = await authRequest(app, "/api/mob-responses/199", cookie);
 

@@ -60,6 +60,7 @@ const VNUMS = {
   CROSS_OWNER_CALLER_DRAFT: 151,
   CROSS_OWNER_PUBLISH_MOB: 431,
   CROSS_OWNER_PUBLISH_ROOM: 430,
+  DASHBOARD_OWNER_ROOM: 153,
   DECIMAL_MOB: 555,
   DEEP_RT_MOB: 560,
   DEEP_RT_OBJ: 561,
@@ -91,6 +92,7 @@ const VNUMS = {
   SCOPE_MOB: 570,
   SCOPE_OBJ: 571,
   SCOPE_ROOM: 572,
+  SINGLE_ORPHAN_MR: 418,
   VNUM_ACCESS_ROOM: 406,
 };
 
@@ -1081,6 +1083,36 @@ describe("mob response publish", () => {
     );
     expect(res.status).toBe(404);
   });
+
+  test("publishing a mob response whose parent mob is unpublished returns 422", async () => {
+    // Create a mob and its response in immortal, but do NOT publish the mob.
+    // This exercises the single-entity route's MobResponseMissingParentError
+    // branch (paralleling the bulk route path covered by TEST-OWNER-10).
+    const vnum = VNUMS.SINGLE_ORPHAN_MR;
+    await createAndUpdate("mobs", vnum, lowOnlyCookie, { ...validMobUpdate });
+    const putRes = await authRequest(
+      app,
+      `/api/mob-responses/${vnum}`,
+      lowOnlyCookie,
+      {
+        body: JSON.stringify({ response: "say {hi;}", vnum }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+    );
+    expect(putRes.status).toBe(200);
+
+    const res = await authRequest(
+      app,
+      `/api/publish/mob-responses/${vnum}`,
+      lowOnlyCookie,
+      { method: "POST" },
+    );
+    expect(res.status).toBe(422);
+    const body: unknown = await res.json();
+    expect(body).toHaveProperty("error", expect.stringContaining(String(vnum)));
+    expect(await getSneezyMobResponse(vnum)).toBeNull();
+  });
 });
 
 // ===========================================================================
@@ -1245,6 +1277,46 @@ describe("dashboard", () => {
     }
   });
 
+  test("senior ?owner=<playerId> returns only that builder's drafts", async () => {
+    // testUser creates a draft in their own block; lowOnlyUser (senior) then
+    // targets that specific playerId via ?owner=. This exercises the
+    // resolveListOwner specific-number branch, which is distinct from the
+    // owner=all branch (scope: "all") and the own-draft branch (scope: caller).
+    const vnum = VNUMS.DASHBOARD_OWNER_ROOM;
+    await createAndUpdate("rooms", vnum, testCookie, {
+      ...validRoomUpdate,
+      name: "testUser owner-filter draft",
+    });
+
+    const res = await authRequest(
+      app,
+      `/api/publish/dashboard?owner=${testUser.playerId}`,
+      lowOnlyCookie,
+    );
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(Array.isArray(body)).toBe(true);
+
+    // The target builder's draft is present.
+    expect(body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          playerId: testUser.playerId,
+          status: "new",
+          type: "room",
+          vnum,
+        }),
+      ]),
+    );
+
+    // Every returned entry is scoped to the targeted playerId - no leakage
+    // of the caller's own drafts (e.g. DIFF_MOB) or other builders'.
+    if (!Array.isArray(body)) throw new Error("expected array");
+    for (const entry of body) {
+      expect(entry).toHaveProperty("playerId", testUser.playerId);
+    }
+  });
+
   test("mob responses appear in dashboard", async () => {
     // RESPONSE_MOB was created and given a mob response in the
     // "mob response publish" describe block's beforeAll. The response was
@@ -1275,6 +1347,21 @@ describe("dashboard", () => {
         }),
       ]),
     );
+  });
+
+  test("senior with no entities gets 200 and empty array", async () => {
+    // noLimitsOnlyUser (senior, blocks 90100-90199) creates no drafts in any
+    // test file. The dashboard query must return an empty array rather than
+    // erroring when the scoped immortal tables match zero rows.
+    const noLimitsCookie = await getAuthCookie(app, "nolimitsonly");
+    const res = await authRequest(
+      app,
+      "/api/publish/dashboard",
+      noLimitsCookie,
+    );
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toEqual([]);
   });
 });
 

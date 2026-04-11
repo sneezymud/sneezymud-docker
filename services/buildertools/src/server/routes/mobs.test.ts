@@ -6,7 +6,12 @@ import { mobSchema } from "@/shared/schemas/mob.ts";
 import { app } from "../app.ts";
 import { immortalDb } from "../db.ts";
 import { mob } from "../schema/immortal.ts";
-import { authRequest, getAuthCookie, testUser } from "../test-helpers.ts";
+import {
+  authRequest,
+  expandedUser,
+  getAuthCookie,
+  testUser,
+} from "../test-helpers.ts";
 
 let cookie: string;
 
@@ -495,6 +500,45 @@ describe("out-of-range data readable from DB", () => {
       method: "PUT",
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("schema boundary round-trips", () => {
+  test("actions round-trips at 0 and UINT32_MAX", async () => {
+    const vnum = 121;
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    for (const actions of [0, 4_294_967_295]) {
+      const putRes = await authRequest(app, `/api/mobs/${vnum}`, cookie, {
+        body: JSON.stringify({ ...validMobUpdate, actions, vnum }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      });
+      expect(putRes.status).toBe(200);
+      const getRes = await authRequest(app, `/api/mobs/${vnum}`, cookie);
+      expect(getRes.status).toBe(200);
+      const body: unknown = await getRes.json();
+      expect(body).toEqual(expect.objectContaining({ actions, vnum }));
+    }
+  });
+
+  test("level round-trips at 1 and 100", async () => {
+    const vnum = 121;
+    for (const level of [1, 100]) {
+      const putRes = await authRequest(app, `/api/mobs/${vnum}`, cookie, {
+        body: JSON.stringify({ ...validMobUpdate, level, vnum }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      });
+      expect(putRes.status).toBe(200);
+      const getRes = await authRequest(app, `/api/mobs/${vnum}`, cookie);
+      expect(getRes.status).toBe(200);
+      const body: unknown = await getRes.json();
+      expect(body).toEqual(expect.objectContaining({ level, vnum }));
+    }
   });
 });
 
@@ -1015,6 +1059,40 @@ describe("owner scoping", () => {
     expect(verifyRes.status).toBe(200);
     const body: unknown = await verifyRes.json();
     expect(body).toHaveProperty("name", "senior edited mob");
+  });
+
+  test("senior cross-owner PUT preserves target's player_id", async () => {
+    // Regression lock on the NOTE in updateMob ("player_id is deliberately
+    // NOT in the .set() clause"). If a senior edit rewrote player_id to the
+    // caller's id, the target builder would silently lose ownership of their
+    // draft. This test asserts the column directly since the API never
+    // exposes player_id in responses.
+    const vnum = 170;
+    await authRequest(app, "/api/mobs", cookie, {
+      body: JSON.stringify({ vnum }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    await authRequest(
+      app,
+      `/api/mobs/${vnum}?owner=${testUser.playerId}`,
+      expandedCookie,
+      {
+        body: JSON.stringify({
+          ...validMobUpdate,
+          name: "senior renamed",
+          vnum,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+    );
+    const [row] = await immortalDb
+      .select({ player_id: mob.player_id })
+      .from(mob)
+      .where(eq(mob.vnum, vnum));
+    expect(row?.player_id).toBe(testUser.playerId);
+    expect(row?.player_id).not.toBe(expandedUser.playerId);
   });
 
   test("senior cross-owner DELETE removes target's mob", async () => {

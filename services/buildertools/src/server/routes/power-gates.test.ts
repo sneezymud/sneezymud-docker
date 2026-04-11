@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 
 import { app } from "../app.ts";
 import { immortalDb } from "../db.ts";
-import { authRequest, getAuthCookie } from "../test-helpers.ts";
+import { authRequest, getAuthCookie, otherUser } from "../test-helpers.ts";
 
 // Vnums 190-199 reserved for power gate tests (otherbuilder/testbuilder)
 // Vnums 200-205 reserved for senior bypass tests (expandedbuilder)
@@ -18,7 +18,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  const vnums = sql`(190, 191, 192, 193, 194, 195, 196, 197, 200, 201, 202, 203, 204, 205)`;
+  const vnums = sql`(190, 191, 192, 193, 194, 195, 196, 197, 198, 200, 201, 202, 203, 204, 205)`;
   await immortalDb.execute(sql`DELETE FROM objaffect WHERE vnum IN ${vnums}`);
   await immortalDb.execute(sql`DELETE FROM objextra WHERE vnum IN ${vnums}`);
   await immortalDb.execute(sql`DELETE FROM obj WHERE vnum IN ${vnums}`);
@@ -480,6 +480,36 @@ describe("room power gates", () => {
     expect(getRes.status).toBe(200);
     const body: unknown = await getRes.json();
     expect(body).toEqual(expect.objectContaining({ spec: 33, vnum: 197 }));
+  });
+});
+
+describe("room power gates - unchanged value passes through", () => {
+  test("without REDIT_ENABLED: saving with unchanged unassignable spec succeeds", async () => {
+    // Mirror of the object-price unchanged pass-through test. Create a room,
+    // bypass the gate via direct SQL to set an unassignable spec (as if an
+    // admin or a senior had set it previously), then have otherbuilder save
+    // the room without touching spec. The gate should not fire on unchanged
+    // values - otherwise non-REDIT_ENABLED builders would be blocked from
+    // editing any legacy room that already has an unassignable spec.
+    const vnum = 198;
+    await post("/api/rooms", otherCookie, { vnum });
+    await immortalDb.execute(sql`
+      UPDATE room SET spec = 1 WHERE vnum = ${vnum} AND player_id = ${otherUser.playerId}
+    `);
+    const putRes = await put(`/api/rooms/${vnum}`, otherCookie, {
+      ...baseRoomPayload,
+      name: "renamed room",
+      spec: 1,
+      vnum,
+    });
+    expect(putRes.status).toBe(200);
+
+    const getRes = await get(`/api/rooms/${vnum}`, otherCookie);
+    expect(getRes.status).toBe(200);
+    const body: unknown = await getRes.json();
+    expect(body).toEqual(
+      expect.objectContaining({ name: "renamed room", spec: 1, vnum }),
+    );
   });
 });
 
