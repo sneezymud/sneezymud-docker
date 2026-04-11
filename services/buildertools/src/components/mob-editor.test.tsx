@@ -151,6 +151,25 @@ describe("MobEditor", () => {
       });
       expect(diffButtons.length).toBeGreaterThan(0);
     });
+
+    test("Delete button absent in read-only mode", async () => {
+      setAuth([POWER.BUILDER]);
+      mockMobEndpoints();
+      renderWithProviders(<MobEditor vnumParam={VNUM} />);
+      await screen.findByText(/read[-\s]?only/i);
+      expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+    });
+
+    test("Undo button absent in read-only mode", async () => {
+      // Without a save path there is no need for an undo affordance, and a
+      // visible Undo button in read-only mode would mislead users into
+      // thinking the form is editable.
+      setAuth([POWER.BUILDER]);
+      mockMobEndpoints();
+      renderWithProviders(<MobEditor vnumParam={VNUM} />);
+      await screen.findByText(/read[-\s]?only/i);
+      expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+    });
   });
 
   describe("dirty state tracking", () => {
@@ -256,6 +275,88 @@ describe("MobEditor", () => {
         name: /dragon breath/,
       });
       expect(option).toBeDefined();
+    });
+
+    test("non-IMP_POWER user can save a mob with pre-existing unassignable spec_proc unchanged", async () => {
+      // Mirror of the server-side unchanged-value pass-through test at the
+      // component level. A non-IMP_POWER builder loads a mob whose spec_proc
+      // was set to an unassignable value by an admin or senior; saving
+      // without touching spec_proc must not trigger a client-side validation
+      // error, since the field is not dirty.
+      setAuth(BASE_POWERS); // no MEDIT_IMP_POWER
+      mockMobEndpoints(makeMob({ spec_proc: 3 })); // 3 is unassignable
+      renderWithProviders(<MobEditor vnumParam={VNUM} />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      const nameInput = screen.getByRole("textbox", { name: /keywords/i });
+      await user.clear(nameInput);
+      await user.type(nameInput, "renamed but spec unchanged");
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(false);
+      });
+
+      await user.click(saveButton);
+
+      // After successful save, dirty state clears and Save becomes disabled
+      await waitFor(() => {
+        expect(saveButton.hasAttribute("disabled")).toBe(true);
+      });
+
+      const putCall = getFetchLog().find((c) => c.method === "PUT");
+      if (!putCall) throw new Error("expected PUT call in fetch log");
+      expect(putCall.body).toEqual(expect.objectContaining({ spec_proc: 3 }));
+    });
+
+    test("403 spec_proc rejection from server is surfaced via toast", async () => {
+      mockFetch([
+        { body: makeMob(), url: `/api/mobs/${VNUM}` },
+        { body: makeMobResponse(), url: `/api/mob-responses/${VNUM}` },
+      ]);
+      renderWithProviders(
+        <>
+          <MobEditor vnumParam={VNUM} />
+          <Toaster />
+        </>,
+      );
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Keywords")).toBeDefined();
+      });
+
+      // Dirty the form so Save is enabled
+      const nameInput = screen.getByRole("textbox", { name: /keywords/i });
+      await user.clear(nameInput);
+      await user.type(nameInput, "triggers a 403");
+
+      // Replace the mock to return a 403 on save
+      resetFetchMock();
+      mockFetch([
+        {
+          body: {
+            error:
+              'Changing "spec_proc" to an unassignable value requires POWER_MEDIT_IMP_POWER',
+          },
+          status: 403,
+          url: `/api/mobs/${VNUM}`,
+        },
+        { body: makeMobResponse(), url: `/api/mob-responses/${VNUM}` },
+      ]);
+
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/requires POWER_MEDIT_IMP_POWER/),
+        ).toBeDefined();
+      });
     });
   });
 
