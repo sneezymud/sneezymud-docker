@@ -6,11 +6,14 @@ import { useRowKeys } from "@/hooks/use-row-keys.ts";
 import { DIRECTION_TYPES } from "@/shared/enums/index.ts";
 import { enforceExitFlagRules } from "@/shared/exit-flag-rules.ts";
 
-export const hasExitData = (exit: RoomExit) =>
-  exit.destination !== 0 ||
-  exit.name !== "" ||
-  exit.description !== "" ||
-  exit.condition_flag !== 0;
+export function hasExitData(exit: RoomExit) {
+  return (
+    exit.destination !== 0 ||
+    exit.name !== "" ||
+    exit.description !== "" ||
+    exit.condition_flag !== 0
+  );
+}
 
 export function useExitEditor(
   exits: RoomExit[],
