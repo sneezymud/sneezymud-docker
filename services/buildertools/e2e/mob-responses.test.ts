@@ -24,8 +24,16 @@ test.describe("mob responses", () => {
     await page.keyboard.press("Enter");
     await page.waitForURL(/\/mobs\/185/);
 
-    // Give the mob a name so it's identifiable
+    // Fill all four required mob fields (Keywords, Short Description,
+    // Long Description, Detailed Description). applyValidation() blocks
+    // save if any are empty and surfaces a "Required fields cannot be
+    // empty" toast - the Save button stays enabled and toBeDisabled()
+    // would time out.
+    await page.locator("#name").fill("test merchant");
     await page.getByLabel("Short Description").fill("a test merchant");
+    await page.getByLabel("Long Description").fill("A test merchant is here.");
+    await page.getByLabel("Detailed Description").fill("A test merchant.");
+
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.getByRole("button", { name: "Save" })).toBeDisabled();
 

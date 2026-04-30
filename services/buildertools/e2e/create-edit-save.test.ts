@@ -26,9 +26,15 @@ test.describe("room create-edit-save", () => {
     await page.keyboard.press("Enter");
     await page.waitForURL(/\/rooms\/197/);
 
-    // Edit a field so the form becomes dirty
-    const nameInput = page.getByLabel("Name");
+    // Fill required fields (Name + Description) so the form passes
+    // client-side validation. Without all required fields, save is blocked
+    // locally with a "Required fields cannot be empty" toast and the PUT
+    // never fires - so the server-error intercept below would never trigger.
+    // Use id-based locators: getByLabel("Name") collides with the rooms list's
+    // search input and row aria-labels during the route transition.
+    const nameInput = page.locator("#name");
     await nameInput.fill("doomed room");
+    await page.locator("#description").fill("placeholder description");
 
     // Intercept the PUT to simulate a server error
     await page.route("**/api/rooms/197", (route) => {
@@ -43,7 +49,7 @@ test.describe("room create-edit-save", () => {
     });
 
     // Click Save
-    const saveButton = page.getByRole("button", { name: "Save" });
+    const saveButton = page.getByRole("button", { exact: true, name: "Save" });
     await saveButton.click();
 
     // Error should be visible to the user (sonner toast)
@@ -75,12 +81,14 @@ test.describe("room create-edit-save", () => {
     // Should navigate to the room editor
     await page.waitForURL(/\/rooms\/198/);
 
-    // Edit the room name (label "Name" from room-fields.tsx)
-    const nameInput = page.getByLabel("Name");
+    // Edit the room name. Use id-based locator to avoid collision with
+    // the rooms list's search input and row aria-labels during the
+    // route transition.
+    const nameInput = page.locator("#name");
     await nameInput.fill("test room hallway");
 
-    // Edit the description (label "Description" from room-fields.tsx)
-    const descInput = page.getByLabel("Description");
+    // Edit the description (id="description" from FieldInput).
+    const descInput = page.locator("#description");
     await descInput.fill("A long hallway stretches before you.");
 
     // Expand the "Properties" section (collapsed by default)
@@ -98,13 +106,21 @@ test.describe("room create-edit-save", () => {
     await capacityInput.fill("5");
 
     // Save
-    await page.getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { exact: true, name: "Save" }).click();
 
     // Wait for save to complete - Save button is disabled when not dirty
-    await expect(page.getByRole("button", { name: "Save" })).toBeDisabled();
+    await expect(
+      page.getByRole("button", { exact: true, name: "Save" }),
+    ).toBeDisabled();
 
-    // Navigate away via nav
-    await page.getByRole("link", { name: "Rooms" }).click();
+    // Navigate away via the sidebar nav. From inside the editor, the
+    // breadcrumb also has a "Rooms" link and the BackLink has a title
+    // ("Back to rooms") that substring-matches "Rooms". Use exact + first
+    // to target the sidebar link.
+    await page
+      .getByRole("link", { exact: true, name: "Rooms" })
+      .first()
+      .click();
     await page.waitForURL(/\/rooms$/);
 
     // Navigate back to the room by clicking its vnum link in the list
@@ -112,8 +128,8 @@ test.describe("room create-edit-save", () => {
     await page.waitForURL(/\/rooms\/198/);
 
     // Verify values persisted
-    await expect(page.getByLabel("Name")).toHaveValue("test room hallway");
-    await expect(page.getByLabel("Description")).toHaveValue(
+    await expect(page.locator("#name")).toHaveValue("test room hallway");
+    await expect(page.locator("#description")).toHaveValue(
       "A long hallway stretches before you.",
     );
 

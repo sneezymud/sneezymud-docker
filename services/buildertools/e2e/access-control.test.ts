@@ -7,6 +7,46 @@ import { expect, test } from "./auth-fixture.ts";
 
 const vnumListSchema = z.array(z.object({ vnum: z.number().int() }));
 
+const SEED_VNUM = 155;
+const API_HEADERS = { "X-Requested-With": "XMLHttpRequest" };
+
+// Pulled out of the test body so the conditionals don't trip
+// playwright/no-conditional-in-test. Each EntityRow's aria-label looks like
+// "(unnamed) (vnum 250)" - return the parsed number, or undefined if the row
+// has no label or the label has no vnum segment.
+function parseVnumFromLabel(label: null | string): number | undefined {
+  if (label === null) return undefined;
+  const match = /vnum (\d+)/.exec(label);
+  return match ? Number(match[1]) : undefined;
+}
+
+test.beforeEach(async ({ authenticatedPage: page }) => {
+  // The first test reads each entity list and asserts at least one vnum is
+  // visible (vacuous-pass guard). Seed one entity per type via API so the
+  // assertions have data to match. Cleanup runs in afterEach.
+  for (const path of ["/api/rooms", "/api/mobs", "/api/objects"]) {
+    const res = await page.request.post(path, {
+      data: { vnum: SEED_VNUM },
+      headers: API_HEADERS,
+    });
+    expect(res.status()).toBe(201);
+  }
+  // Reload so the list pages refetch and render the new rows.
+  await page.reload();
+});
+
+test.afterEach(async ({ authenticatedPage: page }) => {
+  for (const path of ["/api/rooms", "/api/mobs", "/api/objects"]) {
+    try {
+      await page.request.delete(`${path}/${SEED_VNUM}`, {
+        headers: API_HEADERS,
+      });
+    } catch {
+      // Already deleted
+    }
+  }
+});
+
 test("builder sees no entities outside their vnum blocks", async ({
   authenticatedPage: page,
 }) => {
@@ -29,16 +69,14 @@ test("builder sees no entities outside their vnum blocks", async ({
       .getByRole("row")
       .filter({ hasNot: page.getByRole("columnheader") });
     const rowCount = await rows.count();
-    const extractedVnums: number[] = [];
-    for (let i = 0; i < rowCount; i++) {
-      const label = await rows.nth(i).getAttribute("aria-label");
-      if (label) {
-        const vnumMatch = /vnum (\d+)/.exec(label);
-        if (vnumMatch) {
-          extractedVnums.push(Number(vnumMatch[1]));
-        }
-      }
-    }
+    const labels = await Promise.all(
+      Array.from({ length: rowCount }, (_, i) =>
+        rows.nth(i).getAttribute("aria-label"),
+      ),
+    );
+    const extractedVnums = labels
+      .map(parseVnumFromLabel)
+      .filter((v): v is number => v !== undefined);
 
     // Guard: ensure we actually found vnums to check (prevents vacuous pass)
     expect(

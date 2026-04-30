@@ -7,7 +7,10 @@ test.describe("login and logout", () => {
     await page.getByLabel("Password").fill("testpass");
     await page.getByRole("button", { name: "Log in" }).click();
     await expect(page).not.toHaveURL(/\/login/);
-    await expect(page.getByText("TestBuilder")).toBeVisible();
+    // exact: true disambiguates from the username "testbuilder" rendered in
+    // a sibling span - Playwright's default substring + case-insensitive
+    // match would resolve both spans.
+    await expect(page.getByText("TestBuilder", { exact: true })).toBeVisible();
   });
 
   test("invalid credentials show error message", async ({ page }) => {

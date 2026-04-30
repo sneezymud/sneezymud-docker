@@ -24,12 +24,17 @@ test.describe("unsaved changes dialog", () => {
   });
 
   test("cancel preserves the edit", async ({ authenticatedPage: page }) => {
-    // Make an edit
-    const nameInput = page.getByLabel("Name");
+    // Make an edit. Use #name to avoid the rooms list locator collision
+    // during route transition (search input + row aria-labels match "Name").
+    const nameInput = page.locator("#name");
     await nameInput.fill("unsaved edit");
 
-    // Try to navigate away
-    await page.getByRole("link", { name: "Rooms" }).click();
+    // Try to navigate away. From inside the editor, sidebar + breadcrumb
+    // both have a "Rooms" link, so use exact + first to target the sidebar.
+    await page
+      .getByRole("link", { exact: true, name: "Rooms" })
+      .first()
+      .click();
 
     // UnsavedChangesDialog should appear with "Cancel" and "Discard changes" buttons
     await page.getByRole("button", { name: "Cancel" }).click();
@@ -41,11 +46,14 @@ test.describe("unsaved changes dialog", () => {
 
   test("confirm discards the edit", async ({ authenticatedPage: page }) => {
     // Make an edit
-    const nameInput = page.getByLabel("Name");
+    const nameInput = page.locator("#name");
     await nameInput.fill("will be discarded");
 
-    // Try to navigate away
-    await page.getByRole("link", { name: "Rooms" }).click();
+    // Try to navigate away (sidebar Rooms link, disambiguated from breadcrumb)
+    await page
+      .getByRole("link", { exact: true, name: "Rooms" })
+      .first()
+      .click();
 
     // UnsavedChangesDialog: click "Discard changes" (confirmLabel)
     await page.getByRole("button", { name: "Discard changes" }).click();
@@ -57,12 +65,19 @@ test.describe("unsaved changes dialog", () => {
   test("save and continue saves then navigates", async ({
     authenticatedPage: page,
   }) => {
-    // Make an edit
-    const nameInput = page.getByLabel("Name");
+    // Make an edit. Description must also be filled - it's a required field
+    // and applyValidation() blocks the save if any required field is empty,
+    // surfacing a "Required fields cannot be empty" toast and preventing
+    // navigation.
+    const nameInput = page.locator("#name");
     await nameInput.fill("saved before leaving");
+    await page.locator("#description").fill("placeholder description");
 
-    // Try to navigate away
-    await page.getByRole("link", { name: "Rooms" }).click();
+    // Try to navigate away (sidebar Rooms link, disambiguated from breadcrumb)
+    await page
+      .getByRole("link", { exact: true, name: "Rooms" })
+      .first()
+      .click();
 
     // UnsavedChangesDialog: click "Save & continue"
     await page.getByRole("button", { name: "Save & continue" }).click();
@@ -70,13 +85,11 @@ test.describe("unsaved changes dialog", () => {
     // Should navigate to the rooms list after saving
     await expect(page).toHaveURL(/\/rooms$/);
 
-    // Navigate back to verify the save persisted
-    await page
-      .getByRole("row")
-      .filter({ hasText: "197" })
-      .getByRole("link")
-      .click();
+    // Navigate back to verify the save persisted. Once a room has a name,
+    // its row contains two links (vnum + name) both linking to /rooms/197 -
+    // grab the vnum link explicitly to avoid a strict-mode collision.
+    await page.getByRole("link", { exact: true, name: "197" }).click();
     await expect(page).toHaveURL(/\/rooms\/197/);
-    await expect(page.getByLabel("Name")).toHaveValue("saved before leaving");
+    await expect(page.locator("#name")).toHaveValue("saved before leaving");
   });
 });

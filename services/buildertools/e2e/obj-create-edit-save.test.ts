@@ -33,11 +33,19 @@ test.describe("object create-edit-save", () => {
     const shortDescInput = page.getByLabel("Short Description");
     await shortDescInput.fill("a test iron sword");
 
+    // Long Description is required by use-object-editor's validator (along
+    // with Keywords + Short Description). Without it, save is blocked.
+    await page
+      .getByLabel("Long Description")
+      .fill("A test iron sword lies here.");
+
     // Select weapon type (type 5) via Combobox (not native select - too many
-    // item types triggers SearchableEnumSelect). Click to open, type to filter,
-    // click option.
+    // item types triggers SearchableEnumSelect). Use focus() instead of
+    // click() to bypass pointer-event interception by the EntityHeader
+    // sticky top-bar (z-10 with backdrop-blur). The combobox opens its
+    // listbox on focus + typing, matching real keyboard-driven UX.
     const typeCombobox = page.getByLabel("Item Type");
-    await typeCombobox.click();
+    await typeCombobox.focus();
     await typeCombobox.fill("Weapon");
     await page.getByRole("option", { name: /Weapon/ }).click();
 

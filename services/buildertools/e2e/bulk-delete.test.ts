@@ -30,6 +30,12 @@ test.describe("bulk delete rooms", () => {
       expect(res.status()).toBe(201);
     }
 
+    // Reload to invalidate the TanStack Query cache. Needed for rooms
+    // because the auth fixture lands on /rooms - clicking the Rooms
+    // sidebar link wouldn't trigger a refetch. Mobs/objects variants
+    // don't need this because clicking Mobs/Objects does navigate.
+    await page.reload();
+
     await page.getByRole("link", { name: "Rooms" }).click();
     await page.waitForURL(/\/rooms$/);
 
