@@ -146,58 +146,23 @@ export function EntityList({
 
   return (
     <>
-      <div className="mb-4 flex items-center">
-        <h2 className="text-foreground text-2xl font-bold tracking-tight">
-          {label}
-        </h2>
-
-        <div className="ml-auto">
-          <MobileMenuButton />
-        </div>
-      </div>
-
+      <ListPageTitle title={label} />
       {banner}
 
-      <div className="mb-4 flex items-center gap-3">
-        <SearchInput
-          className="min-w-0 flex-1"
-          onChange={setSearch}
-          placeholder="Search by vnum or name..."
-          value={search}
-        />
-
-        <Button
-          aria-label={
-            viewMode === "table"
-              ? "Switch to card view"
-              : "Switch to table view"
-          }
-          onClick={() => {
-            setViewMode(viewMode === "table" ? "card" : "table");
-          }}
-          size="icon-sm"
-          variant="ghost"
-        >
-          {viewMode === "table" ? (
-            <LayoutGrid className="h-4 w-4" />
-          ) : (
-            <LayoutList className="h-4 w-4" />
-          )}
-        </Button>
-
-        {canEdit && onCreateVnum && vnumBlocks ? (
-          <VnumPicker
-            allowAnyVnum={allowAnyVnum}
-            createPending={createPending}
-            existingVnums={new Set(entities.map((e) => e.vnum))}
-            onCreate={onCreateVnum}
-            onOpenChange={setShowCreate}
-            open={showCreate}
-            triggerLabel={`Add`}
-            vnumBlocks={vnumBlocks}
-          />
-        ) : null}
-      </div>
+      <ListToolbar
+        allowAnyVnum={allowAnyVnum}
+        canEdit={canEdit}
+        createPending={createPending}
+        existingVnums={entities}
+        onCreateVnum={onCreateVnum}
+        search={search}
+        setSearch={setSearch}
+        setShowCreate={setShowCreate}
+        setViewMode={setViewMode}
+        showCreate={showCreate}
+        viewMode={viewMode}
+        vnumBlocks={vnumBlocks}
+      />
 
       {canEdit && onDeleteSelected && ownerFilter !== "all" ? (
         <DeleteSelectionBar
@@ -256,12 +221,116 @@ export function EntityList({
         totalPages={totalPages}
       />
 
-      <p className="text-muted-foreground mt-3 text-xs">
-        {search
-          ? `${filteredCount} results (${entities.length} total)`
-          : `${entities.length} ${label.toLowerCase()}`}
-      </p>
+      <ResultsCount
+        filteredCount={filteredCount}
+        label={label}
+        search={search}
+        total={entities.length}
+      />
     </>
+  );
+}
+
+function ListPageTitle({ title }: { title: string }) {
+  return (
+    <div className="mb-4 flex items-center">
+      <h2 className="text-foreground text-2xl font-bold tracking-tight">
+        {title}
+      </h2>
+
+      <div className="ml-auto">
+        <MobileMenuButton />
+      </div>
+    </div>
+  );
+}
+
+function ListToolbar({
+  allowAnyVnum,
+  canEdit,
+  createPending,
+  existingVnums,
+  onCreateVnum,
+  search,
+  setSearch,
+  setShowCreate,
+  setViewMode,
+  showCreate,
+  viewMode,
+  vnumBlocks,
+}: {
+  allowAnyVnum: boolean | undefined;
+  canEdit: boolean;
+  createPending: boolean | undefined;
+  existingVnums: EntityListItem[];
+  onCreateVnum: ((vnum: number) => void) | undefined;
+  search: string;
+  setSearch: (s: string) => void;
+  setShowCreate: (open: boolean) => void;
+  setViewMode: (mode: ListViewMode) => void;
+  showCreate: boolean;
+  viewMode: ListViewMode;
+  vnumBlocks: Array<{ end: number; start: number }> | undefined;
+}) {
+  return (
+    <div className="mb-4 flex items-center gap-3">
+      <SearchInput
+        className="min-w-0 flex-1"
+        onChange={setSearch}
+        placeholder="Search by vnum or name..."
+        value={search}
+      />
+
+      <Button
+        aria-label={
+          viewMode === "table" ? "Switch to card view" : "Switch to table view"
+        }
+        onClick={() => {
+          setViewMode(viewMode === "table" ? "card" : "table");
+        }}
+        size="icon-sm"
+        variant="ghost"
+      >
+        {viewMode === "table" ? (
+          <LayoutGrid className="h-4 w-4" />
+        ) : (
+          <LayoutList className="h-4 w-4" />
+        )}
+      </Button>
+
+      {canEdit && onCreateVnum && vnumBlocks ? (
+        <VnumPicker
+          allowAnyVnum={allowAnyVnum}
+          createPending={createPending}
+          existingVnums={new Set(existingVnums.map((e) => e.vnum))}
+          onCreate={onCreateVnum}
+          onOpenChange={setShowCreate}
+          open={showCreate}
+          triggerLabel={`Add`}
+          vnumBlocks={vnumBlocks}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ResultsCount({
+  filteredCount,
+  label,
+  search,
+  total,
+}: {
+  filteredCount: number;
+  label: string;
+  search: string;
+  total: number;
+}) {
+  return (
+    <p className="text-muted-foreground mt-3 text-xs">
+      {search
+        ? `${filteredCount} results (${total} total)`
+        : `${total} ${label.toLowerCase()}`}
+    </p>
   );
 }
 
