@@ -57,7 +57,6 @@ objectRoutes.get("/", async (c) => {
       rows.map((r) => ({
         ...r,
         owner: names.get(r.player_id ?? 0) ?? "Unknown",
-        playerId: r.player_id,
       })),
     );
   }
