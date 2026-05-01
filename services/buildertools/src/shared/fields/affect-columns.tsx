@@ -23,7 +23,7 @@ export const affectColumns: Array<ColumnDef<ObjAffect>> = [
         entries={APPLY_TYPES}
         id={id}
         onChange={(v) => {
-          onRowChange({ mod1: 0, mod2: 0, type: v } as Partial<ObjAffect>);
+          onRowChange({ mod1: 0, mod2: 0, type: v });
         }}
         value={row.type}
       />

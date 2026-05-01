@@ -74,7 +74,7 @@ export function isDuplicateKeyError(err: unknown): boolean {
     typeof err === "object" &&
     err !== null &&
     "errno" in err &&
-    (err as { errno: unknown }).errno === 1062
+    err.errno === 1062
   );
 }
 
@@ -85,7 +85,7 @@ export function isDuplicateKeyError(err: unknown): boolean {
 export function isConstraintError(err: unknown): boolean {
   if (hasConstraintCode(err)) return true;
   if (err != null && typeof err === "object" && "cause" in err) {
-    return hasConstraintCode((err as { cause: unknown }).cause);
+    return hasConstraintCode(err.cause);
   }
   return false;
 }
