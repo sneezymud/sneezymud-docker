@@ -75,7 +75,7 @@ export default async function globalSetup(_config: FullConfig) {
     } catch {
       // Server not ready yet
     }
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
   serverProcess.kill("SIGTERM");

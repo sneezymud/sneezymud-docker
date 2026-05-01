@@ -36,7 +36,7 @@ export const Route = createFileRoute("/_authenticated")({
       }
       // Retry once after a brief delay (handles transient network failures)
       try {
-        await new Promise((r) => setTimeout(r, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         const sessionUser = await apiFetch("/api/auth/me", sessionUserSchema);
         setUser(sessionUser);
       } catch {
