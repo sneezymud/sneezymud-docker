@@ -35,8 +35,8 @@ export function VnumPicker({
 
   // Find next available vnum
   let suggestedVnum: null | number = null;
-  for (const block of vnumBlocks) {
-    for (let v = block.start; v <= block.end; v++) {
+  for (const { end, start } of vnumBlocks) {
+    for (let v = start; v <= end; v++) {
       if (!existingVnums.has(v)) {
         suggestedVnum = v;
         break;
@@ -143,7 +143,9 @@ function VnumPickerForm({
   const inBlocks =
     allowAnyVnum === true ||
     vnumBlocks.length === 0 ||
-    vnumBlocks.some((b) => vnumNumber >= b.start && vnumNumber <= b.end);
+    vnumBlocks.some(
+      ({ end, start }) => vnumNumber >= start && vnumNumber <= end,
+    );
   const isValid =
     vnumInput !== "" &&
     Number.isInteger(vnumNumber) &&
@@ -182,7 +184,8 @@ function VnumPickerForm({
 
           {!allowAnyVnum && vnumBlocks.length > 0 && (
             <p className="text-muted-foreground mt-1 text-xs">
-              Ranges: {vnumBlocks.map((b) => `${b.start}-${b.end}`).join(", ")}
+              Ranges:{" "}
+              {vnumBlocks.map(({ end, start }) => `${start}-${end}`).join(", ")}
             </p>
           )}
         </div>

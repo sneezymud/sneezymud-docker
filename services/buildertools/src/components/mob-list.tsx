@@ -12,7 +12,10 @@ export function MobList({
     <EntityListPage
       from={from}
       to={to}
-      toEntityItem={(m, fallbackPlayerId) => {
+      toEntityItem={(
+        { level, name, owner, player_id, race, short_desc, vnum },
+        fallbackPlayerId,
+      ) => {
         const item: {
           metadata: string;
           name: string;
@@ -21,13 +24,13 @@ export function MobList({
           secondary: string;
           vnum: number;
         } = {
-          metadata: `Lvl ${m.level} / ${RACE_TYPES.find((r) => r.value === m.race)?.label ?? "Unknown"}`,
-          name: m.short_desc || m.name,
-          playerId: m.player_id ?? fallbackPlayerId,
-          secondary: m.name,
-          vnum: m.vnum,
+          metadata: `Lvl ${level} / ${RACE_TYPES.find((r) => r.value === race)?.label ?? "Unknown"}`,
+          name: short_desc || name,
+          playerId: player_id ?? fallbackPlayerId,
+          secondary: name,
+          vnum,
         };
-        if (m.owner !== undefined) item.owner = m.owner;
+        if (owner !== undefined) item.owner = owner;
         return item;
       }}
       type="mob"

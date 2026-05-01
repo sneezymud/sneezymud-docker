@@ -55,12 +55,13 @@ export function gateSpecProcs(
   entries: EnumEntry[],
   isUnassignable: (value: number) => boolean,
 ): EnumEntry[] {
-  return entries.map((e) =>
-    isUnassignable(e.value)
+  return entries.map((entry) => {
+    const { disabledReason, value } = entry;
+    return isUnassignable(value)
       ? {
-          ...e,
-          disabledReason: e.disabledReason ?? "Requires higher immortal power",
+          ...entry,
+          disabledReason: disabledReason ?? "Requires higher immortal power",
         }
-      : e,
-  );
+      : entry;
+  });
 }

@@ -54,12 +54,12 @@ export function BitfieldEditor({
         {setEntries.length === 0 ? (
           <span className="text-muted-foreground text-sm">None set</span>
         ) : (
-          setEntries.map((e) => (
+          setEntries.map(({ bit, label: entryLabel }) => (
             <span
               className="bg-secondary text-foreground rounded px-1.5 py-0.5 text-xs"
-              key={e.bit}
+              key={bit}
             >
-              {e.label}
+              {entryLabel}
             </span>
           ))
         )}
@@ -78,12 +78,12 @@ export function BitfieldEditor({
 
       {!collapsed && (
         <div className="grid grid-cols-2">
-          {activeEntries.map((entry) => {
-            const isSet = hasBit(value, entry.bit);
+          {activeEntries.map(({ bit, label: entryLabel, tooltip }) => {
+            const isSet = hasBit(value, bit);
             return (
               <div
                 className="flex items-center gap-0.5"
-                key={entry.bit}
+                key={bit}
               >
                 <div
                   className={cn(
@@ -98,20 +98,20 @@ export function BitfieldEditor({
                     checked={isSet}
                     className="size-5"
                     disabled={disabled}
-                    id={`${id}-${entry.bit}`}
+                    id={`${id}-${bit}`}
                     onCheckedChange={() => {
-                      onChange(toggleBit(value, entry.bit));
+                      onChange(toggleBit(value, bit));
                     }}
                   />
 
-                  <label htmlFor={`${id}-${entry.bit}`}>{entry.label}</label>
+                  <label htmlFor={`${id}-${bit}`}>{entryLabel}</label>
                 </div>
 
-                {entry.tooltip !== undefined && (
+                {tooltip !== undefined && (
                   <Popover>
                     <PopoverTrigger asChild>
                       <button
-                        aria-label={`Info about ${entry.label}`}
+                        aria-label={`Info about ${entryLabel}`}
                         className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex cursor-help rounded-sm outline-none focus-visible:ring-[3px]"
                         type="button"
                       >
@@ -126,7 +126,7 @@ export function BitfieldEditor({
                       className="max-w-xs text-sm"
                       sideOffset={5}
                     >
-                      <p>{entry.tooltip}</p>
+                      <p>{tooltip}</p>
                     </PopoverContent>
                   </Popover>
                 )}

@@ -24,8 +24,8 @@ export async function listMobs(
     blocks === null
       ? undefined
       : or(
-          ...blocks.map((b) =>
-            and(gte(mob.vnum, b.start), lte(mob.vnum, b.end)),
+          ...blocks.map(({ end, start }) =>
+            and(gte(mob.vnum, start), lte(mob.vnum, end)),
           ),
         );
 

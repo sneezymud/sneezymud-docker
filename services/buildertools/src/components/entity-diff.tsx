@@ -380,8 +380,9 @@ function classifyFields(
   production: null | Record<string, unknown>,
 ): ClassifiedField[] {
   return fields.map((field) => {
-    const iVal = immortal?.[field.key];
-    const pVal = production?.[field.key];
+    const { key } = field;
+    const iVal = immortal?.[key];
+    const pVal = production?.[key];
 
     if (production === null) {
       return { field, status: "added" };

@@ -247,17 +247,17 @@ export async function getDashboardEntities(
   // For entities that exist in both, do a field-level comparison to find
   // actually modified ones. Fetch full rows from both DBs.
   const roomPairs = immRooms
-    .filter((r) => prodRoomSet.has(r.vnum))
-    .map((r) => ({ player_id: r.player_id, vnum: r.vnum }));
+    .filter(({ vnum }) => prodRoomSet.has(vnum))
+    .map(({ player_id, vnum }) => ({ player_id, vnum }));
   const mobPairs = immMobs
-    .filter((m) => prodMobSet.has(m.vnum))
-    .map((m) => ({ player_id: m.player_id, vnum: m.vnum }));
+    .filter(({ vnum }) => prodMobSet.has(vnum))
+    .map(({ player_id, vnum }) => ({ player_id, vnum }));
   const objPairs = immObjs
-    .filter((o) => prodObjSet.has(o.vnum))
-    .map((o) => ({ player_id: o.player_id, vnum: o.vnum }));
+    .filter(({ vnum }) => prodObjSet.has(vnum))
+    .map(({ player_id, vnum }) => ({ player_id, vnum }));
   const mobRespPairs = immMobResps
-    .filter((r) => prodMobRespSet.has(r.vnum))
-    .map((r) => ({ player_id: r.player_id, vnum: r.vnum }));
+    .filter(({ vnum }) => prodMobRespSet.has(vnum))
+    .map(({ player_id, vnum }) => ({ player_id, vnum }));
 
   const [modifiedRooms, modifiedMobs, modifiedObjs, modifiedMobResps] =
     await Promise.all([
@@ -269,87 +269,87 @@ export async function getDashboardEntities(
 
   const entities: DashboardEntity[] = [];
 
-  for (const r of immRooms) {
-    const key = `${r.player_id}:${r.vnum}`;
-    if (!prodRoomSet.has(r.vnum)) {
+  for (const { name, player_id, vnum } of immRooms) {
+    const key = `${player_id}:${vnum}`;
+    if (!prodRoomSet.has(vnum)) {
       entities.push({
-        name: r.name || "(unnamed)",
-        playerId: r.player_id,
+        name: name || "(unnamed)",
+        playerId: player_id,
         status: "new",
         type: "room",
-        vnum: r.vnum,
+        vnum,
       });
     } else if (modifiedRooms.has(key)) {
       entities.push({
-        name: r.name || "(unnamed)",
-        playerId: r.player_id,
+        name: name || "(unnamed)",
+        playerId: player_id,
         status: "modified",
         type: "room",
-        vnum: r.vnum,
+        vnum,
       });
     }
   }
 
-  for (const m of immMobs) {
-    const key = `${m.player_id}:${m.vnum}`;
-    if (!prodMobSet.has(m.vnum)) {
+  for (const { name, player_id, vnum } of immMobs) {
+    const key = `${player_id}:${vnum}`;
+    if (!prodMobSet.has(vnum)) {
       entities.push({
-        name: m.name || "(unnamed)",
-        playerId: m.player_id,
+        name: name || "(unnamed)",
+        playerId: player_id,
         status: "new",
         type: "mob",
-        vnum: m.vnum,
+        vnum,
       });
     } else if (modifiedMobs.has(key)) {
       entities.push({
-        name: m.name || "(unnamed)",
-        playerId: m.player_id,
+        name: name || "(unnamed)",
+        playerId: player_id,
         status: "modified",
         type: "mob",
-        vnum: m.vnum,
+        vnum,
       });
     }
   }
 
-  for (const o of immObjs) {
-    const key = `${o.player_id}:${o.vnum}`;
-    if (!prodObjSet.has(o.vnum)) {
+  for (const { name, player_id, vnum } of immObjs) {
+    const key = `${player_id}:${vnum}`;
+    if (!prodObjSet.has(vnum)) {
       entities.push({
-        name: o.name || "(unnamed)",
-        playerId: o.player_id,
+        name: name || "(unnamed)",
+        playerId: player_id,
         status: "new",
         type: "object",
-        vnum: o.vnum,
+        vnum,
       });
     } else if (modifiedObjs.has(key)) {
       entities.push({
-        name: o.name || "(unnamed)",
-        playerId: o.player_id,
+        name: name || "(unnamed)",
+        playerId: player_id,
         status: "modified",
         type: "object",
-        vnum: o.vnum,
+        vnum,
       });
     }
   }
 
-  for (const r of immMobResps) {
-    const key = `${r.player_id}:${r.vnum}`;
-    const name = r.name ?? "(unnamed)";
-    if (!prodMobRespSet.has(r.vnum)) {
+  for (const { name: rawName, player_id, vnum } of immMobResps) {
+    const key = `${player_id}:${vnum}`;
+    const name = rawName ?? "(unnamed)";
+    if (!prodMobRespSet.has(vnum)) {
       entities.push({
         name,
-        playerId: r.player_id,
+        playerId: player_id,
         status: "new",
         type: "mob-response",
-        vnum: r.vnum,
+        vnum,
       });
     } else if (modifiedMobResps.has(key)) {
       entities.push({
         name,
-        playerId: r.player_id,
+        playerId: player_id,
         status: "modified",
         type: "mob-response",
-        vnum: r.vnum,
+        vnum,
       });
     }
   }
@@ -428,11 +428,12 @@ function childrenEqual<T extends Record<string, unknown>>(
 function groupByVnum<T extends { vnum: number }>(rows: T[]): Map<number, T[]> {
   const map = new Map<number, T[]>();
   for (const row of rows) {
-    const existing = map.get(row.vnum);
+    const { vnum } = row;
+    const existing = map.get(vnum);
     if (existing) {
       existing.push(row);
     } else {
-      map.set(row.vnum, [row]);
+      map.set(vnum, [row]);
     }
   }
   return map;
@@ -443,7 +444,8 @@ function groupByVnumAndPlayer<T extends { player_id: number; vnum: number }>(
 ): Map<string, T[]> {
   const out = new Map<string, T[]>();
   for (const row of rows) {
-    const key = `${row.player_id}:${row.vnum}`;
+    const { player_id, vnum } = row;
+    const key = `${player_id}:${vnum}`;
     const bucket = out.get(key);
     if (bucket) bucket.push(row);
     else out.set(key, [row]);
@@ -507,8 +509,9 @@ async function findModifiedRooms(
   const modified = new Set<string>();
 
   for (const immRow of immParents) {
-    const key = `${immRow.player_id}:${immRow.vnum}`;
-    const snzRow = snzParentMap.get(immRow.vnum);
+    const { player_id, vnum } = immRow;
+    const key = `${player_id}:${vnum}`;
+    const snzRow = snzParentMap.get(vnum);
     if (!snzRow) continue;
 
     if (!fieldsEqual(immRow, snzRow, ROOM_FIELDS)) {
@@ -517,7 +520,7 @@ async function findModifiedRooms(
     }
 
     const immExitsForKey = immExitsByKey.get(key) ?? [];
-    const snzExitsForVnum = snzExitsByVnum.get(immRow.vnum) ?? [];
+    const snzExitsForVnum = snzExitsByVnum.get(vnum) ?? [];
     if (
       !childrenEqual(
         immExitsForKey,
@@ -531,7 +534,7 @@ async function findModifiedRooms(
     }
 
     const immExtrasForKey = immExtrasByKey.get(key) ?? [];
-    const snzExtrasForVnum = snzExtrasByVnum.get(immRow.vnum) ?? [];
+    const snzExtrasForVnum = snzExtrasByVnum.get(vnum) ?? [];
     if (
       !childrenEqual(
         immExtrasForKey,
@@ -599,8 +602,9 @@ async function findModifiedMobs(
   const modified = new Set<string>();
 
   for (const immRow of immParents) {
-    const key = `${immRow.player_id}:${immRow.vnum}`;
-    const snzRow = snzParentMap.get(immRow.vnum);
+    const { player_id, vnum } = immRow;
+    const key = `${player_id}:${vnum}`;
+    const snzRow = snzParentMap.get(vnum);
     if (!snzRow) continue;
 
     // Derive letter and pos the same way publishMobTx does, then overlay them
@@ -613,7 +617,7 @@ async function findModifiedMobs(
     }
 
     const immExtrasForKey = immExtrasByKey.get(key) ?? [];
-    const snzExtrasForVnum = snzExtrasByVnum.get(immRow.vnum) ?? [];
+    const snzExtrasForVnum = snzExtrasByVnum.get(vnum) ?? [];
     if (
       !childrenEqual(
         immExtrasForKey,
@@ -627,7 +631,7 @@ async function findModifiedMobs(
     }
 
     const immImmsForKey = immImmsByKey.get(key) ?? [];
-    const snzImmsForVnum = snzImmsByVnum.get(immRow.vnum) ?? [];
+    const snzImmsForVnum = snzImmsByVnum.get(vnum) ?? [];
     if (
       !childrenEqual(
         immImmsForKey,
@@ -702,8 +706,9 @@ async function findModifiedObjects(
   const modified = new Set<string>();
 
   for (const immRow of immParents) {
-    const key = `${immRow.player_id}:${immRow.vnum}`;
-    const snzRow = snzParentMap.get(immRow.vnum);
+    const { player_id, vnum } = immRow;
+    const key = `${player_id}:${vnum}`;
+    const snzRow = snzParentMap.get(vnum);
     if (!snzRow) continue;
 
     if (!fieldsEqual(immRow, snzRow, OBJ_FIELDS)) {
@@ -714,12 +719,12 @@ async function findModifiedObjects(
     // objaffect: the composite key (type, mod1, mod2) IS the entire content
     // (excluding owner/vnum), so use the key as both identity and comparison.
     const immAffectsForKey = immAffectsByKey.get(key) ?? [];
-    const snzAffectsForVnum = snzAffectsByVnum.get(immRow.vnum) ?? [];
+    const snzAffectsForVnum = snzAffectsByVnum.get(vnum) ?? [];
     if (
       !childrenEqual(
         immAffectsForKey,
         snzAffectsForVnum,
-        (r) => `${r.type}|${r.mod1}|${r.mod2}`,
+        ({ mod1, mod2, type }) => `${type}|${mod1}|${mod2}`,
         [],
       )
     ) {
@@ -728,7 +733,7 @@ async function findModifiedObjects(
     }
 
     const immExtrasForKey = immExtrasByKey.get(key) ?? [];
-    const snzExtrasForVnum = snzExtrasByVnum.get(immRow.vnum) ?? [];
+    const snzExtrasForVnum = snzExtrasByVnum.get(vnum) ?? [];
     if (
       !childrenEqual(
         immExtrasForKey,
@@ -773,8 +778,9 @@ async function findModifiedMobResponses(
   const modified = new Set<string>();
 
   for (const immRow of immRows) {
-    const key = `${immRow.player_id}:${immRow.vnum}`;
-    const snzRow = snzMap.get(immRow.vnum);
+    const { player_id, vnum } = immRow;
+    const key = `${player_id}:${vnum}`;
+    const snzRow = snzMap.get(vnum);
     if (!snzRow) continue;
 
     if (!fieldsEqual(immRow, snzRow, MOB_RESPONSE_FIELDS)) {

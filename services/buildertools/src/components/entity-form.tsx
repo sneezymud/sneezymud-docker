@@ -68,7 +68,7 @@ function FieldGroup({
 
   const hasEditedFields =
     originalValues !== undefined &&
-    fields.some((f) => values[f.key] !== originalValues[f.key]);
+    fields.some(({ key }) => values[key] !== originalValues[key]);
 
   const [expanded, setExpanded] = useState(
     group.defaultExpanded !== false || hasEditedFields,
@@ -100,15 +100,16 @@ function FieldGroup({
         <div className="overflow-hidden">
           <div className="grid grid-cols-1 gap-y-4">
             {fields.map((field, i) => {
+              const { key } = field;
               const fieldDirty =
                 originalValues !== undefined &&
-                values[field.key] !== originalValues[field.key];
+                values[key] !== originalValues[key];
               const showSeparator =
                 fieldGroupSize !== undefined &&
                 i > 0 &&
                 i % fieldGroupSize === 0;
               return (
-                <Fragment key={field.key}>
+                <Fragment key={key}>
                   {showSeparator ? (
                     <Separator className="col-span-full" />
                   ) : null}
@@ -117,9 +118,9 @@ function FieldGroup({
                     field={field}
                     isDirty={fieldDirty}
                     onChange={onChange}
-                    value={values[field.key]}
-                    {...(fieldErrors?.[field.key] !== undefined && {
-                      error: fieldErrors[field.key],
+                    value={values[key]}
+                    {...(fieldErrors?.[key] !== undefined && {
+                      error: fieldErrors[key],
                     })}
                   />
                 </Fragment>

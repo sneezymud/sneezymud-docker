@@ -15,8 +15,8 @@ import { useAuthStore } from "@/state/auth.ts";
 
 const DASHBOARD_KEY = ["publish-dashboard"] as const;
 
-export function entityKey(e: DashboardEntity): string {
-  return `${e.playerId}:${e.type}:${e.vnum}`;
+export function entityKey({ playerId, type, vnum }: DashboardEntity): string {
+  return `${playerId}:${type}:${vnum}`;
 }
 
 export function usePublishDashboard() {
@@ -122,10 +122,10 @@ export function usePublishDashboard() {
 
   const selectedEntities = (entities ?? [])
     .filter((e) => selected.has(entityKey(e)))
-    .map((e) => ({
-      ownerPlayerId: e.playerId,
-      type: e.type,
-      vnum: e.vnum,
+    .map(({ playerId, type, vnum }) => ({
+      ownerPlayerId: playerId,
+      type,
+      vnum,
     }));
 
   return {

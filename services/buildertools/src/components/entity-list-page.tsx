@@ -63,7 +63,7 @@ export function EntityListPage<T extends ListEntityType>({
   const entities = query.data.map((item) => toEntityItem(item, playerId));
   const filtered =
     from !== undefined && to !== undefined
-      ? entities.filter((e) => e.vnum >= from && e.vnum <= to)
+      ? entities.filter(({ vnum }) => vnum >= from && vnum <= to)
       : entities;
 
   return (

@@ -12,7 +12,10 @@ export function ObjectList({
     <EntityListPage
       from={from}
       to={to}
-      toEntityItem={(o, fallbackPlayerId) => {
+      toEntityItem={(
+        { name, owner, player_id, short_desc, type, vnum },
+        fallbackPlayerId,
+      ) => {
         const item: {
           metadata?: string;
           name: string;
@@ -21,14 +24,14 @@ export function ObjectList({
           secondary: string;
           vnum: number;
         } = {
-          name: o.short_desc || o.name,
-          playerId: o.player_id ?? fallbackPlayerId,
-          secondary: o.name,
-          vnum: o.vnum,
+          name: short_desc || name,
+          playerId: player_id ?? fallbackPlayerId,
+          secondary: name,
+          vnum,
         };
-        const typeLabel = ITEM_TYPES.find((t) => t.value === o.type)?.label;
+        const typeLabel = ITEM_TYPES.find((t) => t.value === type)?.label;
         if (typeLabel !== undefined) item.metadata = typeLabel;
-        if (o.owner !== undefined) item.owner = o.owner;
+        if (owner !== undefined) item.owner = owner;
         return item;
       }}
       type="object"

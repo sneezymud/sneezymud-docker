@@ -51,11 +51,11 @@ export function ZonesPage() {
     columns,
     data: zones ?? [],
     defaultSort: { desc: false, id: "zone_nr" },
-    filterFn: (zone, search) => {
+    filterFn: ({ zone_name, zone_nr }, search) => {
       const searchLower = search.toLowerCase();
       return (
-        zone.zone_name.toLowerCase().includes(searchLower) ||
-        String(zone.zone_nr).includes(search)
+        zone_name.toLowerCase().includes(searchLower) ||
+        String(zone_nr).includes(search)
       );
     },
   });
@@ -102,18 +102,19 @@ export function ZonesPage() {
       />
 
       <div className="divide-border/70 divide-y">
-        {rows.map((zone) => (
-          <ZoneRow
-            expanded={expandedZone === zone.zone_nr}
-            key={zone.zone_nr}
-            onToggle={() => {
-              setExpandedZone((prev) =>
-                prev === zone.zone_nr ? null : zone.zone_nr,
-              );
-            }}
-            zone={zone}
-          />
-        ))}
+        {rows.map((zone) => {
+          const { zone_nr } = zone;
+          return (
+            <ZoneRow
+              expanded={expandedZone === zone_nr}
+              key={zone_nr}
+              onToggle={() => {
+                setExpandedZone((prev) => (prev === zone_nr ? null : zone_nr));
+              }}
+              zone={zone}
+            />
+          );
+        })}
 
         {rows.length === 0 && (
           <div className="py-8 text-center text-sm">
@@ -156,17 +157,15 @@ function parseZoneName(name: string): {
 function ZoneRow({
   expanded,
   onToggle,
-  zone,
+  zone: { bottom, lifespan, top, zone_enabled, zone_name, zone_nr },
 }: {
   expanded: boolean;
   onToggle: () => void;
   zone: Zone;
 }) {
-  const { author, displayName } = parseZoneName(zone.zone_name);
+  const { author, displayName } = parseZoneName(zone_name);
   const range =
-    zone.bottom != null && zone.top != null
-      ? `${zone.bottom}\u2013${zone.top}`
-      : "\u2014";
+    bottom != null && top != null ? `${bottom}\u2013${top}` : "\u2014";
 
   return (
     <div>
@@ -177,7 +176,7 @@ function ZoneRow({
       >
         <div className="min-w-0 flex-1">
           <div className="text-muted-foreground flex gap-2 font-mono text-xs">
-            <span>#{zone.zone_nr}</span>
+            <span>#{zone_nr}</span>
             <span>{range}</span>
           </div>
 
@@ -206,17 +205,17 @@ function ZoneRow({
               )}
 
               <span className="text-muted-foreground">
-                Lifespan: {zone.lifespan ?? "\u2014"}
+                Lifespan: {lifespan ?? "\u2014"}
               </span>
 
-              {zone.zone_enabled === 1 ? (
+              {zone_enabled === 1 ? (
                 <Badge variant="outline">Enabled</Badge>
               ) : (
                 <Badge variant="secondary">Disabled</Badge>
               )}
             </div>
 
-            {zone.bottom != null && zone.top != null && (
+            {bottom != null && top != null && (
               <div className="flex gap-3">
                 <Button
                   asChild
@@ -225,7 +224,7 @@ function ZoneRow({
                   variant="inline"
                 >
                   <Link
-                    search={{ from: zone.bottom, to: zone.top }}
+                    search={{ from: bottom, to: top }}
                     to="/rooms"
                   >
                     Rooms
@@ -239,7 +238,7 @@ function ZoneRow({
                   variant="inline"
                 >
                   <Link
-                    search={{ from: zone.bottom, to: zone.top }}
+                    search={{ from: bottom, to: top }}
                     to="/mobs"
                   >
                     Mobs
@@ -253,7 +252,7 @@ function ZoneRow({
                   variant="inline"
                 >
                   <Link
-                    search={{ from: zone.bottom, to: zone.top }}
+                    search={{ from: bottom, to: top }}
                     to="/objects"
                   >
                     Objects

@@ -333,7 +333,9 @@ export async function roomExists(
 
 function vnumBlockFilter(blocks: VnumBlock[]) {
   return or(
-    ...blocks.map((b) => and(gte(room.vnum, b.start), lte(room.vnum, b.end))),
+    ...blocks.map(({ end, start }) =>
+      and(gte(room.vnum, start), lte(room.vnum, end)),
+    ),
   );
 }
 

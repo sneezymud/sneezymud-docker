@@ -23,8 +23,8 @@ export async function listObjects(
     blocks === null
       ? undefined
       : or(
-          ...blocks.map((b) =>
-            and(gte(obj.vnum, b.start), lte(obj.vnum, b.end)),
+          ...blocks.map(({ end, start }) =>
+            and(gte(obj.vnum, start), lte(obj.vnum, end)),
           ),
         );
 

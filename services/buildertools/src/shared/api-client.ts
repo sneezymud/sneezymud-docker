@@ -48,7 +48,7 @@ export async function apiFetch<T extends z.ZodType>(
       const issues = parsed.data.issues;
       if (issues && issues.length > 0) {
         const detail = issues
-          .map((i) => `${i.path.join(".")}: ${i.message}`)
+          .map(({ message, path }) => `${path.join(".")}: ${message}`)
           .join("; ");
         throw new ApiResponseError(response.status, detail);
       }

@@ -89,8 +89,11 @@ export function useObjectEditor(vnumParam: string, owner: number | undefined) {
         { key: "long_desc" as const, label: "Long Description" },
       ];
       const errors = requiredFields
-        .filter((f) => !merged[f.key].trim())
-        .map((f) => ({ field: f.key, message: `${f.label} is required` }));
+        .filter(({ key }) => !merged[key].trim())
+        .map(({ key, label }) => ({
+          field: key,
+          message: `${label} is required`,
+        }));
       return errors.length > 0 ? errors : null;
     },
   });

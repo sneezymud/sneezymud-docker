@@ -60,8 +60,8 @@ export function resolvePermissions(
 export function makeFieldGroupsReadOnly(
   groups: FieldGroupDef[],
 ): FieldGroupDef[] {
-  return groups.map((g) => ({
-    ...g,
-    fields: g.fields.map((f) => ({ ...f, readOnly: true })),
+  return groups.map(({ fields, ...rest }) => ({
+    ...rest,
+    fields: fields.map((f) => ({ ...f, readOnly: true })),
   }));
 }

@@ -50,12 +50,14 @@ publishRoutes.get("/dashboard", requirePower(POWER.LOW), async (c) => {
 
   const entities = await getDashboardEntities(resolved.scope);
 
-  const playerNames = await resolvePlayerNames(entities.map((e) => e.playerId));
+  const playerNames = await resolvePlayerNames(
+    entities.map(({ playerId }) => playerId),
+  );
 
   return c.json(
-    entities.map((e) => ({
-      ...e,
-      owner: playerNames.get(e.playerId) ?? "Unknown",
+    entities.map((entity) => ({
+      ...entity,
+      owner: playerNames.get(entity.playerId) ?? "Unknown",
     })),
   );
 });
@@ -289,10 +291,10 @@ publishRoutes.post(
 
     try {
       await publishBulk(
-        entities.map((e) => ({
-          ownerPlayerId: e.ownerPlayerId,
-          type: e.type,
-          vnum: e.vnum,
+        entities.map(({ ownerPlayerId, type, vnum }) => ({
+          ownerPlayerId,
+          type,
+          vnum,
         })),
       );
     } catch (error) {

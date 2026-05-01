@@ -96,8 +96,11 @@ export function useMobEditor(vnumParam: string, owner: number | undefined) {
         { key: "description" as const, label: "Detailed Description" },
       ];
       const errors = requiredFields
-        .filter((f) => !merged[f.key].trim())
-        .map((f) => ({ field: f.key, message: `${f.label} is required` }));
+        .filter(({ key }) => !merged[key].trim())
+        .map(({ key, label }) => ({
+          field: key,
+          message: `${label} is required`,
+        }));
       return errors.length > 0 ? errors : null;
     },
   });

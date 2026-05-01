@@ -144,9 +144,9 @@ export function jsonValidator<T extends ZodType>(schema: T) {
       return c.json(
         {
           error: "Validation failed",
-          issues: result.error.issues.map((i) => ({
-            message: i.message,
-            path: i.path.map(String),
+          issues: result.error.issues.map(({ message, path }) => ({
+            message,
+            path: path.map(String),
           })),
         },
         400,
