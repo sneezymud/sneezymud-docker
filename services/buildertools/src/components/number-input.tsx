@@ -91,20 +91,21 @@ function useNumberDisplay({
     }
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setDisplay(raw);
+  function handleChange({
+    target: { value: nextValue },
+  }: React.ChangeEvent<HTMLInputElement>) {
+    setDisplay(nextValue);
+    const parsed = Number(nextValue);
 
-    const parsed = Number(raw);
-    if (raw !== "" && Number.isFinite(parsed)) {
+    if (nextValue !== "" && Number.isFinite(parsed)) {
       let clamped = integer ? Math.round(parsed) : parsed;
       if (min !== undefined && clamped < min) clamped = min;
       if (max !== undefined && clamped > max) clamped = max;
       onValueChange(clamped);
     }
-  };
+  }
 
-  const handleBlur = () => {
+  function handleBlur() {
     const parsed = Number(display);
     if (display === "" || !Number.isFinite(parsed)) {
       setDisplay(String(value));
@@ -114,7 +115,7 @@ function useNumberDisplay({
     if (parsed !== value) {
       setDisplay(String(value));
     }
-  };
+  }
 
   const parsed = Number(display);
   const outOfRange =

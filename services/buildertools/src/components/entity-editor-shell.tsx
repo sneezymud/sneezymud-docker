@@ -20,8 +20,6 @@ import {
   roomDiffSchema,
 } from "@/shared/schemas/publish.ts";
 
-export type EditorEntityType = "mob" | "object" | "room";
-
 interface EditorState {
   cOwner: number | undefined;
   deletePending: boolean;
@@ -36,6 +34,127 @@ interface EditorState {
   unsavedNavProceed: (() => void) | undefined;
   unsavedNavReset: (() => void) | undefined;
   unsavedNavStatus: "blocked" | "idle";
+}
+
+export function EntityEditorShell({
+  breadcrumbLabel,
+  children,
+  diffDescription,
+  editor,
+  owner,
+  ownerName,
+  powers,
+  type,
+  vnum,
+}: {
+  breadcrumbLabel: string;
+  children: React.ReactNode;
+  diffDescription: string;
+  editor: EditorState;
+  owner: number | undefined;
+  ownerName: string | undefined;
+  powers: number[];
+  type: "mob" | "object" | "room";
+  vnum: number;
+}) {
+  const {
+    backTitle,
+    breadcrumbList,
+    deleteCascadeNote,
+    diffEntityType,
+    diffFields,
+    requiredPowers,
+  } = EDITOR_CONFIG[type];
+  const {
+    cOwner,
+    deletePending,
+    dirty,
+    handleDelete,
+    handleSave,
+    handleSaveAndProceed,
+    permissions: { canPublish },
+    readOnly,
+    resetEdits,
+    saving,
+    unsavedNavProceed,
+    unsavedNavReset,
+    unsavedNavStatus,
+  } = editor;
+  const [diffOpen, setDiffOpen] = useState(false);
+
+  // Derive URL/schema inside queryFn so @tanstack/query/exhaustive-deps sees
+  // them as dependencies of `type` (already in queryKey) rather than free vars.
+  const diffQuery = useQuery({
+    enabled: false,
+    queryFn: () => {
+      const { diffEntityType: entityType, diffSchema } = EDITOR_CONFIG[type];
+      return apiFetch(
+        `/api/publish/diff/${entityType}/${vnum}${ownerSuffix(cOwner)}`,
+        diffSchema,
+      );
+    },
+    queryKey: entityKeys.diff(type, vnum, cOwner),
+  });
+
+  const missingPowers = requiredPowers
+    .filter((p) => !hasPower(powers, p))
+    .map((p) => POWER_LABELS[p]);
+
+  return (
+    <>
+      <EntityHeader
+        before={
+          <BackLink
+            title={backTitle}
+            to={breadcrumbList.to}
+          />
+        }
+        breadcrumbs={[breadcrumbList, { label: breadcrumbLabel }]}
+        deleteMessage={`Are you sure you want to delete ${type} ${vnum}? ${deleteCascadeNote}`}
+        deletePending={deletePending}
+        dirty={dirty}
+        onDelete={handleDelete}
+        onReset={resetEdits}
+        onSave={handleSave}
+        readOnly={readOnly}
+        saving={saving}
+        {...(ownerName !== undefined && { ownerName })}
+      >
+        <DiffButton
+          isFetching={diffQuery.isFetching}
+          onDiff={() => {
+            void diffQuery.refetch();
+            setDiffOpen(true);
+          }}
+        />
+      </EntityHeader>
+
+      <DiffSheet
+        canPublish={canPublish}
+        description={diffDescription}
+        diffQuery={diffQuery}
+        entityType={diffEntityType}
+        fields={diffFields}
+        onOpenChange={setDiffOpen}
+        open={diffOpen}
+        type={type}
+        vnum={vnum}
+        {...(owner !== undefined && { ownerPlayerId: owner })}
+      />
+
+      {readOnly && <ReadOnlyBanner missingPowers={missingPowers} />}
+      {children}
+
+      <UnsavedChangesDialog
+        onSaveAndProceed={handleSaveAndProceed}
+        readOnly={readOnly}
+        saving={saving}
+        unsavedNavProceed={unsavedNavProceed}
+        unsavedNavReset={unsavedNavReset}
+        unsavedNavStatus={unsavedNavStatus}
+      />
+    </>
+  );
 }
 
 const EDITOR_CONFIG = {
@@ -67,98 +186,3 @@ const EDITOR_CONFIG = {
     requiredPowers: [POWER.REDIT, POWER.RSAVE, POWER.EDIT],
   },
 } as const;
-
-export function EntityEditorShell({
-  breadcrumbLabel,
-  children,
-  diffDescription,
-  editor,
-  owner,
-  ownerName,
-  powers,
-  type,
-  vnum,
-}: {
-  breadcrumbLabel: string;
-  children: React.ReactNode;
-  diffDescription: string;
-  editor: EditorState;
-  owner: number | undefined;
-  ownerName: string | undefined;
-  powers: number[];
-  type: EditorEntityType;
-  vnum: number;
-}) {
-  const config = EDITOR_CONFIG[type];
-  const [diffOpen, setDiffOpen] = useState(false);
-
-  const diffQuery = useQuery({
-    enabled: false,
-    queryFn: () =>
-      apiFetch(
-        `/api/publish/diff/${EDITOR_CONFIG[type].diffEntityType}/${vnum}${ownerSuffix(editor.cOwner)}`,
-        EDITOR_CONFIG[type].diffSchema,
-      ),
-    queryKey: entityKeys.diff(type, vnum, editor.cOwner),
-  });
-
-  const missingPowers = config.requiredPowers
-    .filter((p) => !hasPower(powers, p))
-    .map((p) => POWER_LABELS[p]);
-
-  return (
-    <>
-      <EntityHeader
-        before={
-          <BackLink
-            title={config.backTitle}
-            to={config.breadcrumbList.to}
-          />
-        }
-        breadcrumbs={[config.breadcrumbList, { label: breadcrumbLabel }]}
-        deleteMessage={`Are you sure you want to delete ${type} ${vnum}? ${config.deleteCascadeNote}`}
-        deletePending={editor.deletePending}
-        dirty={editor.dirty}
-        onDelete={editor.handleDelete}
-        onReset={editor.resetEdits}
-        onSave={editor.handleSave}
-        readOnly={editor.readOnly}
-        saving={editor.saving}
-        {...(ownerName !== undefined && { ownerName })}
-      >
-        <DiffButton
-          isFetching={diffQuery.isFetching}
-          onDiff={() => {
-            void diffQuery.refetch();
-            setDiffOpen(true);
-          }}
-        />
-      </EntityHeader>
-
-      <DiffSheet
-        canPublish={editor.permissions.canPublish}
-        description={diffDescription}
-        diffQuery={diffQuery}
-        entityType={config.diffEntityType}
-        fields={config.diffFields}
-        onOpenChange={setDiffOpen}
-        open={diffOpen}
-        type={type}
-        vnum={vnum}
-        {...(owner !== undefined && { ownerPlayerId: owner })}
-      />
-
-      {editor.readOnly && <ReadOnlyBanner missingPowers={missingPowers} />}
-      {children}
-
-      <UnsavedChangesDialog
-        onSaveAndProceed={editor.handleSaveAndProceed}
-        readOnly={editor.readOnly}
-        saving={editor.saving}
-        unsavedNavProceed={editor.unsavedNavProceed}
-        unsavedNavReset={editor.unsavedNavReset}
-        unsavedNavStatus={editor.unsavedNavStatus}
-      />
-    </>
-  );
-}

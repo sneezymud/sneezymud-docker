@@ -40,10 +40,12 @@ export function useRoomEditor(vnumParam: string, owner: number | undefined) {
     queryKey: zoneKeys.all,
   });
 
-  const zoneEntries: EnumEntry[] | undefined = zones?.map((zn) => ({
-    label: `${zn.zone_nr}: ${zn.zone_name}`,
-    value: zn.zone_nr,
-  }));
+  const zoneEntries: EnumEntry[] | undefined = zones?.map(
+    ({ zone_name, zone_nr }) => ({
+      label: `${zone_nr}: ${zone_name}`,
+      value: zone_nr,
+    }),
+  );
 
   const [edits, setEdits] = useState<null | Partial<Room>>(null);
   const [exitEdits, setExitEdits] = useState<null | RoomExit[]>(null);
@@ -51,11 +53,37 @@ export function useRoomEditor(vnumParam: string, owner: number | undefined) {
 
   const dirty = edits !== null || exitEdits !== null || extraEdits !== null;
 
-  const resetEdits = () => {
+  function resetEdits() {
     setEdits(null);
     setExitEdits(null);
     setExtraEdits(null);
-  };
+  }
+
+  async function saveFn() {
+    if (!room) return null;
+    const body: Room = {
+      ...room,
+      ...edits,
+      exits: exitEdits ?? room.exits,
+      extras: extraEdits ?? room.extras,
+    };
+    return apiFetch(`/api/rooms/${vnum}${ownerSuffix(cOwner)}`, roomSchema, {
+      body: JSON.stringify(body),
+      method: "PUT",
+    });
+  }
+
+  function validate() {
+    if (!room) return null;
+    const merged = { ...room, ...edits };
+    const errors = requiredFields
+      .filter(({ key }) => !merged[key].trim())
+      .map(({ key, label }) => ({
+        field: key,
+        message: `${label} is required`,
+      }));
+    return errors.length > 0 ? errors : null;
+  }
 
   const {
     clearFieldError,
@@ -77,41 +105,18 @@ export function useRoomEditor(vnumParam: string, owner: number | undefined) {
     listPath: "/rooms",
     onReset: resetEdits,
     readOnly,
-    saveFn: async () => {
-      if (!room) return null;
-      const body: Room = {
-        ...room,
-        ...edits,
-        exits: exitEdits ?? room.exits,
-        extras: extraEdits ?? room.extras,
-      };
-      return apiFetch(`/api/rooms/${vnum}${ownerSuffix(cOwner)}`, roomSchema, {
-        body: JSON.stringify(body),
-        method: "PUT",
-      });
-    },
-    validate: () => {
-      if (!room) return null;
-      const merged = { ...room, ...edits };
-      const requiredFields = [
-        { key: "name" as const, label: "Name" },
-        { key: "description" as const, label: "Description" },
-      ];
-      const errors = requiredFields
-        .filter((f) => !merged[f.key].trim())
-        .map((f) => ({ field: f.key, message: `${f.label} is required` }));
-      return errors.length > 0 ? errors : null;
-    },
+    saveFn,
+    validate,
   });
 
   const currentValues = room ? roomToFormValues(room, edits) : {};
   const originalValues = room ? roomToFormValues(room, null) : {};
 
-  const handleFieldChange = (key: string, value: number | string) => {
+  function handleFieldChange(key: string, value: number | string) {
     if (!room) return;
     clearFieldError(key);
     applyRoomFieldChange(key, value, room, setEdits);
-  };
+  }
 
   return {
     cOwner,
@@ -215,3 +220,8 @@ function applyRoomFieldChange(
 
   setEdits((prev) => diffEdits({ ...prev, [key]: value }, room));
 }
+
+const requiredFields = [
+  { key: "name", label: "Name" },
+  { key: "description", label: "Description" },
+] as const;

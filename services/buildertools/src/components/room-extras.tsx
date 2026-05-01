@@ -11,42 +11,6 @@ import { ConfirmDialog } from "./confirm-dialog.tsx";
 import { FormField } from "./form-field.tsx";
 import { SectionHeader } from "./section-header.tsx";
 
-function extraFields(prefix: string): FieldDef[] {
-  return [
-    {
-      fullWidth: true,
-      key: `${prefix}-name`,
-      label: "Keywords",
-      tooltip:
-        "Space-separated keywords for 'look <keyword>' in-game. All lowercase.",
-      type: "text",
-    },
-    {
-      fullWidth: true,
-      key: `${prefix}-description`,
-      label: "Description",
-      type: "textarea",
-    },
-  ];
-}
-
-const EXTRA_KEYS: Record<string, keyof RoomExtra> = {
-  description: "description",
-  name: "name",
-};
-
-function toExtraKey(fieldKey: string, prefix: string): keyof RoomExtra {
-  const suffix = fieldKey.slice(prefix.length + 1);
-  const key = EXTRA_KEYS[suffix];
-  if (key === undefined) {
-    throw new Error(`Unknown extra field key: ${suffix}`);
-  }
-  return key;
-}
-
-const hasExtraData = (extra: RoomExtra) =>
-  extra.name !== "" || extra.description !== "";
-
 interface RoomExtrasProps {
   extras: RoomExtra[];
   onChange: (extras: RoomExtra[]) => void;
@@ -63,27 +27,27 @@ export function RoomExtras({
   const [pendingRemove, setPendingRemove] = useState<null | number>(null);
   const { removeKey, rowKeys, setRowKeys } = useRowKeys(extras.length);
 
-  const addExtra = () => {
+  function addExtra() {
     const newExtra: RoomExtra = { description: "", name: "", vnum };
     const newKey = crypto.randomUUID();
     onChange([...extras, newExtra]);
     setRowKeys([...rowKeys, newKey]);
-  };
+  }
 
-  const removeExtra = (index: number) => {
+  function removeExtra(index: number) {
     removeKey(index);
     onChange(extras.filter((_, i) => i !== index));
-  };
+  }
 
-  const update = (
+  function update(
     index: number,
     field: keyof RoomExtra,
     value: number | string,
-  ) => {
+  ) {
     onChange(
       extras.map((e, i) => (i === index ? { ...e, [field]: value } : e)),
     );
-  };
+  }
 
   return (
     <fieldset
@@ -170,3 +134,40 @@ export function RoomExtras({
     </fieldset>
   );
 }
+
+function extraFields(prefix: string): FieldDef[] {
+  return [
+    {
+      fullWidth: true,
+      key: `${prefix}-name`,
+      label: "Keywords",
+      tooltip:
+        "Space-separated keywords for 'look <keyword>' in-game. All lowercase.",
+      type: "text",
+    },
+    {
+      fullWidth: true,
+      key: `${prefix}-description`,
+      label: "Description",
+      type: "textarea",
+    },
+  ];
+}
+
+function toExtraKey(fieldKey: string, prefix: string): keyof RoomExtra {
+  const suffix = fieldKey.slice(prefix.length + 1);
+  const key = EXTRA_KEYS[suffix];
+  if (key === undefined) {
+    throw new Error(`Unknown extra field key: ${suffix}`);
+  }
+  return key;
+}
+
+function hasExtraData(extra: RoomExtra) {
+  return extra.name !== "" || extra.description !== "";
+}
+
+const EXTRA_KEYS: Record<string, keyof RoomExtra> = {
+  description: "description",
+  name: "name",
+} as const;

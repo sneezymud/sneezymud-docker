@@ -14,63 +14,7 @@ import { cn } from "@/lib/utils.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import { objectKeys, roomKeys } from "@/shared/query-keys.ts";
 
-export type EntityType = "object" | "room";
-
-function formatValue(v: number) {
-  return v === 0 ? "" : String(v);
-}
-
-const nameSchema = z.object({
-  name: z.string().nullable(),
-  vnum: z.number(),
-});
-
-const perTypeData = {
-  object: {
-    allowEmpty: false,
-    keys: objectKeys,
-    max: undefined,
-    min: undefined,
-    searchSchema: z
-      .array(z.object({ short_desc: z.string(), vnum: z.number() }))
-      .transform((arr) =>
-        arr.map(({ short_desc, vnum }) => ({ label: short_desc, vnum })),
-      ),
-  },
-  room: {
-    allowEmpty: true,
-    keys: roomKeys,
-    max: 49_999,
-    min: 0,
-    searchSchema: z
-      .array(z.object({ name: z.string(), vnum: z.number() }))
-      .transform((arr) => arr.map(({ name, vnum }) => ({ label: name, vnum }))),
-  },
-} as const;
-
-function createEntityConfig(type: EntityType) {
-  const { keys, searchSchema, ...rest } = perTypeData[type];
-  return {
-    ...rest,
-    nameFn: (vnum: number) =>
-      apiFetch(`/api/${type}s/name/${vnum}`, nameSchema),
-    nameKeyFn: keys.name,
-    route: `/${type}s/$vnum` as const,
-    searchFn: (text: string) =>
-      apiFetch(
-        `/api/${type}s/search?q=${encodeURIComponent(text)}`,
-        searchSchema,
-      ),
-    searchKeyFn: keys.search,
-  };
-}
-
-const entityConfigs = {
-  object: createEntityConfig("object"),
-  room: createEntityConfig("room"),
-} as const;
-
-const EMPTY_ITEMS: Array<{ label: string; vnum: number }> = [];
+type EntityType = "object" | "room";
 
 export function EntityPicker({
   className,
@@ -135,6 +79,10 @@ export function EntityPicker({
   );
 }
 
+function formatValue(v: number) {
+  return v === 0 ? "" : String(v);
+}
+
 function useEntityPicker({
   max,
   min,
@@ -166,7 +114,7 @@ function useEntityPicker({
     if (!focused) setInputText(displayText);
   }
 
-  const commitText = () => {
+  function commitText() {
     const trimmed = inputText.trim();
 
     if (trimmed === "" || trimmed === "-") {
@@ -193,14 +141,14 @@ function useEntityPicker({
 
     onChange(num);
     setInputText(formatValue(num));
-  };
+  }
 
-  const dismiss = () => {
+  function dismiss() {
     dismissingRef.current = true;
     setFocused(false);
     inputRef.current?.blur();
     dismissingRef.current = false;
-  };
+  }
 
   const { data: results } = useQuery({
     enabled: inputText.length >= 2,
@@ -360,3 +308,55 @@ function EntityPreview({ type, value }: { type: EntityType; value: number }) {
     </Link>
   );
 }
+
+const nameSchema = z.object({
+  name: z.string().nullable(),
+  vnum: z.number(),
+});
+
+const perTypeData = {
+  object: {
+    allowEmpty: false,
+    keys: objectKeys,
+    max: undefined,
+    min: undefined,
+    searchSchema: z
+      .array(z.object({ short_desc: z.string(), vnum: z.number() }))
+      .transform((arr) =>
+        arr.map(({ short_desc, vnum }) => ({ label: short_desc, vnum })),
+      ),
+  },
+  room: {
+    allowEmpty: true,
+    keys: roomKeys,
+    max: 49_999,
+    min: 0,
+    searchSchema: z
+      .array(z.object({ name: z.string(), vnum: z.number() }))
+      .transform((arr) => arr.map(({ name, vnum }) => ({ label: name, vnum }))),
+  },
+} as const;
+
+function createEntityConfig(type: EntityType) {
+  const { keys, searchSchema, ...rest } = perTypeData[type];
+  return {
+    ...rest,
+    nameFn: (vnum: number) =>
+      apiFetch(`/api/${type}s/name/${vnum}`, nameSchema),
+    nameKeyFn: keys.name,
+    route: `/${type}s/$vnum` as const,
+    searchFn: (text: string) =>
+      apiFetch(
+        `/api/${type}s/search?q=${encodeURIComponent(text)}`,
+        searchSchema,
+      ),
+    searchKeyFn: keys.search,
+  };
+}
+
+const entityConfigs = {
+  object: createEntityConfig("object"),
+  room: createEntityConfig("room"),
+} as const;
+
+const EMPTY_ITEMS: Array<{ label: string; vnum: number }> = [];

@@ -18,15 +18,6 @@ import { Textarea } from "@/components/ui/textarea.tsx";
 import { useRowKeys } from "@/hooks/use-row-keys.ts";
 import { mobExtraSchema, mobStringKeywords } from "@/shared/schemas/mob.ts";
 
-const MOB_STRING_LABELS: Record<MobStringKeyword, string> = {
-  bamfin: "Enter World",
-  bamfout: "Leave World",
-  deathcry: "Death Cry",
-  movein: "Room Enter",
-  moveout: "Room Leave",
-  repop: "Respawn",
-};
-
 export function MobStringsEditor({
   onChange,
   readOnly,
@@ -46,19 +37,19 @@ export function MobStringsEditor({
     (k) => !usedKeywords.has(k),
   );
 
-  const addRow = () => {
+  function addRow() {
     const keyword = availableKeywords[0];
     if (!keyword) {
       return;
     }
     addKey();
     onChange([...rows, { description: "", keyword, vnum }]);
-  };
+  }
 
-  const removeRow = (index: number) => {
+  function removeRow(index: number) {
     removeKey(index);
     onChange(rows.filter((_, i) => i !== index));
-  };
+  }
 
   return (
     <fieldset
@@ -162,7 +153,7 @@ function MobStringRow({
   onDescriptionChange,
   onKeywordChange,
   onRemove,
-  row,
+  row: { description, keyword },
   usedKeywords,
 }: {
   index: number;
@@ -182,7 +173,7 @@ function MobStringRow({
             onValueChange={(v) => {
               onKeywordChange(mobExtraSchema.shape.keyword.parse(v));
             }}
-            value={row.keyword}
+            value={keyword}
           >
             <SelectTrigger
               className="w-full"
@@ -193,7 +184,7 @@ function MobStringRow({
 
             <SelectContent position="popper">
               {mobStringKeywords
-                .filter((k) => k === row.keyword || !usedKeywords.has(k))
+                .filter((k) => k === keyword || !usedKeywords.has(k))
                 .map((k) => (
                   <SelectItem
                     key={k}
@@ -207,7 +198,7 @@ function MobStringRow({
         </div>
 
         <Button
-          aria-label={`Remove ${MOB_STRING_LABELS[row.keyword]} string`}
+          aria-label={`Remove ${MOB_STRING_LABELS[keyword]} string`}
           className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive mt-5 ml-2 shrink-0"
           onClick={onRemove}
           size="xs"
@@ -226,9 +217,18 @@ function MobStringRow({
           onChange={(e) => {
             onDescriptionChange(e.target.value);
           }}
-          value={row.description}
+          value={description}
         />
       </div>
     </div>
   );
 }
+
+const MOB_STRING_LABELS: Record<MobStringKeyword, string> = {
+  bamfin: "Enter World",
+  bamfout: "Leave World",
+  deathcry: "Death Cry",
+  movein: "Room Enter",
+  moveout: "Room Leave",
+  repop: "Respawn",
+};

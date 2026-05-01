@@ -45,14 +45,16 @@ function useListViewMode(): [ListViewMode, (mode: ListViewMode) => void] {
       return "table";
     }
   });
-  const setModeSafe = (m: ListViewMode) => {
+
+  function setModeSafe(m: ListViewMode) {
     setMode(m);
     try {
       localStorage.setItem("bt-list-view", m);
     } catch {
       // localStorage unavailable
     }
-  };
+  }
+
   return [mode, setModeSafe];
 }
 
@@ -139,8 +141,8 @@ export function EntityList({
   });
 
   const selectedVnums = entities
-    .filter((e) => selectedIds[`${e.playerId}:${e.vnum}`])
-    .map((e) => e.vnum);
+    .filter(({ playerId, vnum }) => selectedIds[`${playerId}:${vnum}`])
+    .map(({ vnum }) => vnum);
   const canCreate = Boolean(onCreateVnum && vnumBlocks);
   const searching = search !== "";
 
