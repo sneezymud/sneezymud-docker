@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useMatchRoute, useNavigate } from "@tanstack/react-router";
 import { Box, DoorOpen, Map, Upload, User } from "lucide-react";
 import { useState } from "react";
@@ -27,40 +27,34 @@ export function Nav({ className, onNavClick }: NavProps) {
   const queryClient = useQueryClient();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
+  const logoutMutation = useMutation({
+    mutationFn: () =>
+      apiFetch("/api/auth/logout", okResponseSchema, {
+        method: "POST",
+        signal: AbortSignal.timeout(5000),
+      }),
+    onError: (error) => {
+      // Proceed with client-side logout even if the server call fails
+      console.error("Logout API call failed:", error);
+    },
+    onSettled: () => {
+      useSidebarStore.getState().close();
+      queryClient.clear();
+      clearUser();
+      return navigate({ to: "/login" });
+    },
+  });
+
   if (!user) {
     return null;
   }
 
   const permissions = resolvePermissions(user.powers, user.isSenior);
 
-  const doLogout = () => {
-    (async () => {
-      useAuthStore.getState().setLoggingOut(true);
-      try {
-        await apiFetch("/api/auth/logout", okResponseSchema, {
-          method: "POST",
-          signal: AbortSignal.timeout(5000),
-        });
-      } catch (error: unknown) {
-        // Proceed with client-side logout even if the server call fails
-        console.error("Logout API call failed:", error);
-      }
-      useSidebarStore.getState().close();
-      queryClient.clear();
-      clearUser();
-      await navigate({ to: "/login" });
-    })().catch((error: unknown) => {
-      console.error("Logout failed:", error);
-    });
-  };
-
-  const handleLogout = () => {
-    if (useDirtyStore.getState().dirty) {
-      setShowLogoutConfirm(true);
-    } else {
-      doLogout();
-    }
-  };
+  function doLogout() {
+    useAuthStore.getState().setLoggingOut(true);
+    logoutMutation.mutate();
+  }
 
   return (
     <nav className={cn("border-border bg-card flex flex-col p-4", className)}>
@@ -141,7 +135,13 @@ export function Nav({ className, onNavClick }: NavProps) {
 
         <Button
           className="text-xs"
-          onClick={handleLogout}
+          onClick={() => {
+            if (useDirtyStore.getState().dirty) {
+              setShowLogoutConfirm(true);
+            } else {
+              doLogout();
+            }
+          }}
           size="inline"
           variant="inline"
         >

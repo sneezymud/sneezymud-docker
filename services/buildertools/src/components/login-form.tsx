@@ -1,3 +1,4 @@
+import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -13,8 +14,6 @@ import { useAuthStore } from "@/state/auth.ts";
 export function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<null | string>(null);
-  const [loading, setLoading] = useState(false);
   const setUser = useAuthStore((s) => s.setUser);
   const navigate = useNavigate();
   const usernameRef = useRef<HTMLInputElement>(null);
@@ -23,35 +22,29 @@ export function LoginForm() {
     usernameRef.current?.focus();
   }, []);
 
-  const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    void (async () => {
-      try {
-        const user = await apiFetch("/api/auth/login", sessionUserSchema, {
-          body: JSON.stringify({ password, username }),
-          method: "POST",
-        });
-        setUser(user);
-        await navigate({ to: "/" });
-      } catch (error_) {
-        if (error_ instanceof ApiResponseError) {
-          setError(error_.message);
-        } else {
-          setError("An unexpected error occurred");
-        }
-      } finally {
-        setLoading(false);
-      }
-    })();
-  };
+  const {
+    error,
+    isPending,
+    mutate: login,
+  } = useMutation({
+    mutationFn: (vars: { password: string; username: string }) =>
+      apiFetch("/api/auth/login", sessionUserSchema, {
+        body: JSON.stringify(vars),
+        method: "POST",
+      }),
+    onSuccess: (user) => {
+      setUser(user);
+      return navigate({ to: "/" });
+    },
+  });
 
   return (
     <form
       className="flex flex-col gap-5"
-      onSubmit={handleSubmit}
+      onSubmit={(e) => {
+        e.preventDefault();
+        login({ password, username });
+      }}
     >
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="username">Username</Label>
@@ -84,22 +77,26 @@ export function LoginForm() {
         />
       </div>
 
-      {error ? (
+      {error && (
         <Alert
           aria-live="assertive"
           variant="destructive"
         >
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>
+            {error instanceof ApiResponseError
+              ? error.message
+              : "An unexpected error occurred"}
+          </AlertDescription>
         </Alert>
-      ) : null}
+      )}
 
       <Button
         className="h-11 w-full"
-        disabled={loading}
+        disabled={isPending}
         size="lg"
         type="submit"
       >
-        {loading ? (
+        {isPending ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
             Logging in...
