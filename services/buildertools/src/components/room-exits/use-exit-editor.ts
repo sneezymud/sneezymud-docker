@@ -15,56 +15,59 @@ export function hasExitData(exit: RoomExit) {
   );
 }
 
-export function useExitEditor(
-  exits: RoomExit[],
-  onChange: (exits: RoomExit[]) => void,
-  vnum: number,
-) {
+export function useExitEditor({
+  exits,
+  onChange,
+  vnum,
+}: {
+  exits: RoomExit[];
+  onChange: (exits: RoomExit[]) => void;
+  vnum: number;
+}) {
   const [pendingRemove, setPendingRemove] = useState<null | number>(null);
   const { removeKey, rowKeys, setRowKeys } = useRowKeys(exits.length);
 
-  const usedDirections = new Set(exits.map((e) => e.direction));
+  const usedDirections = new Set(exits.map(({ direction }) => direction));
   const availableDirections = DIRECTION_TYPES.filter(
-    (d) => !usedDirections.has(d.value),
+    ({ value }) => !usedDirections.has(value),
   );
 
-  const addExit = () => {
+  function commitSorted(paired: Array<{ exit: RoomExit; key: string }>) {
+    const sorted = paired.toSorted(
+      (a, b) => a.exit.direction - b.exit.direction,
+    );
+    onChange(sorted.map(({ exit }) => exit));
+    setRowKeys(sorted.map(({ key }) => key));
+  }
+
+  function addExit() {
     const dir = availableDirections[0];
     if (!dir) {
       return;
     }
-    const newExit = {
-      block: 0,
-      condition_flag: 0,
-      description: "",
-      destination: 0,
-      direction: dir.value,
-      key_num: -1,
-      lock_difficulty: 0,
-      name: "",
-      type: 0,
-      vnum,
-      weight: 1,
-    };
-    const paired = [
-      ...exits.map((e, i) => ({ exit: e, key: rowKeys[i] ?? "" })),
-      { exit: newExit, key: crypto.randomUUID() },
-    ];
-    paired.sort((a, b) => a.exit.direction - b.exit.direction);
-    onChange(paired.map((p) => p.exit));
-    setRowKeys(paired.map((p) => p.key));
-  };
+    commitSorted([
+      ...exits.map((exit, i) => ({ exit, key: rowKeys[i] ?? "" })),
+      {
+        exit: { ...newExit, direction: dir.value, vnum },
+        key: crypto.randomUUID(),
+      },
+    ]);
+  }
 
-  const removeExit = (index: number) => {
+  function removeExit(index: number) {
     removeKey(index);
     onChange(exits.filter((_, i) => i !== index));
-  };
+  }
 
-  const update = (
-    index: number,
-    field: keyof RoomExit,
-    value: number | string,
-  ) => {
+  function update({
+    field,
+    index,
+    value,
+  }: {
+    field: keyof RoomExit;
+    index: number;
+    value: number | string;
+  }) {
     if (field === "condition_flag" && typeof value === "number") {
       const oldFlags = exits[index]?.condition_flag ?? 0;
       const enforced = enforceExitFlagRules(oldFlags, value);
@@ -76,17 +79,16 @@ export function useExitEditor(
       return;
     }
     onChange(exits.map((e, i) => (i === index ? { ...e, [field]: value } : e)));
-  };
+  }
 
-  const changeDirection = (index: number, newDirection: number) => {
-    const paired = exits.map((e, i) => ({
-      exit: i === index ? { ...e, direction: newDirection } : e,
-      key: rowKeys[i] ?? "",
-    }));
-    paired.sort((a, b) => a.exit.direction - b.exit.direction);
-    onChange(paired.map((p) => p.exit));
-    setRowKeys(paired.map((p) => p.key));
-  };
+  function changeDirection(index: number, newDirection: number) {
+    commitSorted(
+      exits.map((exit, i) => ({
+        exit: i === index ? { ...exit, direction: newDirection } : exit,
+        key: rowKeys[i] ?? "",
+      })),
+    );
+  }
 
   return {
     addExit,
@@ -100,3 +102,15 @@ export function useExitEditor(
     usedDirections,
   };
 }
+
+const newExit = {
+  block: 0,
+  condition_flag: 0,
+  description: "",
+  destination: 0,
+  key_num: -1,
+  lock_difficulty: 0,
+  name: "",
+  type: 0,
+  weight: 1,
+} as const;

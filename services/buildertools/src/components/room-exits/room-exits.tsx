@@ -25,7 +25,7 @@ export function RoomExits({ exits, onChange, readOnly, vnum }: RoomExitsProps) {
     setPendingRemove,
     update,
     usedDirections,
-  } = useExitEditor(exits, onChange, vnum);
+  } = useExitEditor({ exits, onChange, vnum });
 
   return (
     <fieldset
@@ -77,7 +77,7 @@ export function RoomExits({ exits, onChange, readOnly, vnum }: RoomExitsProps) {
               }
             }}
             onUpdate={(field, value) => {
-              update(index, field, value);
+              update({ field, index, value });
             }}
             prefix={rowKeys[index] ?? ""}
             usedDirections={usedDirections}
