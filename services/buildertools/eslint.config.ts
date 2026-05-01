@@ -10,6 +10,8 @@ import jestDom from "eslint-plugin-jest-dom";
 import jsxA11y from "eslint-plugin-jsx-a11y";
 import { configs as perfectionist } from "eslint-plugin-perfectionist";
 import playwright from "eslint-plugin-playwright";
+// @ts-expect-error No types available for this package
+import { configs as promise } from "eslint-plugin-promise";
 import { configs as reactCompiler } from "eslint-plugin-react-compiler";
 import reactHooks from "eslint-plugin-react-hooks";
 import { reactRefresh } from "eslint-plugin-react-refresh";
@@ -46,13 +48,16 @@ const config: Config = defineConfig([
     extends: [eslint.configs.recommended],
     rules: {
       // Keep arrow functions as concise as possible
-      "arrow-body-style": "warn",
+      "arrow-body-style": "error",
 
-      // Always use curely braces for safety/consistency
-      curly: ["warn", "all"],
+      // Always use curly braces for safety/consistency
+      curly: ["error", "all"],
+
+      // Enforce consistent function declaration style
+      "func-style": ["warn", "declaration"],
 
       // Prefer arrow functions for callbacks only
-      "prefer-arrow-callback": ["warn"],
+      "prefer-arrow-callback": ["error"],
     },
   },
 
@@ -106,6 +111,11 @@ const config: Config = defineConfig([
       "unicorn/prevent-abbreviations": "off",
     },
   },
+
+  // This plugin doesn't include any TypeScript types, and there's no @types
+  // package available for it.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  promise["flat/recommended"],
 
   {
     extends: [tseslint.strictTypeChecked, tseslint.stylisticTypeChecked],
@@ -171,6 +181,11 @@ const config: Config = defineConfig([
           allowNumber: true,
         },
       ],
+
+      // Plain `return promise` is preferred over `return await promise` outside
+      // try/catch (avoids an extra microtask). Inside try/catch, await is
+      // required so rejections route through the catch block.
+      "@typescript-eslint/return-await": ["error", "in-try-catch"],
     },
   },
 
