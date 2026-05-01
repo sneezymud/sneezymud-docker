@@ -38,7 +38,7 @@ export function useSingleEntityPublish({
     mutationFn: async () => {
       const ownerQuery =
         ownerPlayerId === undefined ? "" : `?owner=${ownerPlayerId}`;
-      return await apiFetch(
+      return apiFetch(
         `/api/publish/${URL_SEGMENT[type]}/${vnum}${ownerQuery}`,
         okResponseSchema,
         { method: "POST" },
