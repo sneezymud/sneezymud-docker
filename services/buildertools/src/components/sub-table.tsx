@@ -33,24 +33,12 @@ interface EnumColumnDef<T> extends ColumnDefBase<T> {
 }
 
 interface CustomColumnDef<T> extends ColumnDefBase<T> {
-  renderCell: (
-    row: T,
-    onChange: (value: number | string) => void,
-    context: { id: string; onRowChange: (updates: Partial<T>) => void },
-  ) => React.ReactNode;
+  renderCell: (input: {
+    context: { id: string; onRowChange: (updates: Partial<T>) => void };
+    onChange: (value: number | string) => void;
+    row: T;
+  }) => React.ReactNode;
   type: "custom";
-}
-
-interface SubTableProps<T extends Record<string, number | string>> {
-  columns: Array<ColumnDef<T>>;
-  emptyRow: T;
-  help?: string;
-  helpParagraph?: string;
-  label: string;
-  maxRows?: number;
-  onChange: (rows: T[]) => void;
-  readOnly?: boolean | undefined;
-  rows: T[];
 }
 
 export function SubTable<T extends Record<string, number | string>>({
@@ -63,35 +51,40 @@ export function SubTable<T extends Record<string, number | string>>({
   onChange,
   readOnly,
   rows,
-}: SubTableProps<T>) {
+}: {
+  columns: Array<ColumnDef<T>>;
+  emptyRow: T;
+  help?: string;
+  helpParagraph?: string;
+  label: string;
+  maxRows?: number;
+  onChange: (rows: T[]) => void;
+  readOnly?: boolean | undefined;
+  rows: T[];
+}) {
   const { addKey, removeKey, rowKeys } = useRowKeys(rows.length);
 
-  const addRow = () => {
+  function addRow() {
     addKey();
     onChange([...rows, { ...emptyRow }]);
-  };
+  }
 
-  const removeRow = (index: number) => {
+  function removeRow(index: number) {
     removeKey(index);
     onChange(rows.filter((_, i) => i !== index));
-  };
+  }
 
-  const updateCell = (
-    index: number,
-    key: keyof T & string,
-    value: number | string,
-  ) => {
+  function updateCell(index: number, key: keyof T, value: number | string) {
     onChange(
       rows.map((row, i) => (i === index ? { ...row, [key]: value } : row)),
     );
-  };
+  }
 
-  const updateRow = (index: number, updates: Partial<T>) => {
-    const updated = rows.map((row, i) =>
-      i === index ? { ...row, ...updates } : row,
+  function updateRow(index: number, updates: Partial<T>) {
+    onChange(
+      rows.map((row, i) => (i === index ? { ...row, ...updates } : row)),
     );
-    onChange(updated);
-  };
+  }
 
   return (
     <fieldset
@@ -133,37 +126,37 @@ export function SubTable<T extends Record<string, number | string>>({
               </Button>
             )}
 
-            {columns.map((col) => {
-              const cellId = `${label}-${index}-${col.key}`;
+            {columns.map(({ key, label: colLabel, ...col }) => {
+              const cellId = `${label}-${index}-${key}`;
               return (
                 <div
                   className="flex flex-col gap-1.5"
-                  key={col.key}
+                  key={key}
                 >
-                  <Label htmlFor={cellId}>{col.label}</Label>
+                  <Label htmlFor={cellId}>{colLabel}</Label>
 
                   {col.type === "custom" ? (
-                    col.renderCell(
-                      row,
-                      (v) => {
-                        updateCell(index, col.key, v);
-                      },
-                      {
+                    col.renderCell({
+                      context: {
                         id: cellId,
                         onRowChange: (updates) => {
                           updateRow(index, updates);
                         },
                       },
-                    )
+                      onChange: (value) => {
+                        updateCell(index, key, value);
+                      },
+                      row,
+                    })
                   ) : (
                     <CellInput
                       entries={col.type === "enum" ? col.entries : undefined}
                       id={cellId}
-                      onChange={(v) => {
-                        updateCell(index, col.key, v);
+                      onChange={(value) => {
+                        updateCell(index, key, value);
                       }}
                       type={col.type}
-                      value={row[col.key] ?? ""}
+                      value={row[key] ?? ""}
                     />
                   )}
                 </div>

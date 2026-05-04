@@ -18,7 +18,7 @@ export const affectColumns: Array<ColumnDef<ObjAffect>> = [
   {
     key: "type",
     label: "Apply Type",
-    renderCell: (row, _onChange, { id, onRowChange }) => (
+    renderCell: ({ context: { id, onRowChange }, row }) => (
       <EnumSelect
         entries={APPLY_TYPES}
         id={id}
@@ -34,7 +34,7 @@ export const affectColumns: Array<ColumnDef<ObjAffect>> = [
   {
     key: "mod1",
     label: "Modifier",
-    renderCell: (row, onChange, { id }) => {
+    renderCell: ({ context: { id }, onChange, row }) => {
       const spec = getApplyTypeSpec(row.type);
       if (!spec) {
         return (
@@ -128,7 +128,7 @@ export const affectColumns: Array<ColumnDef<ObjAffect>> = [
   {
     key: "mod2",
     label: "Modifier 2",
-    renderCell: (row, onChange, { id }) => {
+    renderCell: ({ context: { id }, onChange, row }) => {
       const spec = getApplyTypeSpec(row.type);
       if (!spec?.mod2) {
         if (spec) {
