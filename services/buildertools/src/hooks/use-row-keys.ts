@@ -25,13 +25,13 @@ export function useRowKeys(rowCount: number) {
     }
   }
 
-  const addKey = () => {
+  function addKey() {
     setRowKeys((prev) => [...prev, crypto.randomUUID()]);
-  };
+  }
 
-  const removeKey = (index: number) => {
+  function removeKey(index: number) {
     setRowKeys((prev) => prev.filter((_, i) => i !== index));
-  };
+  }
 
   return { addKey, removeKey, rowKeys, setRowKeys };
 }

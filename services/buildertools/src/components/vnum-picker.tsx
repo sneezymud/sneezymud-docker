@@ -47,10 +47,6 @@ export function VnumPicker({
     }
   }
 
-  const handleOpenChange = (isOpen: boolean) => {
-    onOpenChange(isOpen);
-  };
-
   if (isMobile) {
     return (
       <>
@@ -64,7 +60,7 @@ export function VnumPicker({
         </Button>
 
         <Sheet
-          onOpenChange={handleOpenChange}
+          onOpenChange={onOpenChange}
           open={open}
         >
           <SheetContent
@@ -91,7 +87,7 @@ export function VnumPicker({
 
   return (
     <Popover
-      onOpenChange={handleOpenChange}
+      onOpenChange={onOpenChange}
       open={open}
     >
       <PopoverTrigger asChild>
@@ -153,19 +149,17 @@ function VnumPickerForm({
     inBlocks &&
     !existingVnums.has(vnumNumber);
 
-  const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (isValid) {
-      onCreate(vnumNumber);
-      onOpenChange(false);
-    }
-  };
-
   return (
     <>
       <form
         className="flex items-center gap-3"
-        onSubmit={handleSubmit}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (isValid) {
+            onCreate(vnumNumber);
+            onOpenChange(false);
+          }
+        }}
       >
         <div className="flex-1">
           <Input

@@ -40,11 +40,42 @@ export function useObjectEditor(vnumParam: string, owner: number | undefined) {
 
   const dirty = edits !== null || affectEdits !== null || extraEdits !== null;
 
-  const resetEdits = () => {
+  function resetEdits() {
     setEdits(null);
     setAffectEdits(null);
     setExtraEdits(null);
-  };
+  }
+
+  async function saveFn() {
+    if (!entity) return null;
+    const body: Obj = {
+      ...entity,
+      ...edits,
+      affects: affectEdits ?? entity.affects,
+      extras: extraEdits ?? entity.extras,
+    };
+    return apiFetch(`/api/objects/${vnum}${ownerSuffix(cOwner)}`, objSchema, {
+      body: JSON.stringify(body),
+      method: "PUT",
+    });
+  }
+
+  function validate() {
+    if (!entity) return null;
+    const merged = { ...entity, ...edits };
+    const requiredFields = [
+      { key: "name" as const, label: "Keywords" },
+      { key: "short_desc" as const, label: "Short Description" },
+      { key: "long_desc" as const, label: "Long Description" },
+    ];
+    const errors = requiredFields
+      .filter(({ key }) => !merged[key].trim())
+      .map(({ key, label }) => ({
+        field: key,
+        message: `${label} is required`,
+      }));
+    return errors.length > 0 ? errors : null;
+  }
 
   const {
     clearFieldError,
@@ -66,35 +97,8 @@ export function useObjectEditor(vnumParam: string, owner: number | undefined) {
     listPath: "/objects",
     onReset: resetEdits,
     readOnly,
-    saveFn: async () => {
-      if (!entity) return null;
-      const body: Obj = {
-        ...entity,
-        ...edits,
-        affects: affectEdits ?? entity.affects,
-        extras: extraEdits ?? entity.extras,
-      };
-      return apiFetch(`/api/objects/${vnum}${ownerSuffix(cOwner)}`, objSchema, {
-        body: JSON.stringify(body),
-        method: "PUT",
-      });
-    },
-    validate: () => {
-      if (!entity) return null;
-      const merged = { ...entity, ...edits };
-      const requiredFields = [
-        { key: "name" as const, label: "Keywords" },
-        { key: "short_desc" as const, label: "Short Description" },
-        { key: "long_desc" as const, label: "Long Description" },
-      ];
-      const errors = requiredFields
-        .filter(({ key }) => !merged[key].trim())
-        .map(({ key, label }) => ({
-          field: key,
-          message: `${label} is required`,
-        }));
-      return errors.length > 0 ? errors : null;
-    },
+    saveFn,
+    validate,
   });
 
   const rawCurrent = entity ? objToFormValues(entity, edits) : {};
@@ -110,11 +114,11 @@ export function useObjectEditor(vnumParam: string, owner: number | undefined) {
     ? expandObjFormValues(rawCurrent, rawOriginal, typeSpec)
     : { expandedOriginal: {}, expandedValues: {} };
 
-  const handleFieldChange = (key: string, value: number | string) => {
+  function handleFieldChange(key: string, value: number | string) {
     if (!entity) return;
     clearFieldError(key);
     setEdits((prev) => applyObjFieldChange(key, value, entity, typeSpec, prev));
-  };
+  }
 
   return {
     affectEdits,

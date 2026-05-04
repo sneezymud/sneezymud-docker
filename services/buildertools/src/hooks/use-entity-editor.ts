@@ -67,9 +67,9 @@ export function useEntityEditor<T>({
   // shouldBlockFn, causing false "unsaved changes" prompts on clean pages.
   useEffect(() => {
     if (!dirty) return;
-    const handler = (e: BeforeUnloadEvent) => {
+    function handler(e: BeforeUnloadEvent) {
       e.preventDefault();
-    };
+    }
     window.addEventListener("beforeunload", handler);
     return () => {
       window.removeEventListener("beforeunload", handler);
@@ -121,7 +121,7 @@ export function useEntityEditor<T>({
     },
   });
 
-  const applyValidation = (): boolean => {
+  function applyValidation(): boolean {
     if (!validate) return true;
     const errors = validate();
     if (!errors) {
@@ -143,14 +143,14 @@ export function useEntityEditor<T>({
       el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
     return false;
-  };
+  }
 
-  const handleSave = () => {
+  function handleSave() {
     if (!applyValidation()) return;
     saveMutation.mutate();
-  };
+  }
 
-  const handleSaveAndProceed = async () => {
+  async function handleSaveAndProceed() {
     if (!applyValidation()) return;
     try {
       await saveMutation.mutateAsync();
@@ -158,16 +158,16 @@ export function useEntityEditor<T>({
     } catch {
       // onError handler in the mutation already shows the toast
     }
-  };
+  }
 
-  const clearFieldError = (key: string) => {
+  function clearFieldError(key: string) {
     setFieldErrors((prev) => {
       if (!(key in prev)) return prev;
       return Object.fromEntries(
         Object.entries(prev).filter(([k]) => k !== key),
       );
     });
-  };
+  }
 
   useKeyboardSave(handleSave, dirty && !saveMutation.isPending && !readOnly);
 

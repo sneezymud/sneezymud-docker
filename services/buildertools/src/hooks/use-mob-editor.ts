@@ -37,11 +37,43 @@ export function useMobEditor(vnumParam: string, owner: number | undefined) {
 
   const dirty = edits !== null || extraEdits !== null || immEdits !== null;
 
-  const resetEdits = () => {
+  function resetEdits() {
     setEdits(null);
     setExtraEdits(null);
     setImmEdits(null);
-  };
+  }
+
+  async function saveFn() {
+    if (!entity) return null;
+    const body: Mob = {
+      ...entity,
+      ...edits,
+      extras: extraEdits ?? entity.extras,
+      immunities: immEdits ?? entity.immunities,
+    };
+    return apiFetch(`/api/mobs/${vnum}${ownerSuffix(cOwner)}`, mobSchema, {
+      body: JSON.stringify(body),
+      method: "PUT",
+    });
+  }
+
+  function validate() {
+    if (!entity) return null;
+    const merged = { ...entity, ...edits };
+    const requiredFields = [
+      { key: "name" as const, label: "Keywords" },
+      { key: "short_desc" as const, label: "Short Description" },
+      { key: "long_desc" as const, label: "Long Description" },
+      { key: "description" as const, label: "Detailed Description" },
+    ];
+    const errors = requiredFields
+      .filter(({ key }) => !merged[key].trim())
+      .map(({ key, label }) => ({
+        field: key,
+        message: `${label} is required`,
+      }));
+    return errors.length > 0 ? errors : null;
+  }
 
   const {
     clearFieldError,
@@ -63,46 +95,18 @@ export function useMobEditor(vnumParam: string, owner: number | undefined) {
     listPath: "/mobs",
     onReset: resetEdits,
     readOnly,
-    saveFn: async () => {
-      if (!entity) return null;
-      const body: Mob = {
-        ...entity,
-        ...edits,
-        extras: extraEdits ?? entity.extras,
-        immunities: immEdits ?? entity.immunities,
-      };
-      return apiFetch(`/api/mobs/${vnum}${ownerSuffix(cOwner)}`, mobSchema, {
-        body: JSON.stringify(body),
-        method: "PUT",
-      });
-    },
-    validate: () => {
-      if (!entity) return null;
-      const merged = { ...entity, ...edits };
-      const requiredFields = [
-        { key: "name" as const, label: "Keywords" },
-        { key: "short_desc" as const, label: "Short Description" },
-        { key: "long_desc" as const, label: "Long Description" },
-        { key: "description" as const, label: "Detailed Description" },
-      ];
-      const errors = requiredFields
-        .filter(({ key }) => !merged[key].trim())
-        .map(({ key, label }) => ({
-          field: key,
-          message: `${label} is required`,
-        }));
-      return errors.length > 0 ? errors : null;
-    },
+    saveFn,
+    validate,
   });
 
   const currentValues = entity ? mobToFormValues(entity, edits) : {};
   const originalValues = entity ? mobToFormValues(entity, null) : {};
 
-  const handleFieldChange = (key: string, value: number | string) => {
+  function handleFieldChange(key: string, value: number | string) {
     if (!entity) return;
     clearFieldError(key);
     setEdits((prev) => diffEdits({ ...prev, [key]: value }, entity));
-  };
+  }
 
   return {
     cOwner,

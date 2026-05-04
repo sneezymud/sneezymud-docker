@@ -6,12 +6,12 @@ export function useKeyboardSave(onSave: () => void, enabled: boolean) {
       return;
     }
 
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+    function handler({ ctrlKey, key, metaKey, ...e }: KeyboardEvent) {
+      if ((ctrlKey || metaKey) && key === "s") {
         e.preventDefault();
         onSave();
       }
-    };
+    }
 
     globalThis.addEventListener("keydown", handler);
     return () => {

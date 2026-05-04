@@ -22,29 +22,10 @@ export function TagInput({ id, onChange, value }: TagInputProps) {
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const addTag = (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    const next = [...tags, trimmed].join(" ");
-    onChange(next);
-    setDraft("");
-  };
-
-  const removeTag = (index: number) => {
+  function removeTag(index: number) {
     const next = tags.filter((_, i) => i !== index).join(" ");
     onChange(next);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === "Tab") {
-      if (draft.trim()) {
-        e.preventDefault();
-        addTag(draft);
-      }
-    } else if (e.key === "Backspace" && draft === "" && tags.length > 0) {
-      removeTag(tags.length - 1);
-    }
-  };
+  }
 
   return (
     <label
@@ -83,7 +64,20 @@ export function TagInput({ id, onChange, value }: TagInputProps) {
         onChange={(e) => {
           setDraft(e.target.value);
         }}
-        onKeyDown={handleKeyDown}
+        onKeyDown={({ key, ...e }) => {
+          if (key === "Enter" || key === "Tab") {
+            if (draft.trim()) {
+              e.preventDefault();
+              const trimmed = draft.trim();
+              if (!trimmed) return;
+              const next = [...tags, trimmed].join(" ");
+              onChange(next);
+              setDraft("");
+            }
+          } else if (key === "Backspace" && draft === "" && tags.length > 0) {
+            removeTag(tags.length - 1);
+          }
+        }}
         placeholder={tags.length === 0 ? "Add keywords\u2026" : ""}
         ref={inputRef}
         type="text"

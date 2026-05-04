@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import type { SessionUser } from "@/shared/schemas/auth";
+
 import { invalidateEntityCaches } from "@/lib/invalidate-entity-caches.ts";
 import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
 import { okResponseSchema } from "@/shared/schemas/common.ts";
@@ -21,20 +23,9 @@ export function entityKey({ playerId, type, vnum }: DashboardEntity): string {
 
 export function usePublishDashboard() {
   const user = useAuthStore((s) => s.user);
-
-  const [ownerFilter, setOwnerFilter] = useState<"all" | "mine">(() => {
-    if (!user || typeof localStorage === "undefined") return "mine";
-    const stored = localStorage.getItem(dashboardStorageKey(user.playerId));
-    if (stored === "all") {
-      if (!user.isSenior) {
-        // Normalize the stored value so subsequent loads are consistent.
-        localStorage.setItem(dashboardStorageKey(user.playerId), "mine");
-        return "mine";
-      }
-      return "all";
-    }
-    return "mine";
-  });
+  const [ownerFilter, setOwnerFilter] = useState(() => initOwnerFilter(user));
+  const [selected, setSelected] = useState(() => new Set<string>());
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (user) {
@@ -42,11 +33,8 @@ export function usePublishDashboard() {
     }
   }, [ownerFilter, user]);
 
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const queryClient = useQueryClient();
-
   const {
-    data: entities,
+    data: entities = [],
     error,
     isError,
     isLoading,
@@ -82,28 +70,26 @@ export function usePublishDashboard() {
 
   // Group entities by type
   const grouped = new Map<string, DashboardEntity[]>();
-  if (entities) {
-    for (const entity of entities) {
-      const group = grouped.get(entity.type) ?? [];
-      group.push(entity);
-      grouped.set(entity.type, group);
-    }
+  for (const entity of entities) {
+    const group = grouped.get(entity.type) ?? [];
+    group.push(entity);
+    grouped.set(entity.type, group);
   }
 
-  const allKeys = entities?.map(entityKey) ?? [];
+  const allKeys = entities.map(entityKey);
   const allSelected =
     allKeys.length > 0 && allKeys.every((k) => selected.has(k));
   const someSelected = allKeys.some((k) => selected.has(k));
 
-  const toggleAll = () => {
+  function toggleAll() {
     if (allSelected) {
       setSelected(new Set());
     } else {
       setSelected(new Set(allKeys));
     }
-  };
+  }
 
-  const toggleOne = (key: string) => {
+  function toggleOne(key: string) {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(key)) {
@@ -113,14 +99,9 @@ export function usePublishDashboard() {
       }
       return next;
     });
-  };
+  }
 
-  const _setOwnerFilter = (v: "all" | "mine") => {
-    setOwnerFilter(v);
-    setSelected(new Set());
-  };
-
-  const selectedEntities = (entities ?? [])
+  const selectedEntities = entities
     .filter((e) => selected.has(entityKey(e)))
     .map(({ playerId, type, vnum }) => ({
       ownerPlayerId: playerId,
@@ -140,7 +121,10 @@ export function usePublishDashboard() {
     publishMutation,
     selected,
     selectedEntities,
-    setOwnerFilter: _setOwnerFilter,
+    setOwnerFilter: (v: "all" | "mine") => {
+      setOwnerFilter(v);
+      setSelected(new Set());
+    },
     someSelected,
     toggleAll,
     toggleOne,
@@ -149,4 +133,19 @@ export function usePublishDashboard() {
 
 function dashboardStorageKey(playerId: number): string {
   return `buildertools-publish-dashboard-owner-filter-${playerId}`;
+}
+
+function initOwnerFilter(user: null | SessionUser): "all" | "mine" {
+  if (!user || typeof localStorage === "undefined") return "mine";
+  const { isSenior, playerId } = user;
+  const stored = localStorage.getItem(dashboardStorageKey(playerId));
+  if (stored === "all") {
+    if (!isSenior) {
+      // Normalize the stored value so subsequent loads are consistent.
+      localStorage.setItem(dashboardStorageKey(playerId), "mine");
+      return "mine";
+    }
+    return "all";
+  }
+  return "mine";
 }

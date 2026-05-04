@@ -153,7 +153,7 @@ function DashboardContent() {
     toggleOne,
   } = usePublishDashboard();
 
-  if (isLoading || isError || !entities) {
+  if (isLoading || isError) {
     return (
       <QueryStatus
         error={error}
