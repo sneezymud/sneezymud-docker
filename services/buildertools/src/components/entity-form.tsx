@@ -8,15 +8,6 @@ import { cn } from "@/lib/utils.ts";
 import { FormField } from "./form-field.tsx";
 import { SectionHeader } from "./section-header.tsx";
 
-interface EntityFormProps {
-  children?: React.ReactNode;
-  fieldErrors?: Record<string, string>;
-  groups: FieldGroupDef[];
-  onChange: (key: string, value: number | string) => void;
-  originalValues?: Record<string, null | number | string> | undefined;
-  values: Record<string, null | number | string>;
-}
-
 export function EntityForm({
   children,
   fieldErrors,
@@ -24,7 +15,14 @@ export function EntityForm({
   onChange,
   originalValues,
   values,
-}: EntityFormProps) {
+}: {
+  children?: React.ReactNode;
+  fieldErrors?: Record<string, string>;
+  groups: FieldGroupDef[];
+  onChange: (key: string, value: number | string) => void;
+  originalValues?: Record<string, null | number | string> | undefined;
+  values: Record<string, null | number | string>;
+}) {
   return (
     <div className="space-y-10">
       {groups.map((group) => (
