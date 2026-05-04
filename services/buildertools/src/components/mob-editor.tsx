@@ -1,24 +1,17 @@
-import { Link } from "@tanstack/react-router";
-
 import type { ColumnDef } from "@/components/sub-table.tsx";
 import type { MobImm } from "@/shared/schemas/mob.ts";
 
 import { EntityEditorShell } from "@/components/entity-editor-shell.tsx";
 import { EntityForm } from "@/components/entity-form.tsx";
+import { MobResponsesLink } from "@/components/mob-responses-link.tsx";
 import { MobStringsEditor } from "@/components/mob-strings-editor.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { EntityFormSkeleton } from "@/components/skeleton.tsx";
 import { SubTable } from "@/components/sub-table.tsx";
-import { Button } from "@/components/ui/button.tsx";
 import { useMobEditor } from "@/hooks/use-mob-editor.ts";
 import { IMMUNITY_TYPES } from "@/shared/enums/index.ts";
-import { mobFieldGroups } from "@/shared/fields/mob-fields.tsx";
+import { getMobFieldGroups } from "@/shared/fields/mob-fields.tsx";
 import { makeFieldGroupsReadOnly } from "@/shared/permissions.ts";
-import { hasPower, POWER } from "@/shared/powers.ts";
-import {
-  gateSpecProcs,
-  isUnassignableMobSpecProc,
-} from "@/shared/spec-proc-access.ts";
 
 export function MobEditor({
   owner,
@@ -44,14 +37,10 @@ export function MobEditor({
     );
   }
 
-  const { mobResponse, powers, readOnly, vnum } = editor;
+  const { powers, readOnly, vnum } = editor;
   const entityLabel = `Mob ${vnum}: ${entity.short_desc || "(unnamed)"}`;
-  const groups = prepareMobFieldGroups(
-    powers,
-    vnumParam,
-    !!mobResponse?.response.trim(),
-    owner,
-  );
+  const baseGroups = getMobFieldGroups(powers);
+  const groups = readOnly ? makeFieldGroupsReadOnly(baseGroups) : baseGroups;
 
   return (
     <EntityEditorShell
@@ -59,9 +48,14 @@ export function MobEditor({
       diffDescription={entityLabel}
       editor={editor}
     >
+      <MobResponsesLink
+        owner={owner}
+        vnum={vnum}
+      />
+
       <EntityForm
         fieldErrors={editor.fieldErrors}
-        groups={readOnly ? makeFieldGroupsReadOnly(groups) : groups}
+        groups={groups}
         onChange={editor.handleFieldChange}
         originalValues={editor.originalValues}
         values={editor.currentValues}
@@ -85,52 +79,6 @@ export function MobEditor({
       </EntityForm>
     </EntityEditorShell>
   );
-}
-
-function prepareMobFieldGroups(
-  powers: number[],
-  vnumParam: string,
-  hasResponses: boolean,
-  owner: number | undefined,
-) {
-  return mobFieldGroups.map((g, i) => {
-    const group = { ...g };
-    if (i === 0) {
-      group.header = (
-        <Button
-          asChild
-          className="mb-2"
-          size="sm"
-          variant="link"
-        >
-          <Link
-            params={{ vnum: vnumParam }}
-            to="/mobs/$vnum/responses"
-            {...(owner !== undefined && { search: { owner } })}
-          >
-            {hasResponses ? "Edit Mob Responses" : "Add Mob Response"}
-          </Link>
-        </Button>
-      );
-    }
-    if (
-      !hasPower(powers, POWER.MEDIT_IMP_POWER) &&
-      g.fields.some((f) => f.key === "spec_proc")
-    ) {
-      group.fields = g.fields.map((f) =>
-        f.key === "spec_proc" && f.type === "enum"
-          ? {
-              ...f,
-              enumEntries: gateSpecProcs(
-                f.enumEntries,
-                isUnassignableMobSpecProc,
-              ),
-            }
-          : f,
-      );
-    }
-    return group;
-  });
 }
 
 const immColumns: Array<ColumnDef<MobImm>> = [

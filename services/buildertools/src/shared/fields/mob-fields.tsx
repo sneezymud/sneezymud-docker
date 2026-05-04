@@ -11,8 +11,38 @@ import {
   RACE_TYPES,
   SEX_TYPES,
 } from "@/shared/enums/index.ts";
+import { hasPower, POWER } from "@/shared/powers.ts";
+import {
+  gateSpecProcs,
+  isUnassignableMobSpecProc,
+} from "@/shared/spec-proc-access.ts";
 
-export const mobFieldGroups: FieldGroupDef[] = [
+export function getMobFieldGroups(powers: number[]): FieldGroupDef[] {
+  if (hasPower(powers, POWER.MEDIT_IMP_POWER)) {
+    return MOB_FIELD_GROUPS;
+  }
+  return MOB_FIELD_GROUPS.map((group) => {
+    if (!group.fields.some((f) => f.key === "spec_proc")) {
+      return group;
+    }
+    return {
+      ...group,
+      fields: group.fields.map((f) =>
+        f.key === "spec_proc" && f.type === "enum"
+          ? {
+              ...f,
+              enumEntries: gateSpecProcs(
+                f.enumEntries,
+                isUnassignableMobSpecProc,
+              ),
+            }
+          : f,
+      ),
+    };
+  });
+}
+
+const MOB_FIELD_GROUPS: FieldGroupDef[] = [
   {
     defaultExpanded: true,
     fields: [

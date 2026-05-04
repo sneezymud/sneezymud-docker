@@ -8,7 +8,6 @@ import { diffEdits } from "@/lib/diff-edits.ts";
 import { canonicalOwner, entityKeys, ownerSuffix } from "@/lib/entity-keys.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import { resolvePermissions } from "@/shared/permissions.ts";
-import { mobResponseSchema } from "@/shared/schemas/mob-response.ts";
 import { mobSchema } from "@/shared/schemas/mob.ts";
 import { useAuthStore } from "@/state/auth.ts";
 
@@ -30,15 +29,6 @@ export function useMobEditor(vnumParam: string, owner: number | undefined) {
     queryFn: () =>
       apiFetch(`/api/mobs/${vnum}${ownerSuffix(cOwner)}`, mobSchema),
     queryKey: entityKeys.detail("mob", vnum, cOwner),
-  });
-
-  const { data: mobResponse } = useQuery({
-    queryFn: () =>
-      apiFetch(
-        `/api/mob-responses/${vnum}${ownerSuffix(cOwner)}`,
-        mobResponseSchema,
-      ),
-    queryKey: entityKeys.detail("mob-response", vnum, cOwner),
   });
 
   const [edits, setEdits] = useState<null | Partial<Mob>>(null);
@@ -130,7 +120,6 @@ export function useMobEditor(vnumParam: string, owner: number | undefined) {
     immEdits,
     isError,
     isLoading,
-    mobResponse,
     originalValues,
     owner,
     permissions,
