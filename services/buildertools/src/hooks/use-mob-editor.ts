@@ -22,7 +22,7 @@ export function useMobEditor(vnumParam: string, owner: number | undefined) {
   const readOnly = !permissions.canEditMobs;
 
   const {
-    data: mob,
+    data: entity,
     error,
     isError,
     isLoading,
@@ -66,7 +66,7 @@ export function useMobEditor(vnumParam: string, owner: number | undefined) {
     unsavedNavStatus,
   } = useEntityEditor({
     allKey: entityKeys.all("mob"),
-    data: mob,
+    data: entity,
     deletePath: `/api/mobs/${vnum}${ownerSuffix(cOwner)}`,
     detailKey: entityKeys.detail("mob", vnum, cOwner),
     dirty,
@@ -74,12 +74,12 @@ export function useMobEditor(vnumParam: string, owner: number | undefined) {
     onReset: resetEdits,
     readOnly,
     saveFn: async () => {
-      if (!mob) return null;
+      if (!entity) return null;
       const body: Mob = {
-        ...mob,
+        ...entity,
         ...edits,
-        extras: extraEdits ?? mob.extras,
-        immunities: immEdits ?? mob.immunities,
+        extras: extraEdits ?? entity.extras,
+        immunities: immEdits ?? entity.immunities,
       };
       return apiFetch(`/api/mobs/${vnum}${ownerSuffix(cOwner)}`, mobSchema, {
         body: JSON.stringify(body),
@@ -87,8 +87,8 @@ export function useMobEditor(vnumParam: string, owner: number | undefined) {
       });
     },
     validate: () => {
-      if (!mob) return null;
-      const merged = { ...mob, ...edits };
+      if (!entity) return null;
+      const merged = { ...entity, ...edits };
       const requiredFields = [
         { key: "name" as const, label: "Keywords" },
         { key: "short_desc" as const, label: "Short Description" },
@@ -105,13 +105,13 @@ export function useMobEditor(vnumParam: string, owner: number | undefined) {
     },
   });
 
-  const currentValues = mob ? mobToFormValues(mob, edits) : {};
-  const originalValues = mob ? mobToFormValues(mob, null) : {};
+  const currentValues = entity ? mobToFormValues(entity, edits) : {};
+  const originalValues = entity ? mobToFormValues(entity, null) : {};
 
   const handleFieldChange = (key: string, value: number | string) => {
-    if (!mob) return;
+    if (!entity) return;
     clearFieldError(key);
-    setEdits((prev) => diffEdits({ ...prev, [key]: value }, mob));
+    setEdits((prev) => diffEdits({ ...prev, [key]: value }, entity));
   };
 
   return {
@@ -119,6 +119,7 @@ export function useMobEditor(vnumParam: string, owner: number | undefined) {
     currentValues,
     deletePending,
     dirty,
+    entity,
     error,
     extraEdits,
     fieldErrors,
@@ -129,10 +130,9 @@ export function useMobEditor(vnumParam: string, owner: number | undefined) {
     immEdits,
     isError,
     isLoading,
-    isSenior,
-    mob,
     mobResponse,
     originalValues,
+    owner,
     permissions,
     powers,
     readOnly,
@@ -140,11 +140,11 @@ export function useMobEditor(vnumParam: string, owner: number | undefined) {
     saving,
     setExtraEdits,
     setImmEdits,
+    type: "mob" as const,
     unsavedNavProceed,
     unsavedNavReset,
     unsavedNavStatus,
     vnum,
-    vnumParam,
   };
 }
 

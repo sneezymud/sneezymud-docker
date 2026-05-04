@@ -18,14 +18,12 @@ export function useRoomEditor(vnumParam: string, owner: number | undefined) {
   const vnum = Number(vnumParam);
   const user = useAuthStore((s) => s.user);
   const cOwner = canonicalOwner(owner, user?.playerId ?? 0);
-  const permissions = resolvePermissions(
-    user?.powers ?? [],
-    user?.isSenior ?? false,
-  );
+  const powers = user?.powers ?? [];
+  const permissions = resolvePermissions(powers, user?.isSenior ?? false);
   const readOnly = !permissions.canEditRooms;
 
   const {
-    data: room,
+    data: entity,
     error,
     isError,
     isLoading,
@@ -60,12 +58,12 @@ export function useRoomEditor(vnumParam: string, owner: number | undefined) {
   }
 
   async function saveFn() {
-    if (!room) return null;
+    if (!entity) return null;
     const body: Room = {
-      ...room,
+      ...entity,
       ...edits,
-      exits: exitEdits ?? room.exits,
-      extras: extraEdits ?? room.extras,
+      exits: exitEdits ?? entity.exits,
+      extras: extraEdits ?? entity.extras,
     };
     return apiFetch(`/api/rooms/${vnum}${ownerSuffix(cOwner)}`, roomSchema, {
       body: JSON.stringify(body),
@@ -74,8 +72,8 @@ export function useRoomEditor(vnumParam: string, owner: number | undefined) {
   }
 
   function validate() {
-    if (!room) return null;
-    const merged = { ...room, ...edits };
+    if (!entity) return null;
+    const merged = { ...entity, ...edits };
     const errors = requiredFields
       .filter(({ key }) => !merged[key].trim())
       .map(({ key, label }) => ({
@@ -98,7 +96,7 @@ export function useRoomEditor(vnumParam: string, owner: number | undefined) {
     unsavedNavStatus,
   } = useEntityEditor({
     allKey: entityKeys.all("room"),
-    data: room,
+    data: entity,
     deletePath: `/api/rooms/${vnum}${ownerSuffix(cOwner)}`,
     detailKey: entityKeys.detail("room", vnum, cOwner),
     dirty,
@@ -109,13 +107,13 @@ export function useRoomEditor(vnumParam: string, owner: number | undefined) {
     validate,
   });
 
-  const currentValues = room ? roomToFormValues(room, edits) : {};
-  const originalValues = room ? roomToFormValues(room, null) : {};
+  const currentValues = entity ? roomToFormValues(entity, edits) : {};
+  const originalValues = entity ? roomToFormValues(entity, null) : {};
 
   function handleFieldChange(key: string, value: number | string) {
-    if (!room) return;
+    if (!entity) return;
     clearFieldError(key);
-    applyRoomFieldChange(key, value, room, setEdits);
+    applyRoomFieldChange(key, value, entity, setEdits);
   }
 
   return {
@@ -123,6 +121,7 @@ export function useRoomEditor(vnumParam: string, owner: number | undefined) {
     currentValues,
     deletePending,
     dirty,
+    entity,
     error,
     exitEdits,
     extraEdits,
@@ -134,17 +133,18 @@ export function useRoomEditor(vnumParam: string, owner: number | undefined) {
     isError,
     isLoading,
     originalValues,
+    owner,
     permissions,
+    powers,
     readOnly,
     resetEdits,
-    room,
     saving,
     setExitEdits,
     setExtraEdits,
+    type: "room" as const,
     unsavedNavProceed,
     unsavedNavReset,
     unsavedNavStatus,
-    user,
     vnum,
     zoneEntries,
     zonesError,

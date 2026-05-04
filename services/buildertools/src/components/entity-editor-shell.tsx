@@ -6,6 +6,7 @@ import { DiffButton, DiffSheet } from "@/components/diff-sheet.tsx";
 import { EntityHeader } from "@/components/entity-header.tsx";
 import { ReadOnlyBanner } from "@/components/read-only-banner.tsx";
 import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog.tsx";
+import { useOwnerName } from "@/hooks/use-owner-name.ts";
 import { entityKeys, ownerSuffix } from "@/lib/entity-keys.ts";
 import { apiFetch } from "@/shared/api-client.ts";
 import {
@@ -27,13 +28,17 @@ interface EditorState {
   handleDelete: () => void;
   handleSave: () => void;
   handleSaveAndProceed: () => Promise<void>;
+  owner: number | undefined;
   permissions: { canPublish: boolean };
+  powers: number[];
   readOnly: boolean;
   resetEdits: () => void;
   saving: boolean;
+  type: "mob" | "object" | "room";
   unsavedNavProceed: (() => void) | undefined;
   unsavedNavReset: (() => void) | undefined;
   unsavedNavStatus: "blocked" | "idle";
+  vnum: number;
 }
 
 export function EntityEditorShell({
@@ -41,22 +46,32 @@ export function EntityEditorShell({
   children,
   diffDescription,
   editor,
-  owner,
-  ownerName,
-  powers,
-  type,
-  vnum,
 }: {
   breadcrumbLabel: string;
   children: React.ReactNode;
   diffDescription: string;
   editor: EditorState;
-  owner: number | undefined;
-  ownerName: string | undefined;
-  powers: number[];
-  type: "mob" | "object" | "room";
-  vnum: number;
 }) {
+  const {
+    cOwner,
+    deletePending,
+    dirty,
+    handleDelete,
+    handleSave,
+    handleSaveAndProceed,
+    owner,
+    permissions: { canPublish },
+    powers,
+    readOnly,
+    resetEdits,
+    saving,
+    type,
+    unsavedNavProceed,
+    unsavedNavReset,
+    unsavedNavStatus,
+    vnum,
+  } = editor;
+  const ownerName = useOwnerName(owner);
   const {
     backTitle,
     breadcrumbList,
@@ -65,37 +80,8 @@ export function EntityEditorShell({
     diffFields,
     requiredPowers,
   } = EDITOR_CONFIG[type];
-  const {
-    cOwner,
-    deletePending,
-    dirty,
-    handleDelete,
-    handleSave,
-    handleSaveAndProceed,
-    permissions: { canPublish },
-    readOnly,
-    resetEdits,
-    saving,
-    unsavedNavProceed,
-    unsavedNavReset,
-    unsavedNavStatus,
-  } = editor;
+  const diffQuery = useDiffQuery({ cOwner, type, vnum });
   const [diffOpen, setDiffOpen] = useState(false);
-
-  // Derive URL/schema inside queryFn so @tanstack/query/exhaustive-deps sees
-  // them as dependencies of `type` (already in queryKey) rather than free vars.
-  const diffQuery = useQuery({
-    enabled: false,
-    queryFn: () => {
-      const { diffEntityType: entityType, diffSchema } = EDITOR_CONFIG[type];
-      return apiFetch(
-        `/api/publish/diff/${entityType}/${vnum}${ownerSuffix(cOwner)}`,
-        diffSchema,
-      );
-    },
-    queryKey: entityKeys.diff(type, vnum, cOwner),
-  });
-
   const missingPowers = requiredPowers
     .filter((p) => !hasPower(powers, p))
     .map((p) => POWER_LABELS[p]);
@@ -155,6 +141,30 @@ export function EntityEditorShell({
       />
     </>
   );
+}
+
+function useDiffQuery({
+  cOwner,
+  type,
+  vnum,
+}: {
+  cOwner: number | undefined;
+  type: "mob" | "object" | "room";
+  vnum: number;
+}) {
+  return useQuery({
+    enabled: false,
+    // Derive URL/schema inside queryFn so @tanstack/query/exhaustive-deps sees
+    // them as dependencies of `type` (already in queryKey) rather than free vars.
+    queryFn: () => {
+      const { diffEntityType, diffSchema } = EDITOR_CONFIG[type];
+      return apiFetch(
+        `/api/publish/diff/${diffEntityType}/${vnum}${ownerSuffix(cOwner)}`,
+        diffSchema,
+      );
+    },
+    queryKey: entityKeys.diff(type, vnum, cOwner),
+  });
 }
 
 const EDITOR_CONFIG = {

@@ -4,7 +4,6 @@ import { QueryStatus } from "@/components/query-status.tsx";
 import { EntityFormSkeleton } from "@/components/skeleton.tsx";
 import { SubTable } from "@/components/sub-table.tsx";
 import { useObjectEditor } from "@/hooks/use-object-editor.ts";
-import { useOwnerName } from "@/hooks/use-owner-name.ts";
 import {
   affectColumns,
   extraColumns,
@@ -19,10 +18,10 @@ export function ObjectEditor({
   owner?: number;
   vnumParam: string;
 }) {
-  const ownerName = useOwnerName(owner);
   const editor = useObjectEditor(vnumParam, owner);
+  const { entity } = editor;
 
-  if (editor.isLoading || editor.isError || !editor.obj) {
+  if (editor.isLoading || editor.isError || !entity) {
     return (
       <QueryStatus
         backLabel="Objects"
@@ -36,27 +35,23 @@ export function ObjectEditor({
     );
   }
 
-  const { currentItemType, obj, permissions, powers, readOnly, vnum } = editor;
-  const entityLabel = `Object ${vnum}: ${obj.short_desc || "(unnamed)"}`;
-  const groups = getObjFieldGroups(currentItemType, permissions);
+  const { currentItemType, permissions, readOnly, vnum } = editor;
+  const entityLabel = `Object ${vnum}: ${entity.short_desc || "(unnamed)"}`;
+  const baseGroups = getObjFieldGroups(currentItemType, permissions);
+  const groups = readOnly ? makeFieldGroupsReadOnly(baseGroups) : baseGroups;
 
   return (
     <EntityEditorShell
       breadcrumbLabel={entityLabel}
       diffDescription={entityLabel}
       editor={editor}
-      owner={owner}
-      ownerName={ownerName}
-      powers={powers}
-      type="object"
-      vnum={vnum}
     >
       <EntityForm
         fieldErrors={editor.fieldErrors}
-        groups={readOnly ? makeFieldGroupsReadOnly(groups) : groups}
+        groups={groups}
         onChange={editor.handleFieldChange}
-        originalValues={editor.expandedOriginal}
-        values={editor.expandedValues}
+        originalValues={editor.originalValues}
+        values={editor.currentValues}
       >
         <SubTable
           columns={affectColumns}
@@ -65,7 +60,7 @@ export function ObjectEditor({
           label="Applies"
           onChange={editor.setAffectEdits}
           readOnly={readOnly || !permissions.canEditObjectApplys}
-          rows={editor.affectEdits ?? obj.affects}
+          rows={editor.affectEdits ?? entity.affects}
         />
 
         <SubTable
@@ -75,7 +70,7 @@ export function ObjectEditor({
           label="Extra Descriptions"
           onChange={editor.setExtraEdits}
           readOnly={readOnly}
-          rows={editor.extraEdits ?? obj.extras}
+          rows={editor.extraEdits ?? entity.extras}
         />
       </EntityForm>
     </EntityEditorShell>

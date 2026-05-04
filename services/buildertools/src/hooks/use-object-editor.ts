@@ -20,12 +20,11 @@ export function useObjectEditor(vnumParam: string, owner: number | undefined) {
   const user = useAuthStore((s) => s.user);
   const cOwner = canonicalOwner(owner, user?.playerId ?? 0);
   const powers = user?.powers ?? [];
-  const isSenior = user?.isSenior ?? false;
-  const permissions = resolvePermissions(powers, isSenior);
+  const permissions = resolvePermissions(powers, user?.isSenior ?? false);
   const readOnly = !permissions.canEditObjects;
 
   const {
-    data: obj,
+    data: entity,
     error,
     isError,
     isLoading,
@@ -60,7 +59,7 @@ export function useObjectEditor(vnumParam: string, owner: number | undefined) {
     unsavedNavStatus,
   } = useEntityEditor({
     allKey: entityKeys.all("object"),
-    data: obj,
+    data: entity,
     deletePath: `/api/objects/${vnum}${ownerSuffix(cOwner)}`,
     detailKey: entityKeys.detail("object", vnum, cOwner),
     dirty,
@@ -68,12 +67,12 @@ export function useObjectEditor(vnumParam: string, owner: number | undefined) {
     onReset: resetEdits,
     readOnly,
     saveFn: async () => {
-      if (!obj) return null;
+      if (!entity) return null;
       const body: Obj = {
-        ...obj,
+        ...entity,
         ...edits,
-        affects: affectEdits ?? obj.affects,
-        extras: extraEdits ?? obj.extras,
+        affects: affectEdits ?? entity.affects,
+        extras: extraEdits ?? entity.extras,
       };
       return apiFetch(`/api/objects/${vnum}${ownerSuffix(cOwner)}`, objSchema, {
         body: JSON.stringify(body),
@@ -81,8 +80,8 @@ export function useObjectEditor(vnumParam: string, owner: number | undefined) {
       });
     },
     validate: () => {
-      if (!obj) return null;
-      const merged = { ...obj, ...edits };
+      if (!entity) return null;
+      const merged = { ...entity, ...edits };
       const requiredFields = [
         { key: "name" as const, label: "Keywords" },
         { key: "short_desc" as const, label: "Short Description" },
@@ -98,30 +97,34 @@ export function useObjectEditor(vnumParam: string, owner: number | undefined) {
     },
   });
 
-  const currentValues = obj ? objToFormValues(obj, edits) : {};
+  const rawCurrent = entity ? objToFormValues(entity, edits) : {};
+  const rawOriginal = entity ? objToFormValues(entity, null) : {};
   const currentItemType =
-    typeof currentValues["type"] === "number" ? currentValues["type"] : 0;
+    typeof rawCurrent["type"] === "number" ? rawCurrent["type"] : 0;
   const typeSpec = getObjTypeSpec(currentItemType);
 
-  const { expandedOriginal, expandedValues } = obj
-    ? expandObjFormValues(currentValues, objToFormValues(obj, null), typeSpec)
+  // Expanded values are what the form actually consumes - val0..val3 explode
+  // into per-type-spec field keys. The hook absorbs the expansion so consumers
+  // see a single uniform `currentValues`/`originalValues` interface.
+  const { expandedOriginal, expandedValues } = entity
+    ? expandObjFormValues(rawCurrent, rawOriginal, typeSpec)
     : { expandedOriginal: {}, expandedValues: {} };
 
   const handleFieldChange = (key: string, value: number | string) => {
-    if (!obj) return;
+    if (!entity) return;
     clearFieldError(key);
-    setEdits((prev) => applyObjFieldChange(key, value, obj, typeSpec, prev));
+    setEdits((prev) => applyObjFieldChange(key, value, entity, typeSpec, prev));
   };
 
   return {
     affectEdits,
     cOwner,
     currentItemType,
+    currentValues: expandedValues,
     deletePending,
     dirty,
+    entity,
     error,
-    expandedOriginal,
-    expandedValues,
     extraEdits,
     fieldErrors,
     handleDelete,
@@ -130,8 +133,8 @@ export function useObjectEditor(vnumParam: string, owner: number | undefined) {
     handleSaveAndProceed,
     isError,
     isLoading,
-    isSenior,
-    obj,
+    originalValues: expandedOriginal,
+    owner,
     permissions,
     powers,
     readOnly,
@@ -139,6 +142,7 @@ export function useObjectEditor(vnumParam: string, owner: number | undefined) {
     saving,
     setAffectEdits,
     setExtraEdits,
+    type: "object" as const,
     unsavedNavProceed,
     unsavedNavReset,
     unsavedNavStatus,

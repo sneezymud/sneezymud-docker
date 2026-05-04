@@ -11,7 +11,6 @@ import { EntityFormSkeleton } from "@/components/skeleton.tsx";
 import { SubTable } from "@/components/sub-table.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { useMobEditor } from "@/hooks/use-mob-editor.ts";
-import { useOwnerName } from "@/hooks/use-owner-name.ts";
 import { IMMUNITY_TYPES } from "@/shared/enums/index.ts";
 import { mobFieldGroups } from "@/shared/fields/mob-fields.tsx";
 import { makeFieldGroupsReadOnly } from "@/shared/permissions.ts";
@@ -28,10 +27,10 @@ export function MobEditor({
   owner?: number;
   vnumParam: string;
 }) {
-  const ownerName = useOwnerName(owner);
   const editor = useMobEditor(vnumParam, owner);
+  const { entity } = editor;
 
-  if (editor.isLoading || editor.isError || !editor.mob) {
+  if (editor.isLoading || editor.isError || !entity) {
     return (
       <QueryStatus
         backLabel="Mobs"
@@ -45,8 +44,8 @@ export function MobEditor({
     );
   }
 
-  const { mob, mobResponse, powers, readOnly, vnum } = editor;
-  const entityLabel = `Mob ${vnum}: ${mob.short_desc || "(unnamed)"}`;
+  const { mobResponse, powers, readOnly, vnum } = editor;
+  const entityLabel = `Mob ${vnum}: ${entity.short_desc || "(unnamed)"}`;
   const groups = prepareMobFieldGroups(
     powers,
     vnumParam,
@@ -59,11 +58,6 @@ export function MobEditor({
       breadcrumbLabel={entityLabel}
       diffDescription={entityLabel}
       editor={editor}
-      owner={owner}
-      ownerName={ownerName}
-      powers={powers}
-      type="mob"
-      vnum={vnum}
     >
       <EntityForm
         fieldErrors={editor.fieldErrors}
@@ -75,7 +69,7 @@ export function MobEditor({
         <MobStringsEditor
           onChange={editor.setExtraEdits}
           readOnly={readOnly}
-          rows={editor.extraEdits ?? mob.extras}
+          rows={editor.extraEdits ?? entity.extras}
           vnum={vnum}
         />
 
@@ -86,7 +80,7 @@ export function MobEditor({
           label="Immunities"
           onChange={editor.setImmEdits}
           readOnly={readOnly}
-          rows={editor.immEdits ?? mob.immunities}
+          rows={editor.immEdits ?? entity.immunities}
         />
       </EntityForm>
     </EntityEditorShell>
