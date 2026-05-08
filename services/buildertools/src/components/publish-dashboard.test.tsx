@@ -1,5 +1,4 @@
-// eslint-disable-next-line testing-library/no-manual-cleanup -- Bun runs all test files in one process; explicit cleanup prevents cross-file DOM leaks
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
@@ -7,32 +6,15 @@ import type { DashboardEntity } from "@/shared/schemas/publish.ts";
 
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { POWER } from "@/shared/powers.ts";
-import { useAuthStore } from "@/state/auth.ts";
 import {
   getFetchLog,
   mockFetch,
   renderWithProviders,
-  resetFetchMock,
+  resetTestState,
+  setTestAuth,
 } from "@/test-helpers-component.tsx";
 
 import { PublishDashboard } from "./publish-dashboard.tsx";
-
-function setAuth(
-  powers: number[],
-  overrides: Partial<{ isSenior: boolean; playerId: number }> = {},
-) {
-  useAuthStore.setState({
-    user: {
-      blocks: [{ end: 1099, start: 1000 }],
-      isSenior: false,
-      playerId: 99_999,
-      playerName: "TestBuilder",
-      powers,
-      username: "testbuilder",
-      ...overrides,
-    },
-  });
-}
 
 const SENIOR_POWERS = [POWER.BUILDER, POWER.LOW];
 
@@ -65,13 +47,11 @@ const mockEntities: DashboardEntity[] = [
 
 describe("PublishDashboard", () => {
   beforeEach(() => {
-    setAuth(SENIOR_POWERS, { isSenior: true });
+    setTestAuth(SENIOR_POWERS, { isSenior: true });
   });
 
   afterEach(() => {
-    cleanup();
-    resetFetchMock();
-    useAuthStore.setState({ user: null });
+    resetTestState();
     // Clean up localStorage entries set by the dashboard hook
     if (typeof localStorage !== "undefined") {
       localStorage.removeItem(
@@ -81,7 +61,7 @@ describe("PublishDashboard", () => {
   });
 
   test("renders permission denied message when canPublish is false", async () => {
-    setAuth([POWER.BUILDER], { isSenior: false });
+    setTestAuth([POWER.BUILDER], { isSenior: false });
     renderWithProviders(<PublishDashboard />);
 
     await waitFor(() => {
@@ -344,7 +324,7 @@ describe("PublishDashboard", () => {
   });
 
   test("multi-owner same-vnum rendered as two rows with distinct selection", async () => {
-    setAuth([POWER.BUILDER, POWER.LOW], { isSenior: true });
+    setTestAuth([POWER.BUILDER, POWER.LOW], { isSenior: true });
     mockFetch([
       {
         body: [
@@ -402,7 +382,7 @@ describe("PublishDashboard", () => {
       "buildertools-publish-dashboard-owner-filter-99999",
       "all",
     );
-    setAuth([POWER.BUILDER, POWER.LOW], { isSenior: false });
+    setTestAuth([POWER.BUILDER, POWER.LOW], { isSenior: false });
     mockFetch([{ body: [], url: "/api/publish/dashboard" }]);
     renderWithProviders(<PublishDashboard />);
 
@@ -427,7 +407,10 @@ describe("PublishDashboard", () => {
       "buildertools-publish-dashboard-owner-filter-99998",
       "all",
     );
-    setAuth([POWER.BUILDER, POWER.LOW], { isSenior: true, playerId: 99_998 });
+    setTestAuth([POWER.BUILDER, POWER.LOW], {
+      isSenior: true,
+      playerId: 99_998,
+    });
     mockFetch([
       { body: [], url: "/api/publish/dashboard?owner=all" },
       { body: [], url: "/api/publish/dashboard" },

@@ -1,99 +1,31 @@
-// eslint-disable-next-line testing-library/no-manual-cleanup -- Bun runs all test files in one process; explicit cleanup prevents cross-file DOM leaks
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import type { Mob } from "@/shared/schemas/mob.ts";
-
 import { POWER } from "@/shared/powers.ts";
-import { useAuthStore } from "@/state/auth.ts";
 import {
+  makeMob,
+  makeMobResponse,
   mockFetch,
   renderWithProviders,
-  resetFetchMock,
+  resetTestState,
+  setTestAuth,
 } from "@/test-helpers-component.tsx";
 
 import { MobResponseEditor } from "./mob-response-editor.tsx";
 
 const VNUM = "1000";
 
-function makeMob(overrides: Partial<Mob> = {}): Mob {
-  return {
-    ac: 10,
-    actions: 0,
-    adjacent_sound: "",
-    affects: 0,
-    agi: 0,
-    attacks: 1,
-    bra: 0,
-    can_be_seen: 0,
-    cha: 0,
-    class: 0,
-    con: 0,
-    damage_level: 1,
-    damage_precision: 50,
-    def_position: 8,
-    description: "A test mob stands here.",
-    dex: 0,
-    extras: [],
-    fact_perc: 0,
-    faction: 0,
-    foc: 0,
-    gold: 1,
-    height: 72,
-    hpbonus: 1,
-    immunities: [],
-    intel: 0,
-    kar: 0,
-    level: 10,
-    local_sound: "",
-    long_desc: "A test mob stands here.",
-    max_exist: 9999,
-    name: "testmob",
-    per: 0,
-    race: 0,
-    sex: 1,
-    short_desc: "a test mob",
-    skin: 0,
-    spe: 0,
-    spec_proc: 0,
-    str: 0,
-    tohit: 0,
-    vision: 0,
-    vnum: 1000,
-    weight: 150,
-    wis: 0,
-    ...overrides,
-  };
-}
-
-function setAuth(powers: number[] = [POWER.BUILDER, POWER.MEDIT]) {
-  useAuthStore.setState({
-    user: {
-      blocks: [{ end: 1099, start: 1000 }],
-      isSenior: false,
-      playerId: 99_999,
-      playerName: "TestBuilder",
-      powers,
-      username: "testbuilder",
-    },
-  });
-}
-
 describe("MobResponseEditor", () => {
   beforeEach(() => {
-    setAuth();
+    setTestAuth([POWER.BUILDER, POWER.MEDIT]);
   });
 
-  afterEach(() => {
-    cleanup();
-    resetFetchMock();
-    useAuthStore.setState({ user: null });
-  });
+  afterEach(resetTestState);
 
   test("renders breadcrumb with mob short_desc once loaded", async () => {
     mockFetch([
       {
-        body: { response: 'say {"hello";}', vnum: 1000 },
+        body: makeMobResponse({ response: 'say {"hello";}' }),
         url: `/api/mob-responses/${VNUM}`,
       },
       {
@@ -115,7 +47,7 @@ describe("MobResponseEditor", () => {
   test("fallback label is 'Mob <vnum>' when short_desc is empty", async () => {
     mockFetch([
       {
-        body: { response: "", vnum: 1000 },
+        body: makeMobResponse(),
         url: `/api/mob-responses/${VNUM}`,
       },
       { body: makeMob({ short_desc: "" }), url: `/api/mobs/${VNUM}` },
@@ -148,7 +80,7 @@ describe("MobResponseEditor", () => {
   test("renders the syntax reference accordion", async () => {
     mockFetch([
       {
-        body: { response: "", vnum: 1000 },
+        body: makeMobResponse(),
         url: `/api/mob-responses/${VNUM}`,
       },
       { body: makeMob(), url: `/api/mobs/${VNUM}` },

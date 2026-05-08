@@ -1,80 +1,26 @@
-// eslint-disable-next-line testing-library/no-manual-cleanup -- Bun runs all test files in one process; explicit cleanup prevents cross-file DOM leaks
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import type { Room } from "@/shared/schemas/room.ts";
 import type { Zone } from "@/shared/schemas/zone.ts";
 
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { POWER } from "@/shared/powers.ts";
-import { useAuthStore } from "@/state/auth.ts";
 import {
+  makeRoom,
+  makeZone,
   mockFetch,
   renderWithProviders,
-  resetFetchMock,
+  resetTestState,
+  setTestAuth,
 } from "@/test-helpers-component.tsx";
 
 import { RoomEditor } from "./room-editor.tsx";
 
-function makeRoom(overrides: Partial<Room> = {}): Room {
-  return {
-    capacity: 0,
-    description: "A simple test room.",
-    exits: [],
-    extras: [],
-    height: -1,
-    name: "Test Room",
-    river_dir: -1,
-    river_speed: 0,
-    room_flag: 131_072,
-    sector: 60,
-    spec: 0,
-    telelook: 0,
-    teletarg: 0,
-    teletime: 0,
-    vnum: 1000,
-    x: 0,
-    y: 0,
-    z: 0,
-    zone: 1,
-    ...overrides,
-  };
-}
-
-const mockZones: Zone[] = [
-  {
-    age: null,
-    bottom: null,
-    lifespan: null,
-    reset_mode: null,
-    top: null,
-    util_flag: null,
-    zone_enabled: 0,
-    zone_name: "Test Zone",
-    zone_nr: 1,
-  },
-];
+const mockZones: Zone[] = [makeZone()];
 
 const VNUM = "1000";
 const BASE_POWERS = [POWER.BUILDER, POWER.REDIT, POWER.RSAVE, POWER.EDIT];
-
-function setAuth(
-  powers: number[],
-  overrides: Partial<{ isSenior: boolean }> = {},
-) {
-  useAuthStore.setState({
-    user: {
-      blocks: [{ end: 1099, start: 1000 }],
-      isSenior: false,
-      playerId: 99_999,
-      playerName: "TestBuilder",
-      powers,
-      username: "testbuilder",
-      ...overrides,
-    },
-  });
-}
 
 /** DiffButton renders in both mobile and desktop EntityHeader. Return the first. */
 function getDiffButton(): HTMLElement {
@@ -92,14 +38,10 @@ const fetchPreconnect = globalThis.fetch.preconnect;
 
 describe("DiffSheet (via RoomEditor)", () => {
   beforeEach(() => {
-    setAuth(BASE_POWERS);
+    setTestAuth(BASE_POWERS);
   });
 
-  afterEach(() => {
-    cleanup();
-    resetFetchMock();
-    useAuthStore.setState({ user: null });
-  });
+  afterEach(resetTestState);
 
   test("Loading spinner visible while diff is fetching", async () => {
     // Use a manually-controlled promise for the diff endpoint so we can
@@ -212,7 +154,7 @@ describe("DiffSheet (via RoomEditor)", () => {
 
   test("Publish button hidden when canPublish === false", async () => {
     // No POWER.LOW, no isSenior - canPublish is false
-    setAuth([POWER.BUILDER, POWER.REDIT, POWER.RSAVE, POWER.EDIT]);
+    setTestAuth([POWER.BUILDER, POWER.REDIT, POWER.RSAVE, POWER.EDIT]);
 
     const immortalRoom = makeRoom();
     const productionRoom = makeRoom({ name: "Production Version" });
@@ -249,7 +191,7 @@ describe("DiffSheet (via RoomEditor)", () => {
 
   test("Publish button hidden when immortal == null", async () => {
     // Grant publish permission so we can isolate the null-immortal condition
-    setAuth([...BASE_POWERS, POWER.LOW], { isSenior: true });
+    setTestAuth([...BASE_POWERS, POWER.LOW], { isSenior: true });
 
     mockFetch([
       { body: makeRoom(), url: `/api/rooms/${VNUM}` },
@@ -282,7 +224,7 @@ describe("DiffSheet (via RoomEditor)", () => {
 
   test("Confirm dialog opens on Publish click and closes on Cancel", async () => {
     // Grant publish permission
-    setAuth([...BASE_POWERS, POWER.LOW], { isSenior: true });
+    setTestAuth([...BASE_POWERS, POWER.LOW], { isSenior: true });
 
     const immortalRoom = makeRoom({ name: "Modified" });
     const productionRoom = makeRoom({ name: "Original" });
@@ -331,7 +273,7 @@ describe("DiffSheet (via RoomEditor)", () => {
   });
 
   test("After successful publish, diff endpoint is refetched and post-publish data returned", async () => {
-    setAuth([...BASE_POWERS, POWER.LOW], { isSenior: true });
+    setTestAuth([...BASE_POWERS, POWER.LOW], { isSenior: true });
 
     let publishDone = false;
     const fetchLog: Array<{ publishDone: boolean; url: string }> = [];
@@ -420,7 +362,7 @@ describe("DiffSheet (via RoomEditor)", () => {
   });
 
   test("After publish failure (500), error is displayed and diff is refetched", async () => {
-    setAuth([...BASE_POWERS, POWER.LOW], { isSenior: true });
+    setTestAuth([...BASE_POWERS, POWER.LOW], { isSenior: true });
 
     const fetchLog: string[] = [];
     globalThis.fetch = Object.assign(

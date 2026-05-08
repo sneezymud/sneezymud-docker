@@ -1,5 +1,4 @@
-// eslint-disable-next-line testing-library/no-manual-cleanup -- Bun runs all test files in one process; explicit cleanup prevents cross-file DOM leaks
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
@@ -7,12 +6,14 @@ import type { MobListItem } from "@/shared/schemas/mob.ts";
 import type { RoomListItem } from "@/shared/schemas/room.ts";
 
 import { POWER } from "@/shared/powers.ts";
-import { useAuthStore } from "@/state/auth.ts";
 import {
+  findFetchCall,
   getFetchLog,
   mockFetch,
   renderWithProviders,
   resetFetchMock,
+  resetTestState,
+  setTestAuth,
 } from "@/test-helpers-component.tsx";
 
 import { MobList } from "./mob-list.tsx";
@@ -20,30 +21,12 @@ import { RoomList } from "./room-list.tsx";
 
 /** Set auth store with room builder powers. */
 function setAuthRooms() {
-  useAuthStore.setState({
-    user: {
-      blocks: [{ end: 1099, start: 1000 }],
-      isSenior: false,
-      playerId: 99_999,
-      playerName: "TestBuilder",
-      powers: [POWER.BUILDER, POWER.REDIT, POWER.RSAVE, POWER.EDIT],
-      username: "testbuilder",
-    },
-  });
+  setTestAuth([POWER.BUILDER, POWER.REDIT, POWER.RSAVE, POWER.EDIT]);
 }
 
 /** Set auth store with mob builder powers. */
 function setAuthMobs() {
-  useAuthStore.setState({
-    user: {
-      blocks: [{ end: 1099, start: 1000 }],
-      isSenior: false,
-      playerId: 99_999,
-      playerName: "TestBuilder",
-      powers: [POWER.BUILDER, POWER.MEDIT],
-      username: "testbuilder",
-    },
-  });
+  setTestAuth([POWER.BUILDER, POWER.MEDIT]);
 }
 
 const mockRooms: RoomListItem[] = [
@@ -74,11 +57,7 @@ describe("RoomList (EntityList)", () => {
     setAuthRooms();
   });
 
-  afterEach(() => {
-    cleanup();
-    resetFetchMock();
-    useAuthStore.setState({ user: null });
-  });
+  afterEach(resetTestState);
 
   test("renders room list with vnums and names", async () => {
     mockFetch([{ body: mockRooms, url: "/api/rooms" }]);
@@ -232,8 +211,7 @@ describe("RoomList (EntityList)", () => {
     await waitFor(() => {
       expect(getFetchLog().some((c) => c.method === "DELETE")).toBe(true);
     });
-    const deleteCall = getFetchLog().find((c) => c.method === "DELETE");
-    if (!deleteCall) throw new Error("DELETE call not found");
+    const deleteCall = findFetchCall("DELETE");
     expect(deleteCall.url).toContain("/api/rooms/bulk");
     expect(deleteCall.body).toHaveProperty("vnums");
     expect(deleteCall.body).toEqual({ vnums: [1000, 1001, 1002] });
@@ -254,11 +232,7 @@ describe("RoomList error and pagination", () => {
     setAuthRooms();
   });
 
-  afterEach(() => {
-    cleanup();
-    resetFetchMock();
-    useAuthStore.setState({ user: null });
-  });
+  afterEach(resetTestState);
 
   test("fetch error displays error message", async () => {
     mockFetch([
@@ -353,15 +327,11 @@ describe("RoomList error and pagination", () => {
 });
 
 function setAuthSenior() {
-  useAuthStore.setState({
-    user: {
-      blocks: [{ end: 1099, start: 1000 }],
-      isSenior: true,
-      playerId: 42,
-      playerName: "SeniorBuilder",
-      powers: [POWER.BUILDER, POWER.REDIT, POWER.RSAVE, POWER.EDIT],
-      username: "seniorbuilder",
-    },
+  setTestAuth([POWER.BUILDER, POWER.REDIT, POWER.RSAVE, POWER.EDIT], {
+    isSenior: true,
+    playerId: 42,
+    playerName: "SeniorBuilder",
+    username: "seniorbuilder",
   });
 }
 
@@ -370,11 +340,7 @@ describe("RoomList cross-owner", () => {
     localStorage.clear();
   });
 
-  afterEach(() => {
-    cleanup();
-    resetFetchMock();
-    useAuthStore.setState({ user: null });
-  });
+  afterEach(resetTestState);
 
   test("senior All view shows owner column", async () => {
     setAuthSenior();
@@ -578,11 +544,7 @@ describe("MobList (EntityList)", () => {
     setAuthMobs();
   });
 
-  afterEach(() => {
-    cleanup();
-    resetFetchMock();
-    useAuthStore.setState({ user: null });
-  });
+  afterEach(resetTestState);
 
   test("renders mob list with short descriptions and metadata", async () => {
     mockFetch([{ body: mockMobs, url: "/api/mobs" }]);

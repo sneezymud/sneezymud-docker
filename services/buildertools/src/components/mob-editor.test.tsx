@@ -1,127 +1,60 @@
-// eslint-disable-next-line testing-library/no-manual-cleanup -- Bun runs all test files in one process; explicit cleanup prevents cross-file DOM leaks
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import type { MobResponse } from "@/shared/schemas/mob-response.ts";
 import type { Mob } from "@/shared/schemas/mob.ts";
 
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { POWER } from "@/shared/powers.ts";
-import { useAuthStore } from "@/state/auth.ts";
 import {
-  getFetchLog,
+  findFetchCall,
+  makeMob,
+  makeMobResponse,
   mockFetch,
   renderWithProviders,
   resetFetchMock,
+  resetTestState,
+  setTestAuth,
+  waitForEditorReady,
+  waitForSaveDisabled,
+  waitForSaveEnabled,
 } from "@/test-helpers-component.tsx";
 
 import { MobEditor } from "./mob-editor.tsx";
 
-/** Minimal valid Mob for API mock responses. Override fields as needed. */
-function makeMob(overrides: Partial<Mob> = {}): Mob {
-  return {
-    ac: 10,
-    actions: 0,
-    adjacent_sound: "",
-    affects: 0,
-    agi: 0,
-    attacks: 1,
-    bra: 0,
-    can_be_seen: 0,
-    cha: 0,
-    class: 0,
-    con: 0,
-    damage_level: 1,
-    damage_precision: 50,
-    def_position: 8,
-    description: "A test mob stands here looking menacing.",
-    dex: 0,
-    extras: [],
-    fact_perc: 0,
-    faction: 0,
-    foc: 0,
-    gold: 1,
-    height: 72,
-    hpbonus: 1,
-    immunities: [],
-    intel: 0,
-    kar: 0,
-    level: 10,
-    local_sound: "",
-    long_desc: "A test mob stands here.",
-    max_exist: 9999,
-    name: "test mob keywords",
-    per: 0,
-    race: 0,
-    sex: 1,
-    short_desc: "a test mob",
-    skin: 0,
-    spe: 0,
-    spec_proc: 0,
-    str: 0,
-    tohit: 0,
-    vision: 0,
-    vnum: 1000,
-    weight: 150,
-    wis: 0,
-    ...overrides,
-  };
-}
-
-function makeMobResponse(overrides: Partial<MobResponse> = {}): MobResponse {
-  return { response: "", vnum: 1000, ...overrides };
-}
-
-/** Set auth store with given powers and standard user fields. */
-function setAuth(powers: number[]) {
-  useAuthStore.setState({
-    user: {
-      blocks: [{ end: 1099, start: 1000 }],
-      isSenior: false,
-      playerId: 99_999,
-      playerName: "TestBuilder",
-      powers,
-      username: "testbuilder",
-    },
-  });
-}
-
 const VNUM = "1000";
 const BASE_POWERS = [POWER.BUILDER, POWER.MEDIT];
 
-function mockMobEndpoints(mob?: Mob, response?: MobResponse) {
-  const m = mob ?? makeMob();
-  const r = response ?? makeMobResponse();
+function mockMobEndpoints(mob?: Mob) {
+  const mobBody = mob ?? makeMob();
+  const responseBody = makeMobResponse();
   mockFetch([
-    { body: m, method: "GET", url: `/api/mobs/${VNUM}` },
-    { body: m, method: "PUT", url: `/api/mobs/${VNUM}` },
-    { body: r, method: "GET", url: `/api/mob-responses/${VNUM}` },
-    { body: r, method: "PUT", url: `/api/mob-responses/${VNUM}` },
+    { body: mobBody, method: "GET", url: `/api/mobs/${VNUM}` },
+    { body: mobBody, method: "PUT", url: `/api/mobs/${VNUM}` },
+    { body: responseBody, method: "GET", url: `/api/mob-responses/${VNUM}` },
+    { body: responseBody, method: "PUT", url: `/api/mob-responses/${VNUM}` },
   ]);
 }
 
 describe("MobEditor", () => {
   beforeEach(() => {
-    setAuth(BASE_POWERS);
+    setTestAuth(BASE_POWERS);
   });
 
-  afterEach(() => {
-    cleanup();
-    resetFetchMock();
-    useAuthStore.setState({ user: null });
-  });
+  afterEach(resetTestState);
 
   describe("read-only mode", () => {
+    beforeEach(() => {
+      setTestAuth([POWER.BUILDER]);
+    });
+
     test("renders ReadOnlyBanner when user lacks MEDIT", async () => {
-      setAuth([POWER.BUILDER]);
       mockMobEndpoints();
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       expect(await screen.findByText(/read[-\s]?only/i)).toBeDefined();
     });
 
     test("Save button absent in read-only mode", async () => {
-      setAuth([POWER.BUILDER]);
       mockMobEndpoints();
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       await screen.findByText(/read[-\s]?only/i);
@@ -129,7 +62,6 @@ describe("MobEditor", () => {
     });
 
     test("form inputs disabled in read-only mode", async () => {
-      setAuth([POWER.BUILDER]);
       mockMobEndpoints();
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       await screen.findByText(/read[-\s]?only/i);
@@ -141,7 +73,6 @@ describe("MobEditor", () => {
     });
 
     test("Diff button still accessible in read-only mode", async () => {
-      setAuth([POWER.BUILDER]);
       mockMobEndpoints();
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       await screen.findByText(/read[-\s]?only/i);
@@ -153,7 +84,6 @@ describe("MobEditor", () => {
     });
 
     test("Delete button absent in read-only mode", async () => {
-      setAuth([POWER.BUILDER]);
       mockMobEndpoints();
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       await screen.findByText(/read[-\s]?only/i);
@@ -164,7 +94,6 @@ describe("MobEditor", () => {
       // Without a save path there is no need for an undo affordance, and a
       // visible Undo button in read-only mode would mislead users into
       // thinking the form is editable.
-      setAuth([POWER.BUILDER]);
       mockMobEndpoints();
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       await screen.findByText(/read[-\s]?only/i);
@@ -178,24 +107,16 @@ describe("MobEditor", () => {
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      // Wait for the form to load
-      await waitFor(() => {
-        expect(screen.getByText("Keywords")).toBeDefined();
-      });
+      await waitForEditorReady("Keywords");
 
-      // Save button should be disabled initially (no edits)
       const saveButton = screen.getByRole("button", { name: "Save" });
       expect(saveButton.hasAttribute("disabled")).toBe(true);
 
-      // Edit the Keywords field (mob name)
       const nameInput = screen.getByRole("textbox", { name: /keywords/i });
       await user.clear(nameInput);
       await user.type(nameInput, "changed mob keywords");
 
-      // Save button should now be enabled
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      return waitForSaveEnabled(saveButton);
     });
 
     test("reverting field to original value disables the Save button", async () => {
@@ -204,51 +125,40 @@ describe("MobEditor", () => {
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Keywords")).toBeDefined();
-      });
+      await waitForEditorReady("Keywords");
 
       const saveButton = screen.getByRole("button", { name: "Save" });
       const nameInput = screen.getByRole("textbox", { name: /keywords/i });
 
-      // Edit the field to make it dirty
       await user.clear(nameInput);
       await user.type(nameInput, "something different");
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
-      // Revert to the original value
       await user.clear(nameInput);
       await user.type(nameInput, "original keywords");
 
-      // Save button should be disabled again - no real changes
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(true);
-      });
+      return waitForSaveDisabled(saveButton);
     });
   });
 
   describe("MEDIT_IMP_POWER gates spec_proc options", () => {
     test("user without MEDIT_IMP_POWER cannot select unassignable spec procs", async () => {
-      setAuth(BASE_POWERS);
+      setTestAuth(BASE_POWERS);
       mockMobEndpoints();
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Keywords")).toBeDefined();
-      });
+      await waitForEditorReady("Keywords");
 
-      // spec_proc combobox input (in collapsed section but still in DOM)
+      // spec_proc combobox is inside a collapsed accordion section but still in the DOM
       const specInput = screen.getByRole("combobox", {
         name: /special proc/i,
       });
       await user.type(specInput, "dragon");
 
       // "dragon breath" (value 3) is unassignable without MEDIT_IMP_POWER
-      await waitFor(() => {
+      return waitFor(() => {
         expect(
           screen.queryByRole("option", { name: /dragon breath/ }),
         ).toBeNull();
@@ -256,14 +166,12 @@ describe("MobEditor", () => {
     });
 
     test("user with MEDIT_IMP_POWER can select unassignable spec procs", async () => {
-      setAuth([...BASE_POWERS, POWER.MEDIT_IMP_POWER]);
+      setTestAuth([...BASE_POWERS, POWER.MEDIT_IMP_POWER]);
       mockMobEndpoints();
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Keywords")).toBeDefined();
-      });
+      await waitForEditorReady("Keywords");
 
       const specInput = screen.getByRole("combobox", {
         name: /special proc/i,
@@ -283,33 +191,25 @@ describe("MobEditor", () => {
       // was set to an unassignable value by an admin or senior; saving
       // without touching spec_proc must not trigger a client-side validation
       // error, since the field is not dirty.
-      setAuth(BASE_POWERS); // no MEDIT_IMP_POWER
+      setTestAuth(BASE_POWERS); // no MEDIT_IMP_POWER
       mockMobEndpoints(makeMob({ spec_proc: 3 })); // 3 is unassignable
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Keywords")).toBeDefined();
-      });
+      await waitForEditorReady("Keywords");
 
       const nameInput = screen.getByRole("textbox", { name: /keywords/i });
       await user.clear(nameInput);
       await user.type(nameInput, "renamed but spec unchanged");
 
       const saveButton = screen.getByRole("button", { name: "Save" });
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
       await user.click(saveButton);
 
-      // After successful save, dirty state clears and Save becomes disabled
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(true);
-      });
+      await waitForSaveDisabled(saveButton);
 
-      const putCall = getFetchLog().find((c) => c.method === "PUT");
-      if (!putCall) throw new Error("expected PUT call in fetch log");
+      const putCall = findFetchCall("PUT");
       expect(putCall.body).toEqual(expect.objectContaining({ spec_proc: 3 }));
     });
 
@@ -326,16 +226,12 @@ describe("MobEditor", () => {
       );
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Keywords")).toBeDefined();
-      });
+      await waitForEditorReady("Keywords");
 
-      // Dirty the form so Save is enabled
       const nameInput = screen.getByRole("textbox", { name: /keywords/i });
       await user.clear(nameInput);
       await user.type(nameInput, "triggers a 403");
 
-      // Replace the mock to return a 403 on save
       resetFetchMock();
       mockFetch([
         {
@@ -352,7 +248,7 @@ describe("MobEditor", () => {
       const saveButton = screen.getByRole("button", { name: "Save" });
       await user.click(saveButton);
 
-      await waitFor(() => {
+      return waitFor(() => {
         expect(
           screen.getByText(/requires POWER_MEDIT_IMP_POWER/),
         ).toBeDefined();
@@ -366,27 +262,19 @@ describe("MobEditor", () => {
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Keywords")).toBeDefined();
-      });
+      await waitForEditorReady("Keywords");
 
       const nameInput = screen.getByRole("textbox", { name: /keywords/i });
 
-      // Clear the required Keywords field
       await user.clear(nameInput);
 
       const saveButton = screen.getByRole("button", { name: "Save" });
 
-      // Save should be enabled (field is dirty)
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
-      // Click save to trigger validation
       await user.click(saveButton);
 
-      // Validation error should appear for the Keywords field
-      await waitFor(() => {
+      return waitFor(() => {
         expect(screen.getByText("Keywords is required")).toBeDefined();
       });
     });
@@ -404,28 +292,20 @@ describe("MobEditor", () => {
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Keywords")).toBeDefined();
-      });
+      await waitForEditorReady("Keywords");
 
       const saveButton = screen.getByRole("button", { name: "Save" });
       expect(saveButton.hasAttribute("disabled")).toBe(true);
 
-      // Edit Keywords to make dirty
       const nameInput = screen.getByRole("textbox", { name: /keywords/i });
       await user.clear(nameInput);
       await user.type(nameInput, "changed mob keywords");
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
       await user.click(saveButton);
 
-      // After successful save, dirty state clears and Save becomes disabled
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(true);
-      });
+      return waitForSaveDisabled(saveButton);
     });
 
     test("server validation error is surfaced", async () => {
@@ -441,21 +321,15 @@ describe("MobEditor", () => {
       );
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Keywords")).toBeDefined();
-      });
+      await waitForEditorReady("Keywords");
 
-      // Edit a field to enable Save
       const nameInput = screen.getByRole("textbox", { name: /keywords/i });
       await user.clear(nameInput);
       await user.type(nameInput, "changed keywords");
 
       const saveButton = screen.getByRole("button", { name: "Save" });
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
-      // Replace mock to return 400 for the save request
       resetFetchMock();
       mockFetch([
         {
@@ -468,8 +342,7 @@ describe("MobEditor", () => {
 
       await user.click(saveButton);
 
-      // Error message surfaces via toast
-      await waitFor(() => {
+      return waitFor(() => {
         expect(screen.getByText("Some validation error")).toBeDefined();
       });
     });
@@ -479,27 +352,20 @@ describe("MobEditor", () => {
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Keywords")).toBeDefined();
-      });
+      await waitForEditorReady("Keywords");
 
       const nameInput = screen.getByRole("textbox", { name: /keywords/i });
       await user.clear(nameInput);
       await user.type(nameInput, "payload test mob");
 
       const saveButton = screen.getByRole("button", { name: "Save" });
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
       await user.click(saveButton);
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(true);
-      });
+      await waitForSaveDisabled(saveButton);
 
-      const putCall = getFetchLog().find((c) => c.method === "PUT");
-      if (!putCall) throw new Error("expected PUT call in fetch log");
+      const putCall = findFetchCall("PUT");
       expect(putCall.url).toContain(`/api/mobs/${VNUM}`);
 
       expect(putCall.body).toEqual(
@@ -520,34 +386,24 @@ describe("MobEditor", () => {
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Keywords")).toBeDefined();
-      });
+      await waitForEditorReady("Keywords");
 
-      // Click "Add mobile string" button to add an extras row
       const addButton = screen.getByRole("button", {
         name: /add mobile string/i,
       });
       await user.click(addButton);
 
-      // A new row should appear with a Message textarea - fill it in
       const messageTextarea = await screen.findByLabelText("Message");
       await user.type(messageTextarea, "The mob enters the world.");
 
-      // Save button should be enabled (dirty state from extras change)
       const saveButton = screen.getByRole("button", { name: "Save" });
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
       await user.click(saveButton);
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(true);
-      });
+      await waitForSaveDisabled(saveButton);
 
-      const putCall = getFetchLog().find((c) => c.method === "PUT");
-      if (!putCall) throw new Error("expected PUT call in fetch log");
+      const putCall = findFetchCall("PUT");
       expect(putCall.url).toContain(`/api/mobs/${VNUM}`);
       expect(putCall.body).toEqual(
         expect.objectContaining({
@@ -566,35 +422,25 @@ describe("MobEditor", () => {
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Keywords")).toBeDefined();
-      });
+      await waitForEditorReady("Keywords");
 
-      // Click "Add immunities" button to add an immunities row
       const addButton = screen.getByRole("button", {
         name: /add immunities/i,
       });
       await user.click(addButton);
 
-      // A new row should appear with Amount field - fill it in
       const amountInput = await screen.findByLabelText("Amount");
       await user.clear(amountInput);
       await user.type(amountInput, "50");
 
-      // Save button should be enabled (dirty state from immunities change)
       const saveButton = screen.getByRole("button", { name: "Save" });
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
       await user.click(saveButton);
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(true);
-      });
+      await waitForSaveDisabled(saveButton);
 
-      const putCall = getFetchLog().find((c) => c.method === "PUT");
-      if (!putCall) throw new Error("expected PUT call in fetch log");
+      const putCall = findFetchCall("PUT");
       expect(putCall.url).toContain(`/api/mobs/${VNUM}`);
       expect(putCall.body).toEqual(
         expect.objectContaining({
@@ -611,31 +457,23 @@ describe("MobEditor", () => {
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Keywords")).toBeDefined();
-      });
+      await waitForEditorReady("Keywords");
 
       const saveButton = screen.getByRole("button", { name: "Save" });
       const nameInput = screen.getByRole("textbox", { name: /keywords/i });
 
-      // Make the form dirty
       await user.clear(nameInput);
       await user.type(nameInput, "changed mob name");
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
-      // Click the Undo button
       const undoButton = screen.getByRole("button", { name: "Undo" });
       await user.click(undoButton);
 
-      // Form reverts to original value
       await waitFor(() => {
         expect(nameInput.getAttribute("value")).toBe("original mob name");
       });
 
-      // Save button becomes disabled again
       expect(saveButton.hasAttribute("disabled")).toBe(true);
     });
   });
@@ -655,41 +493,30 @@ describe("MobEditor", () => {
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Keywords")).toBeDefined();
-      });
+      await waitForEditorReady("Keywords");
 
-      // Verify the extras row is displayed
       await waitFor(() => {
         expect(screen.getByDisplayValue("A flash of light.")).toBeDefined();
       });
 
-      // Click the remove button for the Enter World string
       const removeButton = screen.getByRole("button", {
         name: /remove enter world string/i,
       });
       await user.click(removeButton);
 
-      // Confirm the removal in the dialog
       const confirmButton = await screen.findByRole("button", {
         name: "Remove",
       });
       await user.click(confirmButton);
 
-      // Save button should be enabled (dirty state from row removal)
       const saveButton = screen.getByRole("button", { name: "Save" });
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
       await user.click(saveButton);
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(true);
-      });
+      await waitForSaveDisabled(saveButton);
 
-      const putCall = getFetchLog().find((c) => c.method === "PUT");
-      if (!putCall) throw new Error("expected PUT call in fetch log");
+      const putCall = findFetchCall("PUT");
       expect(putCall.url).toContain(`/api/mobs/${VNUM}`);
       expect(putCall.body).toEqual(expect.objectContaining({ extras: [] }));
     });
@@ -700,16 +527,13 @@ describe("MobEditor", () => {
       mockMobEndpoints();
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
 
-      await waitFor(() => {
-        expect(screen.getByText("Keywords")).toBeDefined();
-      });
+      await waitForEditorReady("Keywords");
 
       const deleteButton = screen.getByRole("button", { name: "Delete" });
       const user = userEvent.setup();
       await user.click(deleteButton);
 
-      // Confirm dialog appears with the confirm button
-      await waitFor(() => {
+      return waitFor(() => {
         expect(
           screen.getByRole("button", { name: "Yes, delete" }),
         ).toBeDefined();
@@ -724,11 +548,8 @@ describe("MobEditor", () => {
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Keywords")).toBeDefined();
-      });
+      await waitForEditorReady("Keywords");
 
-      // Replace mock to add a DELETE handler (same URL, returns { ok: true })
       resetFetchMock();
       mockFetch([
         { body: { ok: true }, url: `/api/mobs/${VNUM}` },
@@ -750,15 +571,13 @@ describe("MobEditor", () => {
         expect(screen.getByText("Not Found")).toBeDefined();
       });
 
-      // Verify the DELETE request was sent to the correct URL
-      const deleteCall = getFetchLog().find((c) => c.method === "DELETE");
-      if (!deleteCall) throw new Error("expected DELETE call in fetch log");
+      const deleteCall = findFetchCall("DELETE");
       expect(deleteCall.url).toContain(`/api/mobs/${VNUM}`);
     });
   });
 
   describe("network errors", () => {
-    test("failed entity fetch shows error state", async () => {
+    test("failed entity fetch shows error state", () => {
       mockFetch([
         {
           body: { error: "Internal server error" },
@@ -770,7 +589,7 @@ describe("MobEditor", () => {
       renderWithProviders(<MobEditor vnumParam={VNUM} />);
 
       // QueryStatus renders an Alert with role="alert" on fetch failure
-      await waitFor(() => {
+      return waitFor(() => {
         expect(screen.getByRole("alert")).toBeDefined();
       });
     });

@@ -1,5 +1,4 @@
-// eslint-disable-next-line testing-library/no-manual-cleanup -- Bun runs all test files in one process; explicit cleanup prevents cross-file DOM leaks
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test } from "bun:test";
 
@@ -10,39 +9,21 @@ import {
   getFetchLog,
   mockFetch,
   renderWithProviders,
-  resetFetchMock,
+  resetTestState,
+  setTestAuth,
 } from "@/test-helpers-component.tsx";
 
 import { Nav } from "./nav.tsx";
 
-function setAuth(
-  powers: number[],
-  overrides: Partial<{ isSenior: boolean }> = {},
-) {
-  useAuthStore.setState({
-    user: {
-      blocks: [{ end: 1099, start: 1000 }],
-      isSenior: false,
-      playerId: 99_999,
-      playerName: "TestBuilder",
-      powers,
-      username: "testbuilder",
-      ...overrides,
-    },
-  });
-}
-
 describe("Nav", () => {
   afterEach(() => {
-    cleanup();
-    useAuthStore.setState({ user: null });
+    resetTestState();
     useDirtyStore.setState({ dirty: false });
-    resetFetchMock();
   });
 
   test("Publish nav link hidden for non-senior (no POWER_LOW/NO_LIMITS/WIZARD)", async () => {
     // BUILDER only - no senior powers, no publish capability.
-    setAuth([POWER.BUILDER], { isSenior: false });
+    setTestAuth([POWER.BUILDER], { isSenior: false });
     renderWithProviders(<Nav />);
 
     // Wait for the nav to render (router needs a tick to initialize)
@@ -54,7 +35,7 @@ describe("Nav", () => {
   });
 
   test("Publish nav link visible for senior with POWER_LOW", async () => {
-    setAuth([POWER.BUILDER, POWER.LOW], { isSenior: true });
+    setTestAuth([POWER.BUILDER, POWER.LOW], { isSenior: true });
     renderWithProviders(<Nav />);
 
     await waitFor(() => {
@@ -63,7 +44,7 @@ describe("Nav", () => {
   });
 
   test("displays user info", async () => {
-    setAuth([POWER.BUILDER]);
+    setTestAuth([POWER.BUILDER]);
     renderWithProviders(<Nav />);
 
     await waitFor(() => {
@@ -73,7 +54,7 @@ describe("Nav", () => {
   });
 
   test("Log out button visible and functional", async () => {
-    setAuth([POWER.BUILDER]);
+    setTestAuth([POWER.BUILDER]);
     mockFetch([{ body: { ok: true }, url: "/api/auth/logout" }]);
     renderWithProviders(<Nav />);
 
@@ -91,7 +72,7 @@ describe("Nav", () => {
   });
 
   test("logout with unsaved changes shows confirmation dialog", async () => {
-    setAuth([POWER.BUILDER]);
+    setTestAuth([POWER.BUILDER]);
     renderWithProviders(<Nav />);
     useDirtyStore.setState({ dirty: true });
 
@@ -125,7 +106,7 @@ describe("Nav", () => {
   });
 
   test("confirming logout with unsaved changes clears auth and dismisses dialog", async () => {
-    setAuth([POWER.BUILDER]);
+    setTestAuth([POWER.BUILDER]);
     mockFetch([{ body: { ok: true }, url: "/api/auth/logout" }]);
     renderWithProviders(<Nav />);
     useDirtyStore.setState({ dirty: true });
@@ -160,7 +141,7 @@ describe("Nav", () => {
   });
 
   test("canceling logout confirmation dismisses dialog", async () => {
-    setAuth([POWER.BUILDER]);
+    setTestAuth([POWER.BUILDER]);
     renderWithProviders(<Nav />);
     useDirtyStore.setState({ dirty: true });
 
@@ -184,7 +165,7 @@ describe("Nav", () => {
   });
 
   test("logout proceeds client-side even when API call fails", async () => {
-    setAuth([POWER.BUILDER]);
+    setTestAuth([POWER.BUILDER]);
     mockFetch([
       {
         body: { error: "Internal server error" },

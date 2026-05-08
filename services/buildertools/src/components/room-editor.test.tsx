@@ -1,5 +1,4 @@
-// eslint-disable-next-line testing-library/no-manual-cleanup -- Bun runs all test files in one process; explicit cleanup prevents cross-file DOM leaks
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
@@ -10,98 +9,47 @@ import { Toaster } from "@/components/ui/sonner.tsx";
 import { POWER } from "@/shared/powers.ts";
 import { useAuthStore } from "@/state/auth.ts";
 import {
-  getFetchLog,
+  findFetchCall,
+  makeRoom,
+  makeZone,
   mockFetch,
   renderWithProviders,
   resetFetchMock,
+  resetTestState,
+  setTestAuth,
+  waitForEditorReady,
+  waitForSaveDisabled,
+  waitForSaveEnabled,
 } from "@/test-helpers-component.tsx";
 
 import { RoomEditor } from "./room-editor.tsx";
 
-/** Minimal valid Room for API mock responses. Override fields as needed. */
-function makeRoom(overrides: Partial<Room> = {}): Room {
-  return {
-    capacity: 0,
-    description: "A simple test room.",
-    exits: [],
-    extras: [],
-    height: -1,
-    name: "Test Room",
-    river_dir: -1,
-    river_speed: 0,
-    room_flag: 131_072,
-    sector: 60,
-    spec: 0,
-    telelook: 0,
-    teletarg: 0,
-    teletime: 0,
-    vnum: 1000,
-    x: 0,
-    y: 0,
-    z: 0,
-    zone: 1,
-    ...overrides,
-  };
-}
-
-const mockZones: Zone[] = [
-  {
-    age: null,
-    bottom: null,
-    lifespan: null,
-    reset_mode: null,
-    top: null,
-    util_flag: null,
-    zone_enabled: 0,
-    zone_name: "Test Zone",
-    zone_nr: 1,
-  },
-];
-
-/** Set auth store with given powers and standard user fields. */
-function setAuth(powers: number[]) {
-  useAuthStore.setState({
-    user: {
-      blocks: [{ end: 1099, start: 1000 }],
-      isSenior: false,
-      playerId: 99_999,
-      playerName: "TestBuilder",
-      powers,
-      username: "testbuilder",
-    },
-  });
-}
+const mockZones: Zone[] = [makeZone()];
 
 const VNUM = "1000";
 const BASE_POWERS = [POWER.BUILDER, POWER.REDIT, POWER.RSAVE, POWER.EDIT];
 
 function mockRoomEndpoints(room?: Room, zones?: Zone[]) {
-  const r = room ?? makeRoom();
+  const roomBody = room ?? makeRoom();
   mockFetch([
-    { body: r, method: "GET", url: `/api/rooms/${VNUM}` },
-    { body: r, method: "PUT", url: `/api/rooms/${VNUM}` },
+    { body: roomBody, method: "GET", url: `/api/rooms/${VNUM}` },
+    { body: roomBody, method: "PUT", url: `/api/rooms/${VNUM}` },
     { body: zones ?? mockZones, url: "/api/zones" },
   ]);
 }
 
 describe("RoomEditor", () => {
   beforeEach(() => {
-    setAuth(BASE_POWERS);
+    setTestAuth(BASE_POWERS);
   });
 
-  afterEach(() => {
-    cleanup();
-    resetFetchMock();
-    useAuthStore.setState({ user: null });
-  });
+  afterEach(resetTestState);
 
   test("renders room fields after loading", async () => {
     mockRoomEndpoints();
     renderWithProviders(<RoomEditor vnumParam={VNUM} />);
 
-    await waitFor(() => {
-      expect(screen.getByText("Name")).toBeDefined();
-    });
+    await waitForEditorReady("Name");
     expect(screen.getByText("Description")).toBeDefined();
     // Properties section fields (collapsed but still in DOM)
     expect(screen.getByText("Room Spec")).toBeDefined();
@@ -114,9 +62,7 @@ describe("RoomEditor", () => {
       renderWithProviders(<RoomEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
+      await waitForEditorReady("Name");
 
       const saveButton = screen.getByRole("button", { name: "Save" });
       expect(saveButton.hasAttribute("disabled")).toBe(true);
@@ -125,9 +71,7 @@ describe("RoomEditor", () => {
       await user.clear(nameInput);
       await user.type(nameInput, "changed room name");
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
     });
 
     test("reverting field to original value disables the Save button", async () => {
@@ -136,9 +80,7 @@ describe("RoomEditor", () => {
       renderWithProviders(<RoomEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
+      await waitForEditorReady("Name");
 
       const saveButton = screen.getByRole("button", { name: "Save" });
       const nameInput = screen.getByRole("textbox", { name: /name/i });
@@ -146,16 +88,12 @@ describe("RoomEditor", () => {
       await user.clear(nameInput);
       await user.type(nameInput, "something different");
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
       await user.clear(nameInput);
       await user.type(nameInput, "original name");
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(true);
-      });
+      await waitForSaveDisabled(saveButton);
     });
   });
 
@@ -165,18 +103,14 @@ describe("RoomEditor", () => {
       renderWithProviders(<RoomEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
+      await waitForEditorReady("Name");
 
       const nameInput = screen.getByRole("textbox", { name: /name/i });
       await user.clear(nameInput);
 
       const saveButton = screen.getByRole("button", { name: "Save" });
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
       await user.click(saveButton);
 
@@ -187,23 +121,19 @@ describe("RoomEditor", () => {
   });
 
   test("read-only mode: banner, no save, inputs disabled, diff accessible", async () => {
-    setAuth([POWER.BUILDER]);
+    setTestAuth([POWER.BUILDER]);
     mockRoomEndpoints();
     renderWithProviders(<RoomEditor vnumParam={VNUM} />);
 
-    // TEST-RO-1: ReadOnlyBanner renders
     expect(await screen.findByText(/read[-\s]?only/i)).toBeDefined();
 
-    // TEST-RO-2: Save button absent
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
 
-    // TEST-RO-3: form inputs disabled
     const nameInput = screen.getByRole("textbox", { name: /name/i });
     expect(
       nameInput.hasAttribute("disabled") || nameInput.hasAttribute("readonly"),
     ).toBe(true);
 
-    // TEST-RO-5: Diff button still accessible
     const diffButtons = screen.getAllByRole("button", {
       name: /compare|diff/i,
     });
@@ -222,7 +152,6 @@ describe("RoomEditor", () => {
       },
     });
 
-    // First mount: owner = 1
     mockFetch([
       {
         body: makeRoom({ name: "owner1 room", vnum: 100 }),
@@ -244,7 +173,6 @@ describe("RoomEditor", () => {
     unmount();
     resetFetchMock();
 
-    // Second mount: owner = 2
     mockFetch([
       {
         body: makeRoom({ name: "owner2 room", vnum: 100 }),
@@ -271,9 +199,7 @@ describe("RoomEditor", () => {
       renderWithProviders(<RoomEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
+      await waitForEditorReady("Name");
 
       const saveButton = screen.getByRole("button", { name: "Save" });
       expect(saveButton.hasAttribute("disabled")).toBe(true);
@@ -282,15 +208,11 @@ describe("RoomEditor", () => {
       await user.clear(nameInput);
       await user.type(nameInput, "edited room name");
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
       await user.click(saveButton);
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(true);
-      });
+      await waitForSaveDisabled(saveButton);
     });
 
     test("server validation error keeps dirty state", async () => {
@@ -298,20 +220,15 @@ describe("RoomEditor", () => {
       renderWithProviders(<RoomEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
+      await waitForEditorReady("Name");
 
       const nameInput = screen.getByRole("textbox", { name: /name/i });
       await user.clear(nameInput);
       await user.type(nameInput, "bad room name");
 
       const saveButton = screen.getByRole("button", { name: "Save" });
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
-      // Swap mock so the PUT returns 400
       resetFetchMock();
       mockFetch([
         {
@@ -324,10 +241,7 @@ describe("RoomEditor", () => {
 
       await user.click(saveButton);
 
-      // Save button should remain enabled - dirty state not cleared on error
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
     });
 
     test("server validation error is surfaced", async () => {
@@ -340,18 +254,14 @@ describe("RoomEditor", () => {
       );
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
+      await waitForEditorReady("Name");
 
       const nameInput = screen.getByRole("textbox", { name: /name/i });
       await user.clear(nameInput);
       await user.type(nameInput, "bad room name");
 
       const saveButton = screen.getByRole("button", { name: "Save" });
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
       resetFetchMock();
       mockFetch([
@@ -375,27 +285,20 @@ describe("RoomEditor", () => {
       renderWithProviders(<RoomEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
+      await waitForEditorReady("Name");
 
       const nameInput = screen.getByRole("textbox", { name: /name/i });
       await user.clear(nameInput);
       await user.type(nameInput, "payload test room");
 
       const saveButton = screen.getByRole("button", { name: "Save" });
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
       await user.click(saveButton);
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(true);
-      });
+      await waitForSaveDisabled(saveButton);
 
-      const putCall = getFetchLog().find((c) => c.method === "PUT");
-      if (!putCall) throw new Error("expected PUT call in fetch log");
+      const putCall = findFetchCall("PUT");
       expect(putCall.url).toContain(`/api/rooms/${VNUM}`);
 
       expect(putCall.body).toEqual(
@@ -417,15 +320,11 @@ describe("RoomEditor", () => {
       renderWithProviders(<RoomEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
+      await waitForEditorReady("Name");
 
-      // Click "Add exit" button to add an exit row
       const addButton = screen.getByRole("button", { name: /add exit/i });
       await user.click(addButton);
 
-      // A new exit row appears. Fill in the destination field.
       // Destination is an EntityPicker (text input), not a spinbutton.
       const destInput = await screen.findByLabelText("Destination");
       await user.clear(destInput);
@@ -433,20 +332,14 @@ describe("RoomEditor", () => {
       // Blur to commit the EntityPicker value
       await user.tab();
 
-      // Save button should be enabled (dirty state from exits change)
       const saveButton = screen.getByRole("button", { name: "Save" });
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
       await user.click(saveButton);
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(true);
-      });
+      await waitForSaveDisabled(saveButton);
 
-      const putCall = getFetchLog().find((c) => c.method === "PUT");
-      if (!putCall) throw new Error("expected PUT call in fetch log");
+      const putCall = findFetchCall("PUT");
       expect(putCall.url).toContain(`/api/rooms/${VNUM}`);
       expect(putCall.body).toEqual(
         expect.objectContaining({
@@ -460,37 +353,27 @@ describe("RoomEditor", () => {
       renderWithProviders(<RoomEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
+      await waitForEditorReady("Name");
 
-      // Click "Add extra description" button
       const addButton = screen.getByRole("button", {
         name: /add extra description/i,
       });
       await user.click(addButton);
 
-      // A new extra row appears with Keywords and Description fields.
       // Find the extra's Keywords input (room form has "Name", not "Keywords")
       const extraKeywords = await screen.findByRole("textbox", {
         name: /keywords/i,
       });
       await user.type(extraKeywords, "wall painting");
 
-      // Save button should be enabled (dirty state from extras change)
       const saveButton = screen.getByRole("button", { name: "Save" });
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
       await user.click(saveButton);
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(true);
-      });
+      await waitForSaveDisabled(saveButton);
 
-      const putCall = getFetchLog().find((c) => c.method === "PUT");
-      if (!putCall) throw new Error("expected PUT call in fetch log");
+      const putCall = findFetchCall("PUT");
       expect(putCall.url).toContain(`/api/rooms/${VNUM}`);
       expect(putCall.body).toEqual(
         expect.objectContaining({
@@ -507,31 +390,23 @@ describe("RoomEditor", () => {
       renderWithProviders(<RoomEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
+      await waitForEditorReady("Name");
 
       const saveButton = screen.getByRole("button", { name: "Save" });
       const nameInput = screen.getByRole("textbox", { name: /name/i });
 
-      // Make the form dirty
       await user.clear(nameInput);
       await user.type(nameInput, "changed room name");
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
-      // Click the Undo button
       const undoButton = screen.getByRole("button", { name: "Undo" });
       await user.click(undoButton);
 
-      // Form reverts to original value
       await waitFor(() => {
         expect(nameInput.getAttribute("value")).toBe("original room name");
       });
 
-      // Save button becomes disabled again
       expect(saveButton.hasAttribute("disabled")).toBe(true);
     });
   });
@@ -559,18 +434,15 @@ describe("RoomEditor", () => {
       renderWithProviders(<RoomEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
+      await waitForEditorReady("Name");
 
-      // Verify the exit row is displayed (North direction is the default for direction 0)
+      // direction 0 maps to North in the exit display
       await waitFor(() => {
         expect(
           screen.getByRole("button", { name: /remove north exit/i }),
         ).toBeDefined();
       });
 
-      // Click the remove button for the north exit
       const removeButton = screen.getByRole("button", {
         name: /remove north exit/i,
       });
@@ -582,20 +454,14 @@ describe("RoomEditor", () => {
       });
       await user.click(confirmButton);
 
-      // Save button should be enabled (dirty state from exit removal)
       const saveButton = screen.getByRole("button", { name: "Save" });
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(false);
-      });
+      await waitForSaveEnabled(saveButton);
 
       await user.click(saveButton);
 
-      await waitFor(() => {
-        expect(saveButton.hasAttribute("disabled")).toBe(true);
-      });
+      await waitForSaveDisabled(saveButton);
 
-      const putCall = getFetchLog().find((c) => c.method === "PUT");
-      if (!putCall) throw new Error("expected PUT call in fetch log");
+      const putCall = findFetchCall("PUT");
       expect(putCall.url).toContain(`/api/rooms/${VNUM}`);
       expect(putCall.body).toEqual(expect.objectContaining({ exits: [] }));
     });
@@ -606,9 +472,7 @@ describe("RoomEditor", () => {
       mockRoomEndpoints();
       renderWithProviders(<RoomEditor vnumParam={VNUM} />);
 
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
+      await waitForEditorReady("Name");
 
       const deleteButton = screen.getByRole("button", { name: "Delete" });
       const user = userEvent.setup();
@@ -631,11 +495,8 @@ describe("RoomEditor", () => {
       renderWithProviders(<RoomEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
+      await waitForEditorReady("Name");
 
-      // Swap mock so DELETE returns success
       resetFetchMock();
       mockFetch([
         { body: { ok: true }, url: `/api/rooms/${VNUM}` },
@@ -682,14 +543,12 @@ describe("RoomEditor", () => {
 
   describe("REDIT_ENABLED power gates room spec options", () => {
     test("user without REDIT_ENABLED cannot select unassignable room specs", async () => {
-      setAuth(BASE_POWERS);
+      setTestAuth(BASE_POWERS);
       mockRoomEndpoints();
       renderWithProviders(<RoomEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
+      await waitForEditorReady("Name");
 
       // "Bank Main Entrance" (value 2) is unassignable without REDIT_ENABLED
       const specInput = screen.getByRole("combobox", { name: /room spec/i });
@@ -703,14 +562,12 @@ describe("RoomEditor", () => {
     });
 
     test("user with REDIT_ENABLED can select unassignable room specs", async () => {
-      setAuth([...BASE_POWERS, POWER.REDIT_ENABLED]);
+      setTestAuth([...BASE_POWERS, POWER.REDIT_ENABLED]);
       mockRoomEndpoints();
       renderWithProviders(<RoomEditor vnumParam={VNUM} />);
       const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeDefined();
-      });
+      await waitForEditorReady("Name");
 
       const specInput = screen.getByRole("combobox", { name: /room spec/i });
       await user.type(specInput, "Bank");

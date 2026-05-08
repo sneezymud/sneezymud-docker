@@ -1,11 +1,11 @@
-// eslint-disable-next-line testing-library/no-manual-cleanup -- Bun runs all test files in one process; explicit cleanup prevents cross-file DOM leaks
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, test } from "bun:test";
 
 import {
+  makeMobResponse,
   mockFetch,
   renderWithProviders,
-  resetFetchMock,
+  resetTestState,
 } from "@/test-helpers-component.tsx";
 
 import { MobResponsesLink } from "./mob-responses-link.tsx";
@@ -13,10 +13,7 @@ import { MobResponsesLink } from "./mob-responses-link.tsx";
 const VNUM = 1234;
 
 describe("MobResponsesLink", () => {
-  afterEach(() => {
-    cleanup();
-    resetFetchMock();
-  });
+  afterEach(resetTestState);
 
   test("does not show link text while loading", async () => {
     // Never-resolving fetch keeps the query in the loading state.
@@ -42,7 +39,7 @@ describe("MobResponsesLink", () => {
   test("shows 'Add Mob Response' when response is empty", async () => {
     mockFetch([
       {
-        body: { response: "", vnum: VNUM },
+        body: makeMobResponse({ vnum: VNUM }),
         method: "GET",
         url: `/api/mob-responses/${VNUM}`,
       },
@@ -63,7 +60,10 @@ describe("MobResponsesLink", () => {
   test("shows 'Edit Mob Responses' when response has content", async () => {
     mockFetch([
       {
-        body: { response: 'say {"hello"; smile;}', vnum: VNUM },
+        body: makeMobResponse({
+          response: 'say {"hello"; smile;}',
+          vnum: VNUM,
+        }),
         method: "GET",
         url: `/api/mob-responses/${VNUM}`,
       },

@@ -1,31 +1,21 @@
-// eslint-disable-next-line testing-library/no-manual-cleanup -- Bun runs all test files in one process; explicit cleanup prevents cross-file DOM leaks
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import type { ObjListItem } from "@/shared/schemas/obj.ts";
 
 import { POWER } from "@/shared/powers.ts";
-import { useAuthStore } from "@/state/auth.ts";
 import {
   mockFetch,
   renderWithProviders,
-  resetFetchMock,
+  resetTestState,
+  setTestAuth,
 } from "@/test-helpers-component.tsx";
 
 import { ObjectList } from "./object-list.tsx";
 
 function setAuthObjects() {
-  useAuthStore.setState({
-    user: {
-      blocks: [{ end: 1099, start: 1000 }],
-      isSenior: false,
-      playerId: 99_999,
-      playerName: "TestBuilder",
-      powers: [POWER.BUILDER, POWER.OEDIT],
-      username: "testbuilder",
-    },
-  });
+  setTestAuth([POWER.BUILDER, POWER.OEDIT]);
 }
 
 const mockObjects: ObjListItem[] = [
@@ -54,11 +44,7 @@ describe("ObjectList (EntityList)", () => {
     setAuthObjects();
   });
 
-  afterEach(() => {
-    cleanup();
-    resetFetchMock();
-    useAuthStore.setState({ user: null });
-  });
+  afterEach(resetTestState);
 
   test("renders object vnums and short descriptions in table", async () => {
     mockFetch([{ body: mockObjects, url: "/api/objects" }]);

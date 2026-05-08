@@ -246,6 +246,14 @@ const config: Config = defineConfig([
       "jest-dom/prefer-to-have-class": "off",
       "jest-dom/prefer-to-have-text-content": "off",
       "jest-dom/prefer-to-have-value": "off",
+      // Custom assertion helpers (e.g. waitForEditorReady, waitForSaveEnabled)
+      // wrap testing-library's waitFor + expect; recognize the waitFor* prefix
+      // as containing assertions so tests built entirely from helpers don't
+      // false-positive as "Test has no assertions".
+      "jest/expect-expect": [
+        "warn",
+        { assertFunctionNames: ["expect", "waitFor*"] },
+      ],
       // Not using Jest — this rule tries to detect the Jest package version
       "jest/no-deprecated-functions": "off",
     },
