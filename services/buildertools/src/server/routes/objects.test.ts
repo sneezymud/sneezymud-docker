@@ -8,10 +8,13 @@ import { immortalDb, sneezyDb } from "../db.ts";
 import { obj } from "../schema/immortal.ts";
 import {
   authRequest,
+  cleanupTestVnums,
+  createAndUpdate,
   expandedUser,
   getAuthCookie,
   otherUser,
   testUser,
+  validObjPayload,
 } from "../test-helpers.ts";
 
 let cookie: string;
@@ -21,20 +24,22 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await immortalDb.execute(
-    sql`DELETE FROM objaffect WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 117, 143, 144, 145, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 180, 181, 500)`,
-  );
-  await immortalDb.execute(
-    sql`DELETE FROM objextra WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 117, 143, 144, 145, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 180, 181)`,
-  );
-  await immortalDb.execute(
-    sql`DELETE FROM obj WHERE vnum IN (110, 111, 112, 113, 114, 115, 116, 117, 143, 144, 145, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 180, 181)`,
-  );
-  await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum IN (5100, 5101, 5102)`);
-  await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum BETWEEN 6100 AND 6124`);
+  await cleanupTestVnums({
+    db: immortalDb,
+    vnums: [
+      110, 111, 112, 113, 114, 115, 116, 117, 143, 144, 145, 160, 161, 162, 163,
+      164, 165, 166, 167, 168, 169, 180, 181, 500,
+    ],
+  });
+  return cleanupTestVnums({
+    db: sneezyDb,
+    vnums: [
+      5100, 5101, 5102, 6100, 6101, 6102, 6103, 6104, 6105, 6106, 6107, 6108,
+      6109, 6110, 6111, 6112, 6113, 6114, 6115, 6116, 6117, 6118, 6119, 6120,
+      6121, 6122, 6123, 6124,
+    ],
+  });
 });
-
-// -- Auth enforcement --
 
 describe("auth enforcement", () => {
   test("unauthenticated request returns 401", async () => {
@@ -52,35 +57,6 @@ describe("auth enforcement", () => {
   });
 });
 
-const validObjUpdate = {
-  action_desc: "",
-  action_flag: 0,
-  affects: [],
-  can_be_seen: 0,
-  cur_struct: 0,
-  decay: 0,
-  extras: [],
-  long_desc: "",
-  material: 0,
-  max_exist: 0,
-  max_struct: 0,
-  name: "",
-  price: 0,
-  short_desc: "",
-  spec_proc: 0,
-  type: 0,
-  val0: 0,
-  val1: 0,
-  val2: 0,
-  val3: 0,
-  vnum: 110,
-  volume: 0,
-  wear_flag: 0,
-  weight: 0,
-};
-
-// -- Invalid vnum parameters --
-
 describe("invalid vnum parameters", () => {
   test("GET /api/objects/abc returns 400", async () => {
     const res = await authRequest(app, "/api/objects/abc", cookie);
@@ -94,15 +70,13 @@ describe("invalid vnum parameters", () => {
 
   test("PUT /api/objects/abc returns 400", async () => {
     const res = await authRequest(app, "/api/objects/abc", cookie, {
-      body: JSON.stringify(validObjUpdate),
+      body: JSON.stringify(validObjPayload()),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
     expect(res.status).toBe(400);
   });
 });
-
-// -- Create --
 
 describe("object creation", () => {
   test("builder can create an object within their blocks", async () => {
@@ -140,8 +114,6 @@ describe("object creation", () => {
   });
 });
 
-// -- Read --
-
 describe("object listing and fetching", () => {
   test("builder can list their objects", async () => {
     const res = await authRequest(app, "/api/objects", cookie);
@@ -177,12 +149,9 @@ describe("object listing and fetching", () => {
   });
 });
 
-// -- Update --
-
 describe("object updates", () => {
   test("builder can update an object with affects and extras roundtrip", async () => {
-    const updated = {
-      ...validObjUpdate,
+    const updated = validObjPayload({
       affects: [{ mod1: 1, mod2: 0, type: 18, vnum: 110 }],
       extras: [
         {
@@ -193,7 +162,7 @@ describe("object updates", () => {
       ],
       name: "sword blade",
       short_desc: "a sharp sword",
-    };
+    });
 
     const putRes = await authRequest(app, "/api/objects/110", cookie, {
       body: JSON.stringify(updated),
@@ -216,7 +185,7 @@ describe("object updates", () => {
 
   test("updating a nonexistent object within blocks returns 404", async () => {
     const res = await authRequest(app, "/api/objects/198", cookie, {
-      body: JSON.stringify({ ...validObjUpdate, vnum: 198 }),
+      body: JSON.stringify(validObjPayload({ vnum: 198 })),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -237,12 +206,9 @@ describe("object updates", () => {
   test("update replaces child rows instead of appending", async () => {
     // Object 110 already has 1 affect and 1 extra from roundtrip test
     const putRes = await authRequest(app, "/api/objects/110", cookie, {
-      body: JSON.stringify({
-        ...validObjUpdate,
-        affects: [],
-        extras: [],
-        vnum: 110,
-      }),
+      body: JSON.stringify(
+        validObjPayload({ affects: [], extras: [], vnum: 110 }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -254,8 +220,6 @@ describe("object updates", () => {
     expect(body).toHaveProperty("extras", []);
   });
 });
-
-// -- Delete --
 
 describe("object deletion", () => {
   test("builder can delete an object", async () => {
@@ -284,28 +248,17 @@ describe("object deletion", () => {
   });
 });
 
-// -- Search --
-
 describe("object search", () => {
   beforeAll(async () => {
-    // Create a named object for search
-    await authRequest(app, "/api/objects", cookie, {
-      body: JSON.stringify({ vnum: 111 }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-    await authRequest(app, "/api/objects/111", cookie, {
-      body: JSON.stringify({
-        ...validObjUpdate,
-        short_desc: "a glowing orb of light",
-        vnum: 111,
-      }),
-      headers: { "Content-Type": "application/json" },
-      method: "PUT",
+    await createAndUpdate({
+      app,
+      cookie,
+      entityType: "objects",
+      updatePayload: validObjPayload({ short_desc: "a glowing orb of light" }),
+      vnum: 111,
     });
 
-    // Insert a sneezy object for cross-database search
-    await sneezyDb.execute(sql`
+    return sneezyDb.execute(sql`
       INSERT INTO obj (vnum, name, short_desc, long_desc, action_desc)
       VALUES (5100, 'dagger', 'a production dagger', '', '')
     `);
@@ -338,20 +291,12 @@ describe("object search", () => {
   });
 
   test("SQL metacharacters in query are treated literally", async () => {
-    // Create an object with % in the short_desc
-    await authRequest(app, "/api/objects", cookie, {
-      body: JSON.stringify({ vnum: 112 }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-    await authRequest(app, "/api/objects/112", cookie, {
-      body: JSON.stringify({
-        ...validObjUpdate,
-        short_desc: "a 100% pure gold ring",
-        vnum: 112,
-      }),
-      headers: { "Content-Type": "application/json" },
-      method: "PUT",
+    await createAndUpdate({
+      app,
+      cookie,
+      entityType: "objects",
+      updatePayload: validObjPayload({ short_desc: "a 100% pure gold ring" }),
+      vnum: 112,
     });
 
     // Searching for literal "%" should match the specific object
@@ -382,19 +327,14 @@ describe("object search", () => {
   // Search crosses block boundaries intentionally - key pickers need
   // to find objects across all builders' blocks and the production database.
   test("search finds object by numeric vnum", async () => {
-    await authRequest(app, "/api/objects", cookie, {
-      body: JSON.stringify({ vnum: 144 }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-    await authRequest(app, "/api/objects/144", cookie, {
-      body: JSON.stringify({
-        ...validObjUpdate,
+    await createAndUpdate({
+      app,
+      cookie,
+      entityType: "objects",
+      updatePayload: validObjPayload({
         short_desc: "a vnum search test object",
-        vnum: 144,
       }),
-      headers: { "Content-Type": "application/json" },
-      method: "PUT",
+      vnum: 144,
     });
 
     const res = await authRequest(app, "/api/objects/search?q=144", cookie);
@@ -420,15 +360,13 @@ describe("object search", () => {
   });
 });
 
-// -- Name lookup --
-
 describe("object name lookup", () => {
-  beforeAll(async () => {
-    await sneezyDb.execute(sql`
+  beforeAll(() =>
+    sneezyDb.execute(sql`
       INSERT IGNORE INTO obj (vnum, name, short_desc, long_desc, action_desc)
       VALUES (5101, 'shield', 'a cross-block shield', '', '')
-    `);
-  });
+    `),
+  );
 
   // Name lookup intentionally bypasses block access checks - key fields
   // reference objects in other builders' blocks and need to display names.
@@ -467,7 +405,7 @@ describe("object name lookup", () => {
     );
     // Clean up the cross-owner row; afterAll deletes by vnum but another
     // test in this file might race with the production-row test above.
-    await immortalDb.execute(
+    return immortalDb.execute(
       sql`DELETE FROM obj WHERE vnum = 5101 AND player_id = ${otherUser.playerId}`,
     );
   });
@@ -555,8 +493,6 @@ describe("bulk object deletion", () => {
   });
 });
 
-// -- Schema read/write split --
-
 describe("out-of-range data readable from DB", () => {
   test("GET returns object with values outside input constraints", async () => {
     await authRequest(app, "/api/objects", cookie, {
@@ -580,7 +516,7 @@ describe("out-of-range data readable from DB", () => {
 
   test("PUT rejects values outside input constraints", async () => {
     const res = await authRequest(app, "/api/objects/165", cookie, {
-      body: JSON.stringify({ ...validObjUpdate, can_be_seen: 50, vnum: 165 }),
+      body: JSON.stringify(validObjPayload({ can_be_seen: 50, vnum: 165 })),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -598,7 +534,7 @@ describe("schema boundary round-trips", () => {
     });
     for (const price of [0, 1_000_000]) {
       const putRes = await authRequest(app, `/api/objects/${vnum}`, cookie, {
-        body: JSON.stringify({ ...validObjUpdate, price, vnum }),
+        body: JSON.stringify(validObjPayload({ price, vnum })),
         headers: { "Content-Type": "application/json" },
         method: "PUT",
       });
@@ -611,28 +547,19 @@ describe("schema boundary round-trips", () => {
   });
 });
 
-// -- Delete cascades --
-
 describe("delete cascades to child tables", () => {
   test("re-created object has no orphaned affects or extras", async () => {
-    // Create object and populate child rows
-    await authRequest(app, "/api/objects", cookie, {
-      body: JSON.stringify({ vnum: 113 }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-    await authRequest(app, "/api/objects/113", cookie, {
-      body: JSON.stringify({
-        ...validObjUpdate,
+    await createAndUpdate({
+      app,
+      cookie,
+      entityType: "objects",
+      updatePayload: validObjPayload({
         affects: [{ mod1: 5, mod2: 0, type: 1, vnum: 113 }],
         extras: [{ description: "old extra", name: "old", vnum: 113 }],
-        vnum: 113,
       }),
-      headers: { "Content-Type": "application/json" },
-      method: "PUT",
+      vnum: 113,
     });
 
-    // Delete and re-create
     await authRequest(app, "/api/objects/113", cookie, { method: "DELETE" });
     await authRequest(app, "/api/objects", cookie, {
       body: JSON.stringify({ vnum: 113 }),
@@ -648,47 +575,38 @@ describe("delete cascades to child tables", () => {
   });
 });
 
-// -- Update with change --
-
 describe("update preserves unchanged fields", () => {
   test("changing type preserves affects and extras", async () => {
-    await authRequest(app, "/api/objects", cookie, {
-      body: JSON.stringify({ vnum: 114 }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-
     const sharedAffects = [{ mod1: 2, mod2: 0, type: 18, vnum: 114 }];
     const sharedExtras = [
       { description: "It glows faintly.", name: "glow light", vnum: 114 },
     ];
 
-    // Save as weapon (type=5) with affects and extras
-    await authRequest(app, "/api/objects/114", cookie, {
-      body: JSON.stringify({
-        ...validObjUpdate,
+    await createAndUpdate({
+      app,
+      cookie,
+      entityType: "objects",
+      updatePayload: validObjPayload({
         affects: sharedAffects,
         extras: sharedExtras,
         name: "glowing blade",
         short_desc: "a glowing blade",
         type: 5,
-        vnum: 114,
       }),
-      headers: { "Content-Type": "application/json" },
-      method: "PUT",
+      vnum: 114,
     });
 
-    // Change to light (type=1), keep affects and extras
     const putRes = await authRequest(app, "/api/objects/114", cookie, {
-      body: JSON.stringify({
-        ...validObjUpdate,
-        affects: sharedAffects,
-        extras: sharedExtras,
-        name: "glowing blade",
-        short_desc: "a glowing blade",
-        type: 1,
-        vnum: 114,
-      }),
+      body: JSON.stringify(
+        validObjPayload({
+          affects: sharedAffects,
+          extras: sharedExtras,
+          name: "glowing blade",
+          short_desc: "a glowing blade",
+          type: 1,
+          vnum: 114,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -708,39 +626,29 @@ describe("update preserves unchanged fields", () => {
   });
 });
 
-// -- Idempotency --
-
 describe("save idempotency", () => {
   test("saving the same payload twice produces identical data", async () => {
-    await authRequest(app, "/api/objects", cookie, {
-      body: JSON.stringify({ vnum: 115 }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-
-    const payload = {
-      ...validObjUpdate,
+    const payload = validObjPayload({
       affects: [{ mod1: 5, mod2: 0, type: 1, vnum: 115 }],
       extras: [{ description: "a shiny gem", name: "gem", vnum: 115 }],
       name: "idempotent sword",
       short_desc: "an idempotent sword",
       type: 5,
       vnum: 115,
-    };
+    });
 
-    // First save
-    await authRequest(app, "/api/objects/115", cookie, {
-      body: JSON.stringify(payload),
-      headers: { "Content-Type": "application/json" },
-      method: "PUT",
+    await createAndUpdate({
+      app,
+      cookie,
+      entityType: "objects",
+      updatePayload: payload,
+      vnum: 115,
     });
     const getA = await authRequest(app, "/api/objects/115", cookie);
     expect(getA.status).toBe(200);
     const snapshotA: unknown = await getA.json();
-    // Validate shape through Zod
     const parsedA = objSchema.parse(snapshotA);
 
-    // Second save (identical payload)
     await authRequest(app, "/api/objects/115", cookie, {
       body: JSON.stringify(payload),
       headers: { "Content-Type": "application/json" },
@@ -756,8 +664,6 @@ describe("save idempotency", () => {
   });
 });
 
-// -- Schema validation --
-
 describe("response schema validation", () => {
   test("GET object response conforms to objSchema", async () => {
     const res = await authRequest(app, "/api/objects/114", cookie);
@@ -768,25 +674,19 @@ describe("response schema validation", () => {
   });
 
   test("populated object with child rows and non-default type conforms to objSchema", async () => {
-    await authRequest(app, "/api/objects", cookie, {
-      body: JSON.stringify({ vnum: 116 }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-
-    await authRequest(app, "/api/objects/116", cookie, {
-      body: JSON.stringify({
-        ...validObjUpdate,
+    await createAndUpdate({
+      app,
+      cookie,
+      entityType: "objects",
+      updatePayload: validObjPayload({
         affects: [{ mod1: 3, mod2: 0, type: 17, vnum: 116 }],
         extras: [{ description: "Runes glow.", name: "runes", vnum: 116 }],
         name: "runic blade",
         price: 500,
         type: 5,
         val0: 100,
-        vnum: 116,
       }),
-      headers: { "Content-Type": "application/json" },
-      method: "PUT",
+      vnum: 116,
     });
 
     const res = await authRequest(app, "/api/objects/116", cookie);
@@ -800,16 +700,8 @@ describe("response schema validation", () => {
   });
 });
 
-// -- Full-field roundtrip --
-
 describe("full-field roundtrip", () => {
   test("all fields survive a PUT/GET cycle", async () => {
-    await authRequest(app, "/api/objects", cookie, {
-      body: JSON.stringify({ vnum: 180 }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-
     const payload = {
       action_desc: "It glows.",
       action_flag: 16,
@@ -840,12 +732,13 @@ describe("full-field roundtrip", () => {
       weight: 5,
     };
 
-    const putRes = await authRequest(app, "/api/objects/180", cookie, {
-      body: JSON.stringify(payload),
-      headers: { "Content-Type": "application/json" },
-      method: "PUT",
+    await createAndUpdate({
+      app,
+      cookie,
+      entityType: "objects",
+      updatePayload: payload,
+      vnum: 180,
     });
-    expect(putRes.status).toBe(200);
 
     const getRes = await authRequest(app, "/api/objects/180", cookie);
     expect(getRes.status).toBe(200);
@@ -893,8 +786,6 @@ describe("full-field roundtrip", () => {
   });
 });
 
-// -- Object creation defaults --
-
 describe("object creation defaults", () => {
   test("newly created object has zero/empty defaults", async () => {
     await authRequest(app, "/api/objects", cookie, {
@@ -918,11 +809,8 @@ describe("object creation defaults", () => {
   });
 });
 
-// -- Search pagination --
-
 describe("object search pagination", () => {
   test("search returns at most 20 results", async () => {
-    // Insert 25 objects in sneezy database with matching names
     for (let i = 0; i < 25; i++) {
       const vnum = 6100 + i;
       await sneezyDb.execute(sql`
@@ -944,35 +832,25 @@ describe("object search pagination", () => {
   });
 });
 
-// -- Search deduplication --
-
 describe("search deduplication across databases", () => {
   beforeAll(async () => {
-    // Insert an object in sneezy (production) with a distinctive name
     await sneezyDb.execute(sql`
       INSERT INTO obj (vnum, name, short_desc, long_desc, action_desc)
       VALUES (5102, 'DedupTestObj', 'a dedup test object', '', '')
     `);
 
-    // Create the same vnum in immortal with a different name
-    await authRequest(app, "/api/objects", cookie, {
-      body: JSON.stringify({ vnum: 169 }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-    await authRequest(app, "/api/objects/169", cookie, {
-      body: JSON.stringify({
-        ...validObjUpdate,
+    return createAndUpdate({
+      app,
+      cookie,
+      entityType: "objects",
+      updatePayload: validObjPayload({
         short_desc: "an immortal dedup test object",
-        vnum: 169,
       }),
-      headers: { "Content-Type": "application/json" },
-      method: "PUT",
+      vnum: 169,
     });
   });
 
   test("immortal version wins over sneezy for same vnum", async () => {
-    // Insert a sneezy row at the same vnum as the immortal object
     await sneezyDb.execute(sql`
       INSERT IGNORE INTO obj (vnum, name, short_desc, long_desc, action_desc)
       VALUES (169, 'DedupConflict', 'a sneezy dedup conflict object', '', '')
@@ -992,30 +870,22 @@ describe("search deduplication across databases", () => {
     );
   });
 
-  afterAll(async () => {
-    await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum = 169`);
-  });
+  afterAll(() => sneezyDb.execute(sql`DELETE FROM obj WHERE vnum = 169`));
 });
-
-// -- Multiple affects ordering --
 
 describe("multiple affects", () => {
   test("multiple affects are saved and returned with correct count and values", async () => {
-    await authRequest(app, "/api/objects", cookie, {
-      body: JSON.stringify({ vnum: 145 }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-
     const affects = [
       { mod1: 1, mod2: 0, type: 19, vnum: 145 },
       { mod1: 2, mod2: 0, type: 17, vnum: 145 },
       { mod1: 3, mod2: 0, type: 18, vnum: 145 },
     ];
-    await authRequest(app, "/api/objects/145", cookie, {
-      body: JSON.stringify({ ...validObjUpdate, affects, vnum: 145 }),
-      headers: { "Content-Type": "application/json" },
-      method: "PUT",
+    await createAndUpdate({
+      app,
+      cookie,
+      entityType: "objects",
+      updatePayload: validObjPayload({ affects }),
+      vnum: 145,
     });
 
     const res = await authRequest(app, "/api/objects/145", cookie);
@@ -1030,29 +900,6 @@ describe("multiple affects", () => {
   });
 });
 
-// -- Owner scoping --
-
-/** Create an object in immortal via API and update it with full data. */
-async function createAndUpdate(
-  vnum: number,
-  authCookie: string,
-  updatePayload: Record<string, unknown>,
-) {
-  const createRes = await authRequest(app, "/api/objects", authCookie, {
-    body: JSON.stringify({ vnum }),
-    headers: { "Content-Type": "application/json" },
-    method: "POST",
-  });
-  expect(createRes.status).toBe(201);
-
-  const putRes = await authRequest(app, `/api/objects/${vnum}`, authCookie, {
-    body: JSON.stringify({ ...updatePayload, vnum }),
-    headers: { "Content-Type": "application/json" },
-    method: "PUT",
-  });
-  expect(putRes.status).toBe(200);
-}
-
 describe("owner scoping", () => {
   let expandedCookie: string;
   let otherCookie: string;
@@ -1065,8 +912,20 @@ describe("owner scoping", () => {
   test("GET /api/objects?owner=mine excludes other owners' entities", async () => {
     const vnumA = 163;
     const vnumB = 164;
-    await createAndUpdate(vnumA, cookie, { ...validObjUpdate });
-    await createAndUpdate(vnumB, otherCookie, { ...validObjUpdate });
+    await createAndUpdate({
+      app,
+      cookie,
+      entityType: "objects",
+      updatePayload: validObjPayload(),
+      vnum: vnumA,
+    });
+    await createAndUpdate({
+      app,
+      cookie: otherCookie,
+      entityType: "objects",
+      updatePayload: validObjPayload(),
+      vnum: vnumB,
+    });
 
     const res = await authRequest(app, "/api/objects?owner=mine", cookie);
     expect(res.status).toBe(200);
@@ -1084,9 +943,12 @@ describe("owner scoping", () => {
 
   test("senior cross-owner GET returns target's draft", async () => {
     const vnum = 166;
-    await createAndUpdate(vnum, cookie, {
-      ...validObjUpdate,
-      name: "test user object",
+    await createAndUpdate({
+      app,
+      cookie,
+      entityType: "objects",
+      updatePayload: validObjPayload({ name: "test user object" }),
+      vnum,
     });
     const res = await authRequest(
       app,
@@ -1126,7 +988,6 @@ describe("owner scoping", () => {
     );
     expect(putRes.status).toBe(200);
 
-    // Verify via GET that the change was actually saved
     const verifyRes = await authRequest(
       app,
       `/api/objects/166?owner=${testUser.playerId}`,
@@ -1152,11 +1013,9 @@ describe("owner scoping", () => {
       `/api/objects/${vnum}?owner=${testUser.playerId}`,
       expandedCookie,
       {
-        body: JSON.stringify({
-          ...validObjUpdate,
-          name: "senior renamed object",
-          vnum,
-        }),
+        body: JSON.stringify(
+          validObjPayload({ name: "senior renamed object", vnum }),
+        ),
         headers: { "Content-Type": "application/json" },
         method: "PUT",
       },
@@ -1171,7 +1030,13 @@ describe("owner scoping", () => {
 
   test("senior cross-owner DELETE removes target's row", async () => {
     const vnum = 167;
-    await createAndUpdate(vnum, cookie, { ...validObjUpdate });
+    await createAndUpdate({
+      app,
+      cookie,
+      entityType: "objects",
+      updatePayload: validObjPayload(),
+      vnum,
+    });
     const res = await authRequest(
       app,
       `/api/objects/${vnum}?owner=${testUser.playerId}`,
@@ -1198,7 +1063,7 @@ describe("owner scoping", () => {
       `/api/objects/163?owner=${testUser.playerId}`,
       otherCookie,
       {
-        body: JSON.stringify({ ...validObjUpdate, vnum: 163 }),
+        body: JSON.stringify(validObjPayload({ vnum: 163 })),
         headers: { "Content-Type": "application/json" },
         method: "PUT",
       },
@@ -1230,8 +1095,6 @@ describe("owner scoping", () => {
     expect(res.status).toBe(400);
   });
 });
-
-// -- Empty state --
 
 describe("empty state for builder with no objects", () => {
   let lowCookie: string;

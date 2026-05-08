@@ -8,9 +8,11 @@ import { immortalDb } from "../db.ts";
 import { mob } from "../schema/immortal.ts";
 import {
   authRequest,
+  cleanupTestVnums,
   expandedUser,
   getAuthCookie,
   testUser,
+  validMobPayload,
 } from "../test-helpers.ts";
 
 let cookie: string;
@@ -19,22 +21,15 @@ beforeAll(async () => {
   cookie = await getAuthCookie(app, "testbuilder");
 });
 
-afterAll(async () => {
-  await immortalDb.execute(
-    sql`DELETE FROM mob_extra WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 190, 191, 192, 193, 300)`,
-  );
-  await immortalDb.execute(
-    sql`DELETE FROM mob_imm WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 190, 191, 192, 193, 300)`,
-  );
-  await immortalDb.execute(
-    sql`DELETE FROM mobresponses WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 190, 191, 192, 193, 300)`,
-  );
-  await immortalDb.execute(
-    sql`DELETE FROM mob WHERE vnum IN (120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 190, 191, 192, 193, 300)`,
-  );
-});
-
-// -- Auth enforcement --
+afterAll(() =>
+  cleanupTestVnums({
+    db: immortalDb,
+    vnums: [
+      120, 121, 143, 170, 171, 172, 175, 176, 177, 178, 180, 181, 182, 183, 184,
+      185, 190, 191, 192, 193, 300,
+    ],
+  }),
+);
 
 describe("auth enforcement", () => {
   test("unauthenticated request returns 401", async () => {
@@ -52,55 +47,6 @@ describe("auth enforcement", () => {
   });
 });
 
-const validMobUpdate = {
-  ac: 10,
-  actions: 0,
-  adjacent_sound: "",
-  affects: 0,
-  agi: 0,
-  attacks: 1,
-  bra: 0,
-  can_be_seen: 0,
-  cha: 0,
-  class: 0,
-  con: 0,
-  damage_level: 0,
-  damage_precision: 0,
-  def_position: 9,
-  description: "A test mob.",
-  dex: 0,
-  extras: [],
-  fact_perc: 0,
-  faction: 0,
-  foc: 0,
-  gold: 0,
-  height: 0,
-  hpbonus: 0,
-  immunities: [],
-  intel: 0,
-  kar: 0,
-  level: 1,
-  local_sound: "",
-  long_desc: "A test mob stands here.",
-  max_exist: 0,
-  name: "test mob",
-  per: 0,
-  race: 0,
-  sex: 0,
-  short_desc: "a test mob",
-  skin: 0,
-  spe: 0,
-  spec_proc: 0,
-  str: 0,
-  tohit: 0,
-  vision: 0,
-  vnum: 120,
-  weight: 0,
-  wis: 0,
-};
-
-// -- Invalid vnum parameters --
-
 describe("invalid vnum parameters", () => {
   test("GET /api/mobs/abc returns 400", async () => {
     const res = await authRequest(app, "/api/mobs/abc", cookie);
@@ -114,15 +60,13 @@ describe("invalid vnum parameters", () => {
 
   test("PUT /api/mobs/abc returns 400", async () => {
     const res = await authRequest(app, "/api/mobs/abc", cookie, {
-      body: JSON.stringify(validMobUpdate),
+      body: JSON.stringify(validMobPayload({ vnum: 120 })),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
     expect(res.status).toBe(400);
   });
 });
-
-// -- Create --
 
 describe("mob creation", () => {
   test("builder can create a mob within their blocks", async () => {
@@ -160,8 +104,6 @@ describe("mob creation", () => {
   });
 });
 
-// -- Read --
-
 describe("mob listing and fetching", () => {
   test("builder can list their mobs", async () => {
     const res = await authRequest(app, "/api/mobs", cookie);
@@ -197,12 +139,9 @@ describe("mob listing and fetching", () => {
   });
 });
 
-// -- Update --
-
 describe("mob updates", () => {
   test("builder can update a mob with extras and immunities roundtrip", async () => {
-    const updated = {
-      ...validMobUpdate,
+    const updated = validMobPayload({
       extras: [
         {
           description: "The guard wears polished armor.",
@@ -213,7 +152,8 @@ describe("mob updates", () => {
       immunities: [{ amt: 100, type: 1, vnum: 120 }],
       name: "guard",
       short_desc: "a burly guard",
-    };
+      vnum: 120,
+    });
 
     const putRes = await authRequest(app, "/api/mobs/120", cookie, {
       body: JSON.stringify(updated),
@@ -236,7 +176,7 @@ describe("mob updates", () => {
 
   test("updating a nonexistent mob within blocks returns 404", async () => {
     const res = await authRequest(app, "/api/mobs/198", cookie, {
-      body: JSON.stringify({ ...validMobUpdate, vnum: 198 }),
+      body: JSON.stringify(validMobPayload({ vnum: 198 })),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -257,14 +197,15 @@ describe("mob updates", () => {
   test("update replaces child rows instead of appending", async () => {
     // Mob 120 already has 1 extra (keyword "bamfin") and 1 immunity from roundtrip test
     const putRes = await authRequest(app, "/api/mobs/120", cookie, {
-      body: JSON.stringify({
-        ...validMobUpdate,
-        extras: [
-          { description: "Replaced extra.", keyword: "deathcry", vnum: 120 },
-        ],
-        immunities: [],
-        vnum: 120,
-      }),
+      body: JSON.stringify(
+        validMobPayload({
+          extras: [
+            { description: "Replaced extra.", keyword: "deathcry", vnum: 120 },
+          ],
+          immunities: [],
+          vnum: 120,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -278,8 +219,6 @@ describe("mob updates", () => {
     expect(body).toHaveProperty("immunities", []);
   });
 });
-
-// -- Delete --
 
 describe("mob deletion", () => {
   test("builder can delete a mob", async () => {
@@ -308,11 +247,8 @@ describe("mob deletion", () => {
   });
 });
 
-// -- Bulk Delete --
-
 describe("bulk mob deletion", () => {
   test("builder can bulk delete multiple mobs", async () => {
-    // Create two mobs to delete
     for (const vnum of [171, 172]) {
       await authRequest(app, "/api/mobs", cookie, {
         body: JSON.stringify({ vnum }),
@@ -331,7 +267,6 @@ describe("bulk mob deletion", () => {
     const body: unknown = await res.json();
     expect(body).toEqual({ deleted: 2, ok: true });
 
-    // Verify they're gone
     const get171 = await authRequest(app, "/api/mobs/171", cookie);
     const get172 = await authRequest(app, "/api/mobs/172", cookie);
     expect(get171.status).toBe(404);
@@ -339,7 +274,9 @@ describe("bulk mob deletion", () => {
   });
 
   test("rejects vnums outside assigned blocks", async () => {
-    // Create a mob within blocks to ensure it survives
+    // Mob 171 must remain after the bulk-DELETE rejection — the assertion
+    // below relies on the in-range vnum surviving when the request is
+    // refused due to an out-of-range sibling.
     await authRequest(app, "/api/mobs", cookie, {
       body: JSON.stringify({ vnum: 171 }),
       headers: { "Content-Type": "application/json" },
@@ -354,7 +291,6 @@ describe("bulk mob deletion", () => {
 
     expect(res.status).toBe(403);
 
-    // Verify the in-range mob was NOT deleted
     const getRes = await authRequest(app, "/api/mobs/171", cookie);
     expect(getRes.status).toBe(200);
   });
@@ -391,8 +327,6 @@ describe("bulk mob deletion", () => {
   });
 });
 
-// -- Derived fields --
-
 describe("mob derived fields", () => {
   test("pos is synced from def_position on update", async () => {
     await authRequest(app, "/api/mobs", cookie, {
@@ -401,14 +335,13 @@ describe("mob derived fields", () => {
       method: "POST",
     });
 
-    // Update with def_position = 5 (sitting)
+    // def_position = 5 maps to "sitting"; pos column should mirror that.
     await authRequest(app, "/api/mobs/176", cookie, {
-      body: JSON.stringify({ ...validMobUpdate, def_position: 5, vnum: 176 }),
+      body: JSON.stringify(validMobPayload({ def_position: 5, vnum: 176 })),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
 
-    // Verify pos was synced in the DB
     const [row] = await immortalDb
       .select({ pos: mob.pos })
       .from(mob)
@@ -418,12 +351,13 @@ describe("mob derived fields", () => {
 
   test("letter is 'A' when local_sound set but adjacent_sound empty", async () => {
     await authRequest(app, "/api/mobs/176", cookie, {
-      body: JSON.stringify({
-        ...validMobUpdate,
-        adjacent_sound: "",
-        local_sound: "The guard grunts.",
-        vnum: 176,
-      }),
+      body: JSON.stringify(
+        validMobPayload({
+          adjacent_sound: "",
+          local_sound: "The guard grunts.",
+          vnum: 176,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -437,12 +371,13 @@ describe("mob derived fields", () => {
 
   test("letter is 'L' when both sounds are set", async () => {
     await authRequest(app, "/api/mobs/176", cookie, {
-      body: JSON.stringify({
-        ...validMobUpdate,
-        adjacent_sound: "You hear grunting nearby.",
-        local_sound: "The guard grunts.",
-        vnum: 176,
-      }),
+      body: JSON.stringify(
+        validMobPayload({
+          adjacent_sound: "You hear grunting nearby.",
+          local_sound: "The guard grunts.",
+          vnum: 176,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -456,12 +391,13 @@ describe("mob derived fields", () => {
 
   test("letter is 'L' when both sounds are empty", async () => {
     await authRequest(app, "/api/mobs/176", cookie, {
-      body: JSON.stringify({
-        ...validMobUpdate,
-        adjacent_sound: "",
-        local_sound: "",
-        vnum: 176,
-      }),
+      body: JSON.stringify(
+        validMobPayload({
+          adjacent_sound: "",
+          local_sound: "",
+          vnum: 176,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -474,8 +410,6 @@ describe("mob derived fields", () => {
   });
 });
 
-// -- Schema read/write split --
-
 describe("out-of-range data readable from DB", () => {
   test("GET returns mob with values outside input constraints", async () => {
     await authRequest(app, "/api/mobs", cookie, {
@@ -484,7 +418,8 @@ describe("out-of-range data readable from DB", () => {
       method: "POST",
     });
 
-    // Set ac to 200 directly in DB (outside input range 0-127)
+    // ac = 200 falls outside the input schema's 0-127 range, so it can only
+    // get into the DB via a direct UPDATE — exercise the read-path tolerance.
     await immortalDb.execute(sql`UPDATE mob SET ac = 200 WHERE vnum = 175`);
 
     const res = await authRequest(app, "/api/mobs/175", cookie);
@@ -495,7 +430,7 @@ describe("out-of-range data readable from DB", () => {
 
   test("PUT rejects values outside input constraints", async () => {
     const res = await authRequest(app, "/api/mobs/175", cookie, {
-      body: JSON.stringify({ ...validMobUpdate, ac: 200, vnum: 175 }),
+      body: JSON.stringify(validMobPayload({ ac: 200, vnum: 175 })),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -513,7 +448,7 @@ describe("schema boundary round-trips", () => {
     });
     for (const actions of [0, 4_294_967_295]) {
       const putRes = await authRequest(app, `/api/mobs/${vnum}`, cookie, {
-        body: JSON.stringify({ ...validMobUpdate, actions, vnum }),
+        body: JSON.stringify(validMobPayload({ actions, vnum })),
         headers: { "Content-Type": "application/json" },
         method: "PUT",
       });
@@ -529,7 +464,7 @@ describe("schema boundary round-trips", () => {
     const vnum = 121;
     for (const level of [1, 100]) {
       const putRes = await authRequest(app, `/api/mobs/${vnum}`, cookie, {
-        body: JSON.stringify({ ...validMobUpdate, level, vnum }),
+        body: JSON.stringify(validMobPayload({ level, vnum })),
         headers: { "Content-Type": "application/json" },
         method: "PUT",
       });
@@ -542,28 +477,25 @@ describe("schema boundary round-trips", () => {
   });
 });
 
-// -- Delete cascades --
-
 describe("delete cascades to child tables", () => {
   test("re-created mob has no orphaned extras or immunities", async () => {
-    // Create mob and populate child rows
     await authRequest(app, "/api/mobs", cookie, {
       body: JSON.stringify({ vnum: 178 }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
     await authRequest(app, "/api/mobs/178", cookie, {
-      body: JSON.stringify({
-        ...validMobUpdate,
-        extras: [{ description: "old extra", keyword: "bamfin", vnum: 178 }],
-        immunities: [{ amt: 50, type: 2, vnum: 178 }],
-        vnum: 178,
-      }),
+      body: JSON.stringify(
+        validMobPayload({
+          extras: [{ description: "old extra", keyword: "bamfin", vnum: 178 }],
+          immunities: [{ amt: 50, type: 2, vnum: 178 }],
+          vnum: 178,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
 
-    // Delete and re-create
     await authRequest(app, "/api/mobs/178", cookie, { method: "DELETE" });
     await authRequest(app, "/api/mobs", cookie, {
       body: JSON.stringify({ vnum: 178 }),
@@ -579,14 +511,12 @@ describe("delete cascades to child tables", () => {
   });
 
   test("deleting a mob also removes its mob responses", async () => {
-    // Create mob
     await authRequest(app, "/api/mobs", cookie, {
       body: JSON.stringify({ vnum: 143 }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
 
-    // Create mob response
     const putRes = await authRequest(app, "/api/mob-responses/143", cookie, {
       body: JSON.stringify({ response: 'say {"hello";}', vnum: 143 }),
       headers: { "Content-Type": "application/json" },
@@ -594,7 +524,6 @@ describe("delete cascades to child tables", () => {
     });
     expect(putRes.status).toBe(200);
 
-    // Verify response exists
     const getBeforeDelete = await authRequest(
       app,
       "/api/mob-responses/143",
@@ -604,13 +533,13 @@ describe("delete cascades to child tables", () => {
     const beforeBody: unknown = await getBeforeDelete.json();
     expect(beforeBody).toHaveProperty("response", 'say {"hello";}');
 
-    // Delete mob
     const delRes = await authRequest(app, "/api/mobs/143", cookie, {
       method: "DELETE",
     });
     expect(delRes.status).toBe(200);
 
-    // Mob response endpoint returns 404 (mobExists check fails)
+    // Mob response endpoint returns 404 once the mob is gone — the
+    // mobExists check rejects the request before the response lookup.
     const getAfterDelete = await authRequest(
       app,
       "/api/mob-responses/143",
@@ -622,17 +551,6 @@ describe("delete cascades to child tables", () => {
   });
 });
 
-// Valid mob payload that satisfies mobInputSchema (non-empty required strings)
-const validMobInput = {
-  ...validMobUpdate,
-  description: "A mob.",
-  long_desc: "A mob stands here.",
-  name: "mob",
-  short_desc: "a mob",
-};
-
-// -- Update with change --
-
 describe("update preserves unchanged fields", () => {
   test("changing name preserves level", async () => {
     await authRequest(app, "/api/mobs", cookie, {
@@ -641,26 +559,18 @@ describe("update preserves unchanged fields", () => {
       method: "POST",
     });
 
-    // Set name="guard" and level=50
     await authRequest(app, "/api/mobs/180", cookie, {
-      body: JSON.stringify({
-        ...validMobInput,
-        level: 50,
-        name: "guard",
-        vnum: 180,
-      }),
+      body: JSON.stringify(
+        validMobPayload({ level: 50, name: "guard", vnum: 180 }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
 
-    // Change name to "merchant", keep level=50
     const putRes = await authRequest(app, "/api/mobs/180", cookie, {
-      body: JSON.stringify({
-        ...validMobInput,
-        level: 50,
-        name: "merchant",
-        vnum: 180,
-      }),
+      body: JSON.stringify(
+        validMobPayload({ level: 50, name: "merchant", vnum: 180 }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -674,8 +584,6 @@ describe("update preserves unchanged fields", () => {
   });
 });
 
-// -- Idempotency --
-
 describe("save idempotency", () => {
   test("saving the same payload twice produces identical data", async () => {
     await authRequest(app, "/api/mobs", cookie, {
@@ -684,17 +592,15 @@ describe("save idempotency", () => {
       method: "POST",
     });
 
-    const payload = {
-      ...validMobInput,
+    const payload = validMobPayload({
       extras: [
         { description: "A scarred face.", keyword: "bamfin", vnum: 181 },
       ],
       immunities: [{ amt: 75, type: 3, vnum: 181 }],
       name: "scarred warrior",
       vnum: 181,
-    };
+    });
 
-    // First save
     await authRequest(app, "/api/mobs/181", cookie, {
       body: JSON.stringify(payload),
       headers: { "Content-Type": "application/json" },
@@ -705,7 +611,6 @@ describe("save idempotency", () => {
     const snapshotA: unknown = await getA.json();
     const parsedA = mobSchema.parse(snapshotA);
 
-    // Second save (identical payload)
     await authRequest(app, "/api/mobs/181", cookie, {
       body: JSON.stringify(payload),
       headers: { "Content-Type": "application/json" },
@@ -716,12 +621,12 @@ describe("save idempotency", () => {
     const snapshotB: unknown = await getB.json();
     const parsedB = mobSchema.parse(snapshotB);
 
-    // Full deep equality - no duplicate child rows, no changed values
+    // Full deep equality catches re-save bugs that point assertions miss:
+    // duplicated child rows from append-not-replace, drifted scalar fields
+    // from accidental reformatting, etc.
     expect(parsedB).toEqual(parsedA);
   });
 });
-
-// -- Schema validation --
 
 describe("response schema validation", () => {
   test("GET mob response conforms to mobSchema", async () => {
@@ -746,19 +651,20 @@ describe("response schema validation", () => {
     });
 
     await authRequest(app, "/api/mobs/183", cookie, {
-      body: JSON.stringify({
-        ...validMobUpdate,
-        ac: 50,
-        extras: [
-          { description: "A glowing aura.", keyword: "bamfin", vnum: 183 },
-        ],
-        immunities: [{ amt: 80, type: 2, vnum: 183 }],
-        level: 30,
-        name: "populated mob",
-        race: 5,
-        str: 20,
-        vnum: 183,
-      }),
+      body: JSON.stringify(
+        validMobPayload({
+          ac: 50,
+          extras: [
+            { description: "A glowing aura.", keyword: "bamfin", vnum: 183 },
+          ],
+          immunities: [{ amt: 80, type: 2, vnum: 183 }],
+          level: 30,
+          name: "populated mob",
+          race: 5,
+          str: 20,
+          vnum: 183,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -773,8 +679,6 @@ describe("response schema validation", () => {
     expect(parsed.str).toBe(20);
   });
 });
-
-// -- Full-field roundtrip --
 
 describe("full-field roundtrip", () => {
   test("every field survives a PUT/GET cycle", async () => {
@@ -898,8 +802,6 @@ describe("full-field roundtrip", () => {
   });
 });
 
-// -- Creation defaults --
-
 describe("mob creation defaults", () => {
   test("newly created mob has expected default values", async () => {
     await authRequest(app, "/api/mobs", cookie, {
@@ -920,8 +822,6 @@ describe("mob creation defaults", () => {
     expect(parsed.immunities).toEqual([]);
   });
 });
-
-// -- Empty state --
 
 describe("empty state for builder with no mobs", () => {
   let lowCookie: string;
@@ -952,8 +852,6 @@ describe("empty state for builder with no mobs", () => {
   });
 });
 
-// -- Owner scoping --
-
 describe("owner scoping", () => {
   let expandedCookie: string;
   let otherCookie: string;
@@ -967,26 +865,24 @@ describe("owner scoping", () => {
     const vnumA = 190;
     const vnumB = 191;
 
-    // testUser creates mob at vnumA
     await authRequest(app, "/api/mobs", cookie, {
       body: JSON.stringify({ vnum: vnumA }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
     await authRequest(app, `/api/mobs/${vnumA}`, cookie, {
-      body: JSON.stringify({ ...validMobUpdate, vnum: vnumA }),
+      body: JSON.stringify(validMobPayload({ vnum: vnumA })),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
 
-    // otherUser creates mob at vnumB
     await authRequest(app, "/api/mobs", otherCookie, {
       body: JSON.stringify({ vnum: vnumB }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
     await authRequest(app, `/api/mobs/${vnumB}`, otherCookie, {
-      body: JSON.stringify({ ...validMobUpdate, vnum: vnumB }),
+      body: JSON.stringify(validMobPayload({ vnum: vnumB })),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -1013,11 +909,7 @@ describe("owner scoping", () => {
       method: "POST",
     });
     await authRequest(app, `/api/mobs/${vnum}`, cookie, {
-      body: JSON.stringify({
-        ...validMobUpdate,
-        name: "test user mob",
-        vnum,
-      }),
+      body: JSON.stringify(validMobPayload({ name: "test user mob", vnum })),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -1033,24 +925,22 @@ describe("owner scoping", () => {
   });
 
   test("senior cross-owner PUT persists changes", async () => {
-    // Mob 192 already created by previous test
+    // Mob 192 created by the previous "senior cross-owner GET" test —
+    // tests in this describe block share the entity and run in order.
     const putRes = await authRequest(
       app,
       `/api/mobs/192?owner=${testUser.playerId}`,
       expandedCookie,
       {
-        body: JSON.stringify({
-          ...validMobUpdate,
-          name: "senior edited mob",
-          vnum: 192,
-        }),
+        body: JSON.stringify(
+          validMobPayload({ name: "senior edited mob", vnum: 192 }),
+        ),
         headers: { "Content-Type": "application/json" },
         method: "PUT",
       },
     );
     expect(putRes.status).toBe(200);
 
-    // Verify the change was saved
     const verifyRes = await authRequest(
       app,
       `/api/mobs/192?owner=${testUser.playerId}`,
@@ -1078,11 +968,7 @@ describe("owner scoping", () => {
       `/api/mobs/${vnum}?owner=${testUser.playerId}`,
       expandedCookie,
       {
-        body: JSON.stringify({
-          ...validMobUpdate,
-          name: "senior renamed",
-          vnum,
-        }),
+        body: JSON.stringify(validMobPayload({ name: "senior renamed", vnum })),
         headers: { "Content-Type": "application/json" },
         method: "PUT",
       },
@@ -1130,7 +1016,7 @@ describe("owner scoping", () => {
       `/api/mobs/190?owner=${testUser.playerId}`,
       otherCookie,
       {
-        body: JSON.stringify({ ...validMobUpdate, vnum: 190 }),
+        body: JSON.stringify(validMobPayload({ vnum: 190 })),
         headers: { "Content-Type": "application/json" },
         method: "PUT",
       },

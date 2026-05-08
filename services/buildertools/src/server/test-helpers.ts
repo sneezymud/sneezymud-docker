@@ -1,8 +1,13 @@
 import type { Hono } from "hono";
 
+import { expect } from "bun:test";
+import { sql } from "drizzle-orm";
+
 import type { SessionUser } from "@/shared/schemas/auth.ts";
 
 import { POWER } from "@/shared/powers.ts";
+
+import { immortalDb } from "./db.ts";
 
 // All powers a fully-privileged builder would have
 const ALL_BUILDER_POWERS = [
@@ -226,6 +231,59 @@ export async function authRequest(
   return app.request(path, { ...options, headers });
 }
 
+const JSON_HEADERS = { "Content-Type": "application/json" };
+
+/** POST a JSON body via authRequest. */
+export function postJson(
+  app: Hono,
+  path: string,
+  cookie: string,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  return authRequest(app, path, cookie, {
+    body: JSON.stringify(body),
+    headers: JSON_HEADERS,
+    method: "POST",
+  });
+}
+
+/** PUT a JSON body via authRequest. */
+export function putJson(
+  app: Hono,
+  path: string,
+  cookie: string,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  return authRequest(app, path, cookie, {
+    body: JSON.stringify(body),
+    headers: JSON_HEADERS,
+    method: "PUT",
+  });
+}
+
+/** DELETE via authRequest with no body. */
+export function delJson(
+  app: Hono,
+  path: string,
+  cookie: string,
+): Promise<Response> {
+  return authRequest(app, path, cookie, { method: "DELETE" });
+}
+
+/** DELETE via authRequest with a `{ vnums }` body for bulk endpoints. */
+export function bulkDelJson(
+  app: Hono,
+  path: string,
+  cookie: string,
+  vnums: number[],
+): Promise<Response> {
+  return authRequest(app, path, cookie, {
+    body: JSON.stringify({ vnums }),
+    headers: JSON_HEADERS,
+    method: "DELETE",
+  });
+}
+
 /**
  * Extract the session cookie from a login response, throwing if absent.
  */
@@ -235,6 +293,35 @@ export function extractCookie(res: Response): string {
     throw new Error("Expected Set-Cookie header");
   }
   return cookie;
+}
+
+/** Create an entity in immortal via API and update it with full data. */
+export async function createAndUpdate({
+  app,
+  cookie,
+  entityType,
+  updatePayload,
+  vnum,
+}: {
+  app: Hono;
+  cookie: string;
+  entityType: "mobs" | "objects" | "rooms";
+  updatePayload: Record<string, unknown>;
+  vnum: number;
+}) {
+  const createRes = await authRequest(app, `/api/${entityType}`, cookie, {
+    body: JSON.stringify({ vnum }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+  });
+  expect(createRes.status).toBe(201);
+
+  const putRes = await authRequest(app, `/api/${entityType}/${vnum}`, cookie, {
+    body: JSON.stringify({ ...updatePayload, vnum }),
+    headers: { "Content-Type": "application/json" },
+    method: "PUT",
+  });
+  expect(putRes.status).toBe(200);
 }
 
 /**
@@ -318,6 +405,31 @@ export function validMobPayload(
     wis: 0,
     ...overrides,
   };
+}
+
+/**
+ * Delete all rows for the given vnums across every entity table (rooms,
+ * mobs, objects, mob-responses) and their child tables. FK-safe order.
+ * Pass `immortalDb` to clean the builder workspace; pass `sneezyDb` to
+ * clean the production database.
+ */
+export async function cleanupTestVnums({
+  db,
+  vnums,
+}: {
+  db: typeof immortalDb;
+  vnums: readonly number[];
+}) {
+  await db.execute(sql`DELETE FROM roomextra WHERE vnum IN ${vnums}`);
+  await db.execute(sql`DELETE FROM roomexit WHERE vnum IN ${vnums}`);
+  await db.execute(sql`DELETE FROM room WHERE vnum IN ${vnums}`);
+  await db.execute(sql`DELETE FROM mob_extra WHERE vnum IN ${vnums}`);
+  await db.execute(sql`DELETE FROM mob_imm WHERE vnum IN ${vnums}`);
+  await db.execute(sql`DELETE FROM mobresponses WHERE vnum IN ${vnums}`);
+  await db.execute(sql`DELETE FROM mob WHERE vnum IN ${vnums}`);
+  await db.execute(sql`DELETE FROM objaffect WHERE vnum IN ${vnums}`);
+  await db.execute(sql`DELETE FROM objextra WHERE vnum IN ${vnums}`);
+  return db.execute(sql`DELETE FROM obj WHERE vnum IN ${vnums}`);
 }
 
 export function validObjPayload(

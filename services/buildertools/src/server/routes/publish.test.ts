@@ -20,11 +20,16 @@ import {
 } from "../schema/sneezy.ts";
 import {
   authRequest,
+  cleanupTestVnums,
+  createAndUpdate,
   expandedUser,
   getAuthCookie,
   lowOnlyUser,
   otherUser,
   testUser,
+  validMobPayload,
+  validObjPayload,
+  validRoomPayload,
 } from "../test-helpers.ts";
 
 // testUser: blocks 100-199, all builder powers, NOT senior (no POWER_LOW)
@@ -98,199 +103,29 @@ const VNUMS = {
 
 afterAll(async () => {
   // Extra vnums used outside the VNUMS object: 516/517 (TEST-8), 90050 (TEST-2), 150 (TEST-OWNER-2)
-  const allVnums = [...Object.values(VNUMS), 150, 516, 517, 90_050];
-
-  // Clean up immortal_test
-  await immortalDb.execute(
-    sql`DELETE FROM roomextra WHERE vnum IN ${allVnums}`,
-  );
-  await immortalDb.execute(sql`DELETE FROM roomexit WHERE vnum IN ${allVnums}`);
-  await immortalDb.execute(sql`DELETE FROM room WHERE vnum IN ${allVnums}`);
-  await immortalDb.execute(
-    sql`DELETE FROM mob_extra WHERE vnum IN ${allVnums}`,
-  );
-  await immortalDb.execute(sql`DELETE FROM mob_imm WHERE vnum IN ${allVnums}`);
-  await immortalDb.execute(
-    sql`DELETE FROM mobresponses WHERE vnum IN ${allVnums}`,
-  );
-  await immortalDb.execute(sql`DELETE FROM mob WHERE vnum IN ${allVnums}`);
-  await immortalDb.execute(
-    sql`DELETE FROM objaffect WHERE vnum IN ${allVnums}`,
-  );
-  await immortalDb.execute(sql`DELETE FROM objextra WHERE vnum IN ${allVnums}`);
-  await immortalDb.execute(sql`DELETE FROM obj WHERE vnum IN ${allVnums}`);
-
-  // Clean up sneezy_test - publish writes here
-  await sneezyDb.execute(sql`DELETE FROM roomexit WHERE vnum IN ${allVnums}`);
-  await sneezyDb.execute(sql`DELETE FROM roomextra WHERE vnum IN ${allVnums}`);
-  await sneezyDb.execute(sql`DELETE FROM room WHERE vnum IN ${allVnums}`);
-  await sneezyDb.execute(sql`DELETE FROM mob_extra WHERE vnum IN ${allVnums}`);
-  await sneezyDb.execute(sql`DELETE FROM mob_imm WHERE vnum IN ${allVnums}`);
-  await sneezyDb.execute(
-    sql`DELETE FROM mobresponses WHERE vnum IN ${allVnums}`,
-  );
-  await sneezyDb.execute(sql`DELETE FROM mob WHERE vnum IN ${allVnums}`);
-  await sneezyDb.execute(sql`DELETE FROM objaffect WHERE vnum IN ${allVnums}`);
-  await sneezyDb.execute(sql`DELETE FROM objextra WHERE vnum IN ${allVnums}`);
-  await sneezyDb.execute(sql`DELETE FROM obj WHERE vnum IN ${allVnums}`);
+  const vnums = [...Object.values(VNUMS), 150, 516, 517, 90_050];
+  await cleanupTestVnums({ db: immortalDb, vnums });
+  return cleanupTestVnums({ db: sneezyDb, vnums });
 });
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const validRoomUpdate = {
-  capacity: 0,
-  description: "A published room.",
-  exits: [],
-  extras: [],
-  height: -1,
-  name: "Test Publish Room",
-  river_dir: 0,
-  river_speed: 0,
-  room_flag: 0,
-  sector: 0,
-  spec: 0,
-  telelook: 0,
-  teletarg: 0,
-  teletime: 0,
-  x: 0,
-  y: 0,
-  z: 0,
-  zone: 1,
-};
-
-const validMobUpdate = {
-  ac: 10,
-  actions: 0,
-  adjacent_sound: "",
-  affects: 0,
-  agi: 0,
-  attacks: 1,
-  bra: 0,
-  can_be_seen: 0,
-  cha: 0,
-  class: 0,
-  con: 0,
-  damage_level: 0,
-  damage_precision: 0,
-  def_position: 9,
-  description: "A published mob.",
-  dex: 0,
-  extras: [],
-  fact_perc: 0,
-  faction: 0,
-  foc: 0,
-  gold: 0,
-  height: 0,
-  hpbonus: 0,
-  immunities: [],
-  intel: 0,
-  kar: 0,
-  level: 1,
-  local_sound: "",
-  long_desc: "A published mob stands here.",
-  max_exist: 0,
-  name: "published mob",
-  per: 0,
-  race: 0,
-  sex: 0,
-  short_desc: "a published mob",
-  skin: 0,
-  spe: 0,
-  spec_proc: 0,
-  str: 0,
-  tohit: 0,
-  vision: 0,
-  weight: 0,
-  wis: 0,
-};
-
-const validObjUpdate = {
-  action_desc: "",
-  action_flag: 0,
-  affects: [],
-  can_be_seen: 0,
-  cur_struct: 0,
-  decay: 0,
-  extras: [],
-  long_desc: "",
-  material: 0,
-  max_exist: 0,
-  max_struct: 0,
-  name: "published object",
-  price: 0,
-  short_desc: "a published object",
-  spec_proc: 0,
-  type: 0,
-  val0: 0,
-  val1: 0,
-  val2: 0,
-  val3: 0,
-  volume: 0,
-  wear_flag: 0,
-  weight: 0,
-};
-
-/** Create an entity in immortal via API and update it with full data. */
-async function createAndUpdate(
-  entityType: "mobs" | "objects" | "rooms",
-  vnum: number,
-  cookie: string,
-  updatePayload: Record<string, unknown>,
-) {
-  const createRes = await authRequest(app, `/api/${entityType}`, cookie, {
-    body: JSON.stringify({ vnum }),
-    headers: { "Content-Type": "application/json" },
-    method: "POST",
-  });
-  expect(createRes.status).toBe(201);
-
-  const putRes = await authRequest(app, `/api/${entityType}/${vnum}`, cookie, {
-    body: JSON.stringify({ ...updatePayload, vnum }),
-    headers: { "Content-Type": "application/json" },
-    method: "PUT",
-  });
-  expect(putRes.status).toBe(200);
-}
-
-// ===========================================================================
-// Step 1: Permission model end-to-end
-// ===========================================================================
-
 describe("publish permission model", () => {
-  // -- POWER_LOW required for publish and dashboard --
-
   describe("standard builder (testUser) lacks POWER_LOW", () => {
-    test("POST /api/publish/rooms/:vnum returns 403", async () => {
-      const res = await authRequest(
-        app,
-        `/api/publish/rooms/${VNUMS.PUB_ROOM}`,
-        testCookie,
-        { method: "POST" },
-      );
-      expect(res.status).toBe(403);
-    });
-
-    test("POST /api/publish/mobs/:vnum returns 403", async () => {
-      const res = await authRequest(
-        app,
-        `/api/publish/mobs/${VNUMS.PUB_MOB}`,
-        testCookie,
-        { method: "POST" },
-      );
-      expect(res.status).toBe(403);
-    });
-
-    test("POST /api/publish/objects/:vnum returns 403", async () => {
-      const res = await authRequest(
-        app,
-        `/api/publish/objects/${VNUMS.PUB_OBJ}`,
-        testCookie,
-        { method: "POST" },
-      );
-      expect(res.status).toBe(403);
-    });
+    const singleEntityCases = [
+      { entityType: "rooms", vnum: VNUMS.PUB_ROOM },
+      { entityType: "mobs", vnum: VNUMS.PUB_MOB },
+      { entityType: "objects", vnum: VNUMS.PUB_OBJ },
+    ] as const;
+    for (const { entityType, vnum } of singleEntityCases) {
+      test(`POST /api/publish/${entityType}/:vnum returns 403`, async () => {
+        const res = await authRequest(
+          app,
+          `/api/publish/${entityType}/${vnum}`,
+          testCookie,
+          { method: "POST" },
+        );
+        expect(res.status).toBe(403);
+      });
+    }
 
     test("POST /api/publish/bulk returns 403", async () => {
       const res = await authRequest(app, "/api/publish/bulk", testCookie, {
@@ -311,41 +146,22 @@ describe("publish permission model", () => {
     });
   });
 
-  // -- Diff endpoints are accessible to any authenticated builder --
-
   describe("standard builder can access diff endpoints", () => {
-    test("GET /api/publish/diff/rooms/:vnum returns 200", async () => {
-      const res = await authRequest(
-        app,
-        "/api/publish/diff/rooms/100",
-        testCookie,
-      );
-      expect(res.status).toBe(200);
-      const body: unknown = await res.json();
-      expect(body).toHaveProperty("immortal");
-      expect(body).toHaveProperty("production");
-    });
-
-    test("GET /api/publish/diff/mobs/:vnum returns 200", async () => {
-      const res = await authRequest(
-        app,
-        "/api/publish/diff/mobs/100",
-        testCookie,
-      );
-      expect(res.status).toBe(200);
-    });
-
-    test("GET /api/publish/diff/objects/:vnum returns 200", async () => {
-      const res = await authRequest(
-        app,
-        "/api/publish/diff/objects/100",
-        testCookie,
-      );
-      expect(res.status).toBe(200);
-    });
+    const entityTypes = ["rooms", "mobs", "objects"] as const;
+    for (const entityType of entityTypes) {
+      test(`GET /api/publish/diff/${entityType}/:vnum returns 200`, async () => {
+        const res = await authRequest(
+          app,
+          `/api/publish/diff/${entityType}/100`,
+          testCookie,
+        );
+        expect(res.status).toBe(200);
+        const body: unknown = await res.json();
+        expect(body).toHaveProperty("immortal");
+        expect(body).toHaveProperty("production");
+      });
+    }
   });
-
-  // -- Diff respects vnum access for standard builders --
 
   describe("diff respects vnum access", () => {
     test("standard builder blocked from vnums outside blocks", async () => {
@@ -366,8 +182,6 @@ describe("publish permission model", () => {
       expect(res.status).toBe(200);
     });
   });
-
-  // -- No-blocks user --
 
   describe("no-blocks user", () => {
     test("diff returns 403 (no vnums accessible)", async () => {
@@ -430,53 +244,79 @@ describe("publish auth enforcement", () => {
   });
 });
 
-// ===========================================================================
-// Step 2: Diff endpoints
-// ===========================================================================
-
 describe("diff endpoints", () => {
   beforeAll(async () => {
-    // Create entities in immortal via lowOnlyUser (has POWER_LOW, blocks 300-399)
-    await createAndUpdate("rooms", VNUMS.DIFF_ROOM, lowOnlyCookie, {
-      ...validRoomUpdate,
-      name: "Diff Test Room",
-    });
-    await createAndUpdate("mobs", VNUMS.DIFF_MOB, lowOnlyCookie, {
-      ...validMobUpdate,
-      name: "diff mob",
-      short_desc: "a diff mob",
-    });
-    await createAndUpdate("objects", VNUMS.DIFF_OBJ, lowOnlyCookie, {
-      ...validObjUpdate,
-      name: "diff object",
-      short_desc: "a diff object",
-    });
-  });
-
-  test("returns immortal data and null production for new entity", async () => {
-    const res = await authRequest(
+    await createAndUpdate({
       app,
-      `/api/publish/diff/rooms/${VNUMS.DIFF_ROOM}`,
-      lowOnlyCookie,
-    );
-    expect(res.status).toBe(200);
-    const body: unknown = await res.json();
-
-    expect(body).toHaveProperty("immortal");
-    expect(body).toHaveProperty("production", null);
-    expect(body).toHaveProperty(
-      "immortal",
-      expect.objectContaining({ name: "Diff Test Room" }),
-    );
-    // Parse the immortal sub-object through roomSchema for structural conformance
-    expect(body).toHaveProperty("immortal");
-    const diffBody = z.object({ immortal: z.unknown() }).parse(body);
-    expect(diffBody.immortal).not.toBeNull();
-    roomSchema.parse(diffBody.immortal);
+      cookie: lowOnlyCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({ name: "Diff Test Room" }),
+      vnum: VNUMS.DIFF_ROOM,
+    });
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "mobs",
+      updatePayload: validMobPayload({
+        name: "diff mob",
+        short_desc: "a diff mob",
+      }),
+      vnum: VNUMS.DIFF_MOB,
+    });
+    return createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "objects",
+      updatePayload: validObjPayload({
+        name: "diff object",
+        short_desc: "a diff object",
+      }),
+      vnum: VNUMS.DIFF_OBJ,
+    });
   });
+
+  const newEntityCases = [
+    {
+      entityType: "rooms",
+      expectedName: "Diff Test Room",
+      schema: roomSchema,
+      vnum: VNUMS.DIFF_ROOM,
+    },
+    {
+      entityType: "mobs",
+      expectedName: "diff mob",
+      schema: mobSchema,
+      vnum: VNUMS.DIFF_MOB,
+    },
+    {
+      entityType: "objects",
+      expectedName: "diff object",
+      schema: objSchema,
+      vnum: VNUMS.DIFF_OBJ,
+    },
+  ] as const;
+  for (const { entityType, expectedName, schema, vnum } of newEntityCases) {
+    test(`${entityType}: diff returns immortal data and null production for new entity`, async () => {
+      const res = await authRequest(
+        app,
+        `/api/publish/diff/${entityType}/${vnum}`,
+        lowOnlyCookie,
+      );
+      expect(res.status).toBe(200);
+      const body: unknown = await res.json();
+
+      expect(body).toHaveProperty(
+        "immortal",
+        expect.objectContaining({ name: expectedName }),
+      );
+      expect(body).toHaveProperty("production", null);
+      const diffBody = z.object({ immortal: z.unknown() }).parse(body);
+      expect(diffBody.immortal).not.toBeNull();
+      schema.parse(diffBody.immortal);
+    });
+  }
 
   test("returns both versions after publishing", async () => {
-    // Publish the room first
     const pubRes = await authRequest(
       app,
       `/api/publish/rooms/${VNUMS.DIFF_ROOM}`,
@@ -516,108 +356,78 @@ describe("diff endpoints", () => {
     expect(body).toHaveProperty("immortal", null);
     expect(body).toHaveProperty("production", null);
   });
-
-  test("mob diff returns correct data", async () => {
-    const res = await authRequest(
-      app,
-      `/api/publish/diff/mobs/${VNUMS.DIFF_MOB}`,
-      lowOnlyCookie,
-    );
-    expect(res.status).toBe(200);
-    const body: unknown = await res.json();
-
-    expect(body).toHaveProperty(
-      "immortal",
-      expect.objectContaining({ name: "diff mob" }),
-    );
-    expect(body).toHaveProperty("production", null);
-    expect(body).toHaveProperty("immortal");
-    const mobDiff = z.object({ immortal: z.unknown() }).parse(body);
-    expect(mobDiff.immortal).not.toBeNull();
-    mobSchema.parse(mobDiff.immortal);
-  });
-
-  test("object diff returns correct data", async () => {
-    const res = await authRequest(
-      app,
-      `/api/publish/diff/objects/${VNUMS.DIFF_OBJ}`,
-      lowOnlyCookie,
-    );
-    expect(res.status).toBe(200);
-    const body: unknown = await res.json();
-
-    expect(body).toHaveProperty(
-      "immortal",
-      expect.objectContaining({ name: "diff object" }),
-    );
-    expect(body).toHaveProperty("production", null);
-    expect(body).toHaveProperty("immortal");
-    const objDiff = z.object({ immortal: z.unknown() }).parse(body);
-    expect(objDiff.immortal).not.toBeNull();
-    objSchema.parse(objDiff.immortal);
-  });
 });
-
-// ===========================================================================
-// Step 3: Publish endpoints
-// ===========================================================================
 
 describe("single entity publish", () => {
   beforeAll(async () => {
-    // Create entities in immortal via lowOnlyUser
-    await createAndUpdate("rooms", VNUMS.PUB_ROOM, lowOnlyCookie, {
-      ...validRoomUpdate,
-      exits: [
-        {
-          block: 1,
-          condition_flag: 0,
-          description: "A passage north.",
-          destination: VNUMS.PUB_ROOM,
-          direction: 0,
-          key_num: -1,
-          lock_difficulty: 0,
-          name: "north",
-          type: 1,
-          vnum: VNUMS.PUB_ROOM,
-          weight: 0,
-        },
-      ],
-      extras: [
-        {
-          description: "You see carvings on the wall.",
-          name: "wall carving",
-          vnum: VNUMS.PUB_ROOM,
-        },
-      ],
-      name: "Published Room",
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({
+        exits: [
+          {
+            block: 1,
+            condition_flag: 0,
+            description: "A passage north.",
+            destination: VNUMS.PUB_ROOM,
+            direction: 0,
+            key_num: -1,
+            lock_difficulty: 0,
+            name: "north",
+            type: 1,
+            vnum: VNUMS.PUB_ROOM,
+            weight: 0,
+          },
+        ],
+        extras: [
+          {
+            description: "You see carvings on the wall.",
+            name: "wall carving",
+            vnum: VNUMS.PUB_ROOM,
+          },
+        ],
+        name: "Published Room",
+      }),
+      vnum: VNUMS.PUB_ROOM,
     });
 
-    await createAndUpdate("mobs", VNUMS.PUB_MOB, lowOnlyCookie, {
-      ...validMobUpdate,
-      extras: [
-        {
-          description: "The guard is battle-scarred.",
-          keyword: "bamfin",
-          vnum: VNUMS.PUB_MOB,
-        },
-      ],
-      immunities: [{ amt: 100, type: 1, vnum: VNUMS.PUB_MOB }],
-      name: "published guard",
-      short_desc: "a published guard",
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "mobs",
+      updatePayload: validMobPayload({
+        extras: [
+          {
+            description: "The guard is battle-scarred.",
+            keyword: "bamfin",
+            vnum: VNUMS.PUB_MOB,
+          },
+        ],
+        immunities: [{ amt: 100, type: 1, vnum: VNUMS.PUB_MOB }],
+        name: "published guard",
+        short_desc: "a published guard",
+      }),
+      vnum: VNUMS.PUB_MOB,
     });
 
-    await createAndUpdate("objects", VNUMS.PUB_OBJ, lowOnlyCookie, {
-      ...validObjUpdate,
-      affects: [{ mod1: 5, mod2: 0, type: 18, vnum: VNUMS.PUB_OBJ }],
-      extras: [
-        {
-          description: "Runes glow faintly.",
-          name: "runes glow",
-          vnum: VNUMS.PUB_OBJ,
-        },
-      ],
-      name: "published sword",
-      short_desc: "a published sword",
+    return createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "objects",
+      updatePayload: validObjPayload({
+        affects: [{ mod1: 5, mod2: 0, type: 18, vnum: VNUMS.PUB_OBJ }],
+        extras: [
+          {
+            description: "Runes glow faintly.",
+            name: "runes glow",
+            vnum: VNUMS.PUB_OBJ,
+          },
+        ],
+        name: "published sword",
+        short_desc: "a published sword",
+      }),
+      vnum: VNUMS.PUB_OBJ,
     });
   });
 
@@ -630,7 +440,6 @@ describe("single entity publish", () => {
     );
     expect(res.status).toBe(200);
 
-    // Verify via diff - both sides should now have data
     const diffRes = await authRequest(
       app,
       `/api/publish/diff/rooms/${VNUMS.PUB_ROOM}`,
@@ -730,7 +539,6 @@ describe("single entity publish", () => {
   });
 
   test("republish is idempotent", async () => {
-    // Publish room again - should overwrite cleanly
     const res = await authRequest(
       app,
       `/api/publish/rooms/${VNUMS.PUB_ROOM}`,
@@ -750,7 +558,6 @@ describe("single entity publish", () => {
       "production",
       expect.objectContaining({ name: "Published Room" }),
     );
-    // Verify child rows were not duplicated - exactly one exit and one extra
     expect(diff).toHaveProperty("production.exits", [
       expect.objectContaining({ destination: VNUMS.PUB_ROOM, direction: 0 }),
     ]);
@@ -761,13 +568,15 @@ describe("single entity publish", () => {
 });
 
 describe("senior bypass on publish", () => {
-  beforeAll(async () => {
-    // Create a room in expandedUser's blocks
-    await createAndUpdate("rooms", VNUMS.EXPANDED_ROOM, expandedCookie, {
-      ...validRoomUpdate,
-      name: "Expanded Publish Room",
-    });
-  });
+  beforeAll(() =>
+    createAndUpdate({
+      app,
+      cookie: expandedCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({ name: "Expanded Publish Room" }),
+      vnum: VNUMS.EXPANDED_ROOM,
+    }),
+  );
 
   test("expanded user can publish", async () => {
     const res = await authRequest(
@@ -791,10 +600,12 @@ describe("senior bypass on publish", () => {
   });
 
   test("expanded user can create and publish outside own blocks", async () => {
-    // expandedUser is senior - can access any vnum including outside blocks 200-299
-    await createAndUpdate("rooms", VNUMS.VNUM_ACCESS_ROOM, expandedCookie, {
-      ...validRoomUpdate,
-      name: "Out-of-Block Room",
+    await createAndUpdate({
+      app,
+      cookie: expandedCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({ name: "Out-of-Block Room" }),
+      vnum: VNUMS.VNUM_ACCESS_ROOM,
     });
 
     const res = await authRequest(
@@ -820,19 +631,32 @@ describe("senior bypass on publish", () => {
 
 describe("bulk publish", () => {
   beforeAll(async () => {
-    await createAndUpdate("rooms", VNUMS.PUB_BULK_ROOM, lowOnlyCookie, {
-      ...validRoomUpdate,
-      name: "Bulk Room",
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({ name: "Bulk Room" }),
+      vnum: VNUMS.PUB_BULK_ROOM,
     });
-    await createAndUpdate("mobs", VNUMS.PUB_BULK_MOB, lowOnlyCookie, {
-      ...validMobUpdate,
-      name: "bulk mob",
-      short_desc: "a bulk mob",
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "mobs",
+      updatePayload: validMobPayload({
+        name: "bulk mob",
+        short_desc: "a bulk mob",
+      }),
+      vnum: VNUMS.PUB_BULK_MOB,
     });
-    await createAndUpdate("objects", VNUMS.PUB_BULK_OBJ, lowOnlyCookie, {
-      ...validObjUpdate,
-      name: "bulk object",
-      short_desc: "a bulk object",
+    return createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "objects",
+      updatePayload: validObjPayload({
+        name: "bulk object",
+        short_desc: "a bulk object",
+      }),
+      vnum: VNUMS.PUB_BULK_OBJ,
     });
   });
 
@@ -864,7 +688,6 @@ describe("bulk publish", () => {
     const body: unknown = await res.json();
     expect(body).toEqual({ ok: true });
 
-    // Verify all three were published via diff endpoints
     const roomDiffRes = await authRequest(
       app,
       `/api/publish/diff/rooms/${VNUMS.PUB_BULK_ROOM}`,
@@ -922,10 +745,12 @@ describe("bulk publish", () => {
   });
 
   test("rolls back the entire batch when one entity is missing in immortal", async () => {
-    // Create a fresh room that has not yet been published to sneezy
-    await createAndUpdate("rooms", VNUMS.BULK_ROLLBACK_ROOM, lowOnlyCookie, {
-      ...validRoomUpdate,
-      name: "Rollback Test Room",
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({ name: "Rollback Test Room" }),
+      vnum: VNUMS.BULK_ROLLBACK_ROOM,
     });
 
     // Bulk publish: include the new room AND a missing vnum that triggers
@@ -951,7 +776,6 @@ describe("bulk publish", () => {
     });
     expect(res.status).toBe(404);
 
-    // Verify rollback: the new room should NOT exist in sneezy
     const diffRes = await authRequest(
       app,
       `/api/publish/diff/rooms/${VNUMS.BULK_ROLLBACK_ROOM}`,
@@ -964,10 +788,12 @@ describe("bulk publish", () => {
 
 describe("publish edge cases", () => {
   test("publishes entity with empty child collections without leaving orphans", async () => {
-    // Create a room with no exits and no extras
-    await createAndUpdate("rooms", VNUMS.EMPTY_CHILDREN_ROOM, lowOnlyCookie, {
-      ...validRoomUpdate,
-      name: "Empty Children Room",
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({ name: "Empty Children Room" }),
+      vnum: VNUMS.EMPTY_CHILDREN_ROOM,
     });
 
     const pubRes = await authRequest(
@@ -978,7 +804,6 @@ describe("publish edge cases", () => {
     );
     expect(pubRes.status).toBe(200);
 
-    // Verify the parent landed and the child arrays are empty
     const diffRes = await authRequest(
       app,
       `/api/publish/diff/rooms/${VNUMS.EMPTY_CHILDREN_ROOM}`,
@@ -1000,10 +825,15 @@ describe("mob response publish", () => {
   beforeAll(async () => {
     // Create a mob in immortal and publish it to sneezy so the FK from
     // sneezy.mobresponses -> sneezy.mob is satisfied when the response is published.
-    await createAndUpdate("mobs", VNUMS.RESPONSE_MOB, lowOnlyCookie, {
-      ...validMobUpdate,
-      name: "response mob",
-      short_desc: "a response mob",
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "mobs",
+      updatePayload: validMobPayload({
+        name: "response mob",
+        short_desc: "a response mob",
+      }),
+      vnum: VNUMS.RESPONSE_MOB,
     });
     const pubMobRes = await authRequest(
       app,
@@ -1049,7 +879,6 @@ describe("mob response publish", () => {
     );
     expect(res.status).toBe(200);
 
-    // Verify both sides via the diff endpoint
     const diffRes = await authRequest(
       app,
       `/api/publish/diff/mob-responses/${VNUMS.RESPONSE_MOB}`,
@@ -1089,7 +918,13 @@ describe("mob response publish", () => {
     // This exercises the single-entity route's MobResponseMissingParentError
     // branch (paralleling the bulk route path covered by TEST-OWNER-10).
     const vnum = VNUMS.SINGLE_ORPHAN_MR;
-    await createAndUpdate("mobs", vnum, lowOnlyCookie, { ...validMobUpdate });
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "mobs",
+      updatePayload: validMobPayload(),
+      vnum,
+    });
     const putRes = await authRequest(
       app,
       `/api/mob-responses/${vnum}`,
@@ -1115,10 +950,6 @@ describe("mob response publish", () => {
   });
 });
 
-// ===========================================================================
-// Dashboard
-// ===========================================================================
-
 describe("dashboard", () => {
   test("lowOnlyUser sees unpublished entities as new", async () => {
     // DIFF_MOB and DIFF_OBJ were created in the diff tests but never published
@@ -1142,7 +973,6 @@ describe("dashboard", () => {
       ]),
     );
 
-    // Verify dashboard entries include resolved owner and name fields
     if (!Array.isArray(body)) throw new Error("expected array");
     for (const entry of body) {
       expect(entry).toHaveProperty("owner");
@@ -1199,7 +1029,6 @@ describe("dashboard", () => {
 
     if (!Array.isArray(body)) throw new Error("expected array");
 
-    // All entities should have a resolved owner name string
     for (const entity of body) {
       expect(entity).toHaveProperty("owner", expect.any(String));
     }
@@ -1211,9 +1040,12 @@ describe("dashboard", () => {
     // affect went undetected and the builder got no signal to publish.
     const ROOM = VNUMS.CHILD_MOD_ROOM;
 
-    await createAndUpdate("rooms", ROOM, lowOnlyCookie, {
-      ...validRoomUpdate,
-      name: "Child-Mod Test Room",
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({ name: "Child-Mod Test Room" }),
+      vnum: ROOM,
     });
 
     const pubRes = await authRequest(
@@ -1283,9 +1115,14 @@ describe("dashboard", () => {
     // resolveListOwner specific-number branch, which is distinct from the
     // owner=all branch (scope: "all") and the own-draft branch (scope: caller).
     const vnum = VNUMS.DASHBOARD_OWNER_ROOM;
-    await createAndUpdate("rooms", vnum, testCookie, {
-      ...validRoomUpdate,
-      name: "testUser owner-filter draft",
+    await createAndUpdate({
+      app,
+      cookie: testCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({
+        name: "testUser owner-filter draft",
+      }),
+      vnum,
     });
 
     const res = await authRequest(
@@ -1297,7 +1134,6 @@ describe("dashboard", () => {
     const body: unknown = await res.json();
     expect(Array.isArray(body)).toBe(true);
 
-    // The target builder's draft is present.
     expect(body).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -1365,16 +1201,15 @@ describe("dashboard", () => {
   });
 });
 
-// ===========================================================================
-// Cross-owner publish (?owner= on single-entity endpoints)
-// ===========================================================================
-
 describe("cross-owner publish", () => {
   test("TEST-1a: expandedUser publishes lowOnlyUser's room via ?owner=", async () => {
     const vnum = VNUMS.CROSS_OWNER_PUBLISH_ROOM;
-    await createAndUpdate("rooms", vnum, lowOnlyCookie, {
-      ...validRoomUpdate,
-      name: "content A",
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({ name: "content A" }),
+      vnum,
     });
     const res = await authRequest(
       app,
@@ -1408,13 +1243,19 @@ describe("cross-owner publish", () => {
 
   test("TEST-1b: cross-owner publish targets other builder when senior also has draft", async () => {
     const vnum = VNUMS.CROSS_OWNER_CALLER_DRAFT;
-    await createAndUpdate("rooms", vnum, testCookie, {
-      ...validRoomUpdate,
-      name: "testUser content",
+    await createAndUpdate({
+      app,
+      cookie: testCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({ name: "testUser content" }),
+      vnum,
     });
-    await createAndUpdate("rooms", vnum, expandedCookie, {
-      ...validRoomUpdate,
-      name: "expanded content",
+    await createAndUpdate({
+      app,
+      cookie: expandedCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({ name: "expanded content" }),
+      vnum,
     });
     const pubRes = await authRequest(
       app,
@@ -1433,10 +1274,15 @@ describe("cross-owner publish", () => {
 
   test("TEST-1d: absent ?owner= uses caller's own draft", async () => {
     const vnum = VNUMS.CROSS_OWNER_PUBLISH_MOB;
-    await createAndUpdate("mobs", vnum, lowOnlyCookie, {
-      ...validMobUpdate,
-      name: "my mob",
-      short_desc: "a mob",
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "mobs",
+      updatePayload: validMobPayload({
+        name: "my mob",
+        short_desc: "a mob",
+      }),
+      vnum,
     });
     const res = await authRequest(
       app,
@@ -1449,9 +1295,12 @@ describe("cross-owner publish", () => {
 
   test("TEST-1e: noLimitsOnlyUser publishes another builder's draft", async () => {
     const vnum = VNUMS.NO_LIMITS_PUBLISH;
-    await createAndUpdate("rooms", vnum, testCookie, {
-      ...validRoomUpdate,
-      name: "for no-limits",
+    await createAndUpdate({
+      app,
+      cookie: testCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({ name: "for no-limits" }),
+      vnum,
     });
     const noLimitsCookie = await getAuthCookie(app, "nolimitsonly");
     const pubRes = await authRequest(
@@ -1464,26 +1313,25 @@ describe("cross-owner publish", () => {
   });
 });
 
-// ===========================================================================
-// Cross-owner bulk publish
-// ===========================================================================
-
 describe("cross-owner bulk publish", () => {
   test("TEST-OWNER-7: bulk publish - senior publishes mixed-owner entities", async () => {
     const vnumA = VNUMS.BULK_XO_A;
     const vnumB = VNUMS.BULK_XO_B;
-    // lowOnlyUser creates draft A in their block range (300-399 + 500-599)
-    await createAndUpdate("rooms", vnumA, lowOnlyCookie, {
-      ...validRoomUpdate,
-      name: "draft A",
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({ name: "draft A" }),
+      vnum: vnumA,
     });
-    // expandedUser creates draft B in their block range (200-299)
-    await createAndUpdate("rooms", vnumB, expandedCookie, {
-      ...validRoomUpdate,
-      name: "draft B",
+    await createAndUpdate({
+      app,
+      cookie: expandedCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({ name: "draft B" }),
+      vnum: vnumB,
     });
 
-    // expandedUser publishes both via bulk
     const res = await authRequest(app, "/api/publish/bulk", expandedCookie, {
       body: JSON.stringify({
         entities: [
@@ -1520,9 +1368,12 @@ describe("cross-owner bulk publish", () => {
   test("TEST-OWNER-9: bulk publish reorders mob-response after mob", async () => {
     // User submits mob-response BEFORE mob. Server must reorder.
     const vnum = VNUMS.BULK_REORDER_MOB;
-    await createAndUpdate("mobs", vnum, lowOnlyCookie, {
-      ...validMobUpdate,
-      name: "reorder target",
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "mobs",
+      updatePayload: validMobPayload({ name: "reorder target" }),
+      vnum,
     });
     const putRes = await authRequest(
       app,
@@ -1560,7 +1411,13 @@ describe("cross-owner bulk publish", () => {
     const vnum = VNUMS.BULK_ORPHAN_MR;
     // Create a mob and mob-response in immortal, but do NOT publish the mob
     // to sneezy. The mob-response will reference a vnum with no sneezy parent.
-    await createAndUpdate("mobs", vnum, lowOnlyCookie, { ...validMobUpdate });
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "mobs",
+      updatePayload: validMobPayload(),
+      vnum,
+    });
     const putRes = await authRequest(
       app,
       `/api/mob-responses/${vnum}`,
@@ -1595,31 +1452,31 @@ describe("cross-owner bulk publish", () => {
   });
 });
 
-// ===========================================================================
-// Constraint error handling
-// ===========================================================================
-
 describe("constraint error handling", () => {
   test("TEST-B-M5: publishing a room with exit to missing destination returns 422", async () => {
     const vnum = VNUMS.CONSTRAINT_ERROR_ROOM;
-    // Create + update a room with an exit pointing to a nonexistent destination
-    await createAndUpdate("rooms", vnum, lowOnlyCookie, {
-      ...validRoomUpdate,
-      exits: [
-        {
-          block: null,
-          condition_flag: 0,
-          description: "",
-          destination: 49_999, // does not exist in sneezy
-          direction: 0,
-          key_num: -1,
-          lock_difficulty: 0,
-          name: "north",
-          type: 1,
-          vnum,
-          weight: 0,
-        },
-      ],
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({
+        exits: [
+          {
+            block: null,
+            condition_flag: 0,
+            description: "",
+            destination: 49_999, // does not exist in sneezy
+            direction: 0,
+            key_num: -1,
+            lock_difficulty: 0,
+            name: "north",
+            type: 1,
+            vnum,
+            weight: 0,
+          },
+        ],
+      }),
+      vnum,
     });
     const res = await authRequest(
       app,
@@ -1632,10 +1489,6 @@ describe("constraint error handling", () => {
     expect(body).toHaveProperty("error");
   });
 });
-
-// ===========================================================================
-// TEST-6a/6b: 404 for missing mob and object publishes
-// ===========================================================================
 
 describe("publish 404 for missing entities", () => {
   test("TEST-6a: POST /api/publish/mobs/:vnum returns 404 for nonexistent vnum", async () => {
@@ -1656,10 +1509,6 @@ describe("publish 404 for missing entities", () => {
   });
 });
 
-// ===========================================================================
-// TEST-7: 403 for mob-response publish without POWER_LOW
-// ===========================================================================
-
 test("TEST-7: POST /api/publish/mob-responses/:vnum returns 403 without POWER_LOW", async () => {
   const res = await authRequest(
     app,
@@ -1670,14 +1519,16 @@ test("TEST-7: POST /api/publish/mob-responses/:vnum returns 403 without POWER_LO
   expect(res.status).toBe(403);
 });
 
-// ===========================================================================
-// TEST-8: empty children publish for mobs and objects
-// ===========================================================================
-
 describe("publish with empty children", () => {
   test("TEST-8: mob with empty immunities/extras publishes cleanly", async () => {
     const vnum = VNUMS.EMPTY_CHILDREN_ROOM + 100; // 516, in lowOnlyUser's 500-599
-    await createAndUpdate("mobs", vnum, lowOnlyCookie, { ...validMobUpdate });
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "mobs",
+      updatePayload: validMobPayload(),
+      vnum,
+    });
 
     const res = await authRequest(
       app,
@@ -1695,8 +1546,12 @@ describe("publish with empty children", () => {
 
   test("TEST-8: object with empty affects/extras publishes cleanly", async () => {
     const vnum = VNUMS.EMPTY_CHILDREN_ROOM + 101; // 517, in lowOnlyUser's 500-599
-    await createAndUpdate("objects", vnum, lowOnlyCookie, {
-      ...validObjUpdate,
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "objects",
+      updatePayload: validObjPayload(),
+      vnum,
     });
 
     const res = await authRequest(
@@ -1714,10 +1569,6 @@ describe("publish with empty children", () => {
   });
 });
 
-// ===========================================================================
-// TEST-200-LIMIT: bulk publish with 201 entities returns 400
-// ===========================================================================
-
 test("TEST-200-LIMIT: bulk publish with 201 entities returns 400", async () => {
   const entities = Array.from({ length: 201 }, (_, i) => ({
     ownerPlayerId: lowOnlyUser.playerId,
@@ -1732,100 +1583,69 @@ test("TEST-200-LIMIT: bulk publish with 201 entities returns 400", async () => {
   expect(res.status).toBe(400);
 });
 
-// ===========================================================================
-// TEST-SCOPE-INTEGRITY: read immortal, publish, read after, assert equality
-// ===========================================================================
-
 describe("scope integrity - immortal data unchanged after publish", () => {
-  test("room: immortal data survives publish round-trip", async () => {
-    const vnum = VNUMS.SCOPE_ROOM;
-    await createAndUpdate("rooms", vnum, lowOnlyCookie, {
-      ...validRoomUpdate,
-      name: "Scope Room",
+  const cases = [
+    {
+      entityType: "rooms",
+      payload: validRoomPayload({ name: "Scope Room" }),
+      vnum: VNUMS.SCOPE_ROOM,
+    },
+    {
+      entityType: "mobs",
+      payload: validMobPayload({ name: "scope mob" }),
+      vnum: VNUMS.SCOPE_MOB,
+    },
+    {
+      entityType: "objects",
+      payload: validObjPayload({ name: "scope object" }),
+      vnum: VNUMS.SCOPE_OBJ,
+    },
+  ] as const;
+  for (const { entityType, payload, vnum } of cases) {
+    test(`${entityType}: immortal data survives publish round-trip`, async () => {
+      await createAndUpdate({
+        app,
+        cookie: lowOnlyCookie,
+        entityType,
+        updatePayload: payload,
+        vnum,
+      });
+
+      const beforeRes = await authRequest(
+        app,
+        `/api/${entityType}/${vnum}`,
+        lowOnlyCookie,
+      );
+      const before: unknown = await beforeRes.json();
+
+      await authRequest(
+        app,
+        `/api/publish/${entityType}/${vnum}`,
+        lowOnlyCookie,
+        { method: "POST" },
+      );
+
+      const afterRes = await authRequest(
+        app,
+        `/api/${entityType}/${vnum}`,
+        lowOnlyCookie,
+      );
+      const after: unknown = await afterRes.json();
+
+      expect(after).toEqual(before);
     });
-
-    const beforeRes = await authRequest(
-      app,
-      `/api/rooms/${vnum}`,
-      lowOnlyCookie,
-    );
-    const before: unknown = await beforeRes.json();
-
-    await authRequest(app, `/api/publish/rooms/${vnum}`, lowOnlyCookie, {
-      method: "POST",
-    });
-
-    const afterRes = await authRequest(
-      app,
-      `/api/rooms/${vnum}`,
-      lowOnlyCookie,
-    );
-    const after: unknown = await afterRes.json();
-
-    expect(after).toEqual(before);
-  });
-
-  test("mob: immortal data survives publish round-trip", async () => {
-    const vnum = VNUMS.SCOPE_MOB;
-    await createAndUpdate("mobs", vnum, lowOnlyCookie, {
-      ...validMobUpdate,
-      name: "scope mob",
-    });
-
-    const beforeRes = await authRequest(
-      app,
-      `/api/mobs/${vnum}`,
-      lowOnlyCookie,
-    );
-    const before: unknown = await beforeRes.json();
-
-    await authRequest(app, `/api/publish/mobs/${vnum}`, lowOnlyCookie, {
-      method: "POST",
-    });
-
-    const afterRes = await authRequest(app, `/api/mobs/${vnum}`, lowOnlyCookie);
-    const after: unknown = await afterRes.json();
-
-    expect(after).toEqual(before);
-  });
-
-  test("object: immortal data survives publish round-trip", async () => {
-    const vnum = VNUMS.SCOPE_OBJ;
-    await createAndUpdate("objects", vnum, lowOnlyCookie, {
-      ...validObjUpdate,
-      name: "scope object",
-    });
-
-    const beforeRes = await authRequest(
-      app,
-      `/api/objects/${vnum}`,
-      lowOnlyCookie,
-    );
-    const before: unknown = await beforeRes.json();
-
-    await authRequest(app, `/api/publish/objects/${vnum}`, lowOnlyCookie, {
-      method: "POST",
-    });
-
-    const afterRes = await authRequest(
-      app,
-      `/api/objects/${vnum}`,
-      lowOnlyCookie,
-    );
-    const after: unknown = await afterRes.json();
-
-    expect(after).toEqual(before);
-  });
+  }
 });
-
-// ===========================================================================
-// TEST-MOB-RESPONSE-PRESERVE: publishing mob preserves sneezy mobresponses
-// ===========================================================================
 
 test("TEST-MOB-RESPONSE-PRESERVE: publishing mob preserves existing sneezy mobresponses", async () => {
   const vnum = VNUMS.PRESERVE_MR_MOB;
-  await createAndUpdate("mobs", vnum, lowOnlyCookie, { ...validMobUpdate });
-  // Publish mob first
+  await createAndUpdate({
+    app,
+    cookie: lowOnlyCookie,
+    entityType: "mobs",
+    updatePayload: validMobPayload(),
+    vnum,
+  });
   await authRequest(app, `/api/publish/mobs/${vnum}`, lowOnlyCookie, {
     method: "POST",
   });
@@ -1848,129 +1668,64 @@ test("TEST-MOB-RESPONSE-PRESERVE: publishing mob preserves existing sneezy mobre
   expect(sneezyRow?.response).toBe("sneezy-only text");
 });
 
-// ===========================================================================
-// TEST-PERMISSIVE-EXPANSION: lowOnlyUser creates out-of-block entities
-// ===========================================================================
-
 describe("permissive expansion for senior builders", () => {
-  test("TEST-PERMISSIVE-EXPANSION: lowOnlyUser creates out-of-block rooms", async () => {
-    const vnum = VNUMS.PERMISSIVE_EXP_ROOM;
-    const res = await authRequest(app, "/api/rooms", lowOnlyCookie, {
-      body: JSON.stringify({ vnum }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
+  const cases = [
+    { entityType: "rooms", vnum: VNUMS.PERMISSIVE_EXP_ROOM },
+    { entityType: "mobs", vnum: VNUMS.PERMISSIVE_EXP_MOB },
+    { entityType: "objects", vnum: VNUMS.PERMISSIVE_EXP_OBJ },
+  ] as const;
+  for (const { entityType, vnum } of cases) {
+    test(`TEST-PERMISSIVE-EXPANSION: lowOnlyUser creates out-of-block ${entityType}`, async () => {
+      const res = await authRequest(app, `/api/${entityType}`, lowOnlyCookie, {
+        body: JSON.stringify({ vnum }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      expect(res.status).toBe(201);
     });
-    expect(res.status).toBe(201);
-  });
-
-  test("TEST-PERMISSIVE-EXPANSION: lowOnlyUser creates out-of-block mobs", async () => {
-    const vnum = VNUMS.PERMISSIVE_EXP_MOB;
-    const res = await authRequest(app, "/api/mobs", lowOnlyCookie, {
-      body: JSON.stringify({ vnum }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-    expect(res.status).toBe(201);
-  });
-
-  test("TEST-PERMISSIVE-EXPANSION: lowOnlyUser creates out-of-block objects", async () => {
-    const vnum = VNUMS.PERMISSIVE_EXP_OBJ;
-    const res = await authRequest(app, "/api/objects", lowOnlyCookie, {
-      body: JSON.stringify({ vnum }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-    expect(res.status).toBe(201);
-  });
+  }
 });
-
-// ===========================================================================
-// TEST-PERMISSIVE-DENY: testUser cannot create out-of-block
-// ===========================================================================
 
 describe("permissive deny for non-senior builders", () => {
-  test("TEST-PERMISSIVE-DENY: testUser cannot create out-of-block rooms", async () => {
-    const vnum = VNUMS.PERMISSIVE_DENY_ROOM;
-    const res = await authRequest(app, "/api/rooms", testCookie, {
-      body: JSON.stringify({ vnum }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
+  const cases = [
+    { entityType: "rooms", vnum: VNUMS.PERMISSIVE_DENY_ROOM },
+    { entityType: "mobs", vnum: VNUMS.PERMISSIVE_DENY_MOB },
+    { entityType: "objects", vnum: VNUMS.PERMISSIVE_DENY_OBJ },
+  ] as const;
+  for (const { entityType, vnum } of cases) {
+    test(`TEST-PERMISSIVE-DENY: testUser cannot create out-of-block ${entityType}`, async () => {
+      const res = await authRequest(app, `/api/${entityType}`, testCookie, {
+        body: JSON.stringify({ vnum }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      expect(res.status).toBe(403);
     });
-    expect(res.status).toBe(403);
-  });
-
-  test("TEST-PERMISSIVE-DENY: testUser cannot create out-of-block mobs", async () => {
-    const vnum = VNUMS.PERMISSIVE_DENY_MOB;
-    const res = await authRequest(app, "/api/mobs", testCookie, {
-      body: JSON.stringify({ vnum }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-    expect(res.status).toBe(403);
-  });
-
-  test("TEST-PERMISSIVE-DENY: testUser cannot create out-of-block objects", async () => {
-    const vnum = VNUMS.PERMISSIVE_DENY_OBJ;
-    const res = await authRequest(app, "/api/objects", testCookie, {
-      body: JSON.stringify({ vnum }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-    expect(res.status).toBe(403);
-  });
+  }
 });
-
-// ===========================================================================
-// TEST-OWNER-CREATE-REJECT: POST create rejects ?owner=
-// ===========================================================================
 
 describe("create rejects owner query param", () => {
-  test("TEST-OWNER-CREATE-REJECT: POST /api/rooms rejects ?owner=", async () => {
-    const res = await authRequest(
-      app,
-      `/api/rooms?owner=${testUser.playerId}`,
-      expandedCookie,
-      {
-        body: JSON.stringify({ vnum: 265 }),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-      },
-    );
-    expect(res.status).toBe(400);
-  });
-
-  test("TEST-OWNER-CREATE-REJECT: POST /api/mobs rejects ?owner=", async () => {
-    const res = await authRequest(
-      app,
-      `/api/mobs?owner=${testUser.playerId}`,
-      expandedCookie,
-      {
-        body: JSON.stringify({ vnum: 266 }),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-      },
-    );
-    expect(res.status).toBe(400);
-  });
-
-  test("TEST-OWNER-CREATE-REJECT: POST /api/objects rejects ?owner=", async () => {
-    const res = await authRequest(
-      app,
-      `/api/objects?owner=${testUser.playerId}`,
-      expandedCookie,
-      {
-        body: JSON.stringify({ vnum: 267 }),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-      },
-    );
-    expect(res.status).toBe(400);
-  });
+  const cases = [
+    { entityType: "rooms", vnum: 265 },
+    { entityType: "mobs", vnum: 266 },
+    { entityType: "objects", vnum: 267 },
+  ] as const;
+  for (const { entityType, vnum } of cases) {
+    test(`TEST-OWNER-CREATE-REJECT: POST /api/${entityType} rejects ?owner=`, async () => {
+      const res = await authRequest(
+        app,
+        `/api/${entityType}?owner=${testUser.playerId}`,
+        expandedCookie,
+        {
+          body: JSON.stringify({ vnum }),
+          headers: { "Content-Type": "application/json" },
+          method: "POST",
+        },
+      );
+      expect(res.status).toBe(400);
+    });
+  }
 });
-
-// ===========================================================================
-// TEST-2: viewOnlyUser read-only path
-// ===========================================================================
 
 // viewOnlyUser is senior (POWER.LOW) but lacks REDIT/RSAVE/EDIT.
 // requireWritePower lets seniors bypass the power check on all methods,
@@ -1993,19 +1748,20 @@ describe("viewOnlyUser read-only API path", () => {
   });
 });
 
-// ===========================================================================
-// TEST-DECIMAL: decimal precision round-trip
-// ===========================================================================
-
 test("TEST-DECIMAL: decimal precision round-trip for mob fields", async () => {
   const vnum = VNUMS.DECIMAL_MOB;
-  await createAndUpdate("mobs", vnum, lowOnlyCookie, {
-    ...validMobUpdate,
-    ac: 12.5,
-    attacks: 2.3,
-    damage_level: 7.8,
-    hpbonus: 99.9,
-    name: "decimal mob",
+  await createAndUpdate({
+    app,
+    cookie: lowOnlyCookie,
+    entityType: "mobs",
+    updatePayload: validMobPayload({
+      ac: 12.5,
+      attacks: 2.3,
+      damage_level: 7.8,
+      hpbonus: 99.9,
+      name: "decimal mob",
+    }),
+    vnum,
   });
 
   await authRequest(app, `/api/publish/mobs/${vnum}`, lowOnlyCookie, {
@@ -2020,38 +1776,39 @@ test("TEST-DECIMAL: decimal precision round-trip for mob fields", async () => {
   expect(snzMob?.hpbonus).toBe(99.9);
 });
 
-// ===========================================================================
-// TEST-3: deep round-trip with children
-// ===========================================================================
-
 describe("deep round-trip with children", () => {
   test("room: all fields and children survive publish", async () => {
     const vnum = VNUMS.DEEP_RT_ROOM;
-    await createAndUpdate("rooms", vnum, lowOnlyCookie, {
-      ...validRoomUpdate,
-      exits: [
-        {
-          block: 1,
-          condition_flag: 0,
-          description: "A passage north.",
-          destination: vnum,
-          direction: 0,
-          key_num: -1,
-          lock_difficulty: 0,
-          name: "north",
-          type: 1,
-          vnum,
-          weight: 0,
-        },
-      ],
-      extras: [
-        {
-          description: "Faded runes.",
-          name: "runes",
-          vnum,
-        },
-      ],
-      name: "Deep RT Room",
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({
+        exits: [
+          {
+            block: 1,
+            condition_flag: 0,
+            description: "A passage north.",
+            destination: vnum,
+            direction: 0,
+            key_num: -1,
+            lock_difficulty: 0,
+            name: "north",
+            type: 1,
+            vnum,
+            weight: 0,
+          },
+        ],
+        extras: [
+          {
+            description: "Faded runes.",
+            name: "runes",
+            vnum,
+          },
+        ],
+        name: "Deep RT Room",
+      }),
+      vnum,
     });
 
     await authRequest(app, `/api/publish/rooms/${vnum}`, lowOnlyCookie, {
@@ -2075,18 +1832,23 @@ describe("deep round-trip with children", () => {
 
   test("mob: all fields and children survive publish", async () => {
     const vnum = VNUMS.DEEP_RT_MOB;
-    await createAndUpdate("mobs", vnum, lowOnlyCookie, {
-      ...validMobUpdate,
-      extras: [
-        {
-          description: "Battle-scarred guard.",
-          keyword: "bamfin",
-          vnum,
-        },
-      ],
-      immunities: [{ amt: 50, type: 2, vnum }],
-      name: "deep rt mob",
-      short_desc: "a deep rt mob",
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "mobs",
+      updatePayload: validMobPayload({
+        extras: [
+          {
+            description: "Battle-scarred guard.",
+            keyword: "bamfin",
+            vnum,
+          },
+        ],
+        immunities: [{ amt: 50, type: 2, vnum }],
+        name: "deep rt mob",
+        short_desc: "a deep rt mob",
+      }),
+      vnum,
     });
 
     await authRequest(app, `/api/publish/mobs/${vnum}`, lowOnlyCookie, {
@@ -2109,18 +1871,23 @@ describe("deep round-trip with children", () => {
 
   test("object: all fields and children survive publish", async () => {
     const vnum = VNUMS.DEEP_RT_OBJ;
-    await createAndUpdate("objects", vnum, lowOnlyCookie, {
-      ...validObjUpdate,
-      affects: [{ mod1: 10, mod2: 0, type: 18, vnum }],
-      extras: [
-        {
-          description: "Glowing runes.",
-          name: "runes glow",
-          vnum,
-        },
-      ],
-      name: "deep rt sword",
-      short_desc: "a deep rt sword",
+    await createAndUpdate({
+      app,
+      cookie: lowOnlyCookie,
+      entityType: "objects",
+      updatePayload: validObjPayload({
+        affects: [{ mod1: 10, mod2: 0, type: 18, vnum }],
+        extras: [
+          {
+            description: "Glowing runes.",
+            name: "runes glow",
+            vnum,
+          },
+        ],
+        name: "deep rt sword",
+        short_desc: "a deep rt sword",
+      }),
+      vnum,
     });
 
     await authRequest(app, `/api/publish/objects/${vnum}`, lowOnlyCookie, {
@@ -2142,16 +1909,15 @@ describe("deep round-trip with children", () => {
   });
 });
 
-// ===========================================================================
-// TEST-OWNER-2: dashboard multi-owner same-vnum keyed by (playerId, vnum)
-// ===========================================================================
-
 test("TEST-OWNER-2: dashboard multi-owner same-vnum keyed by (playerId, vnum)", async () => {
   const vnum = 150;
   const otherCookie = await getAuthCookie(app, "otherbuilder");
-  await createAndUpdate("rooms", vnum, testCookie, {
-    ...validRoomUpdate,
-    name: "canonical",
+  await createAndUpdate({
+    app,
+    cookie: testCookie,
+    entityType: "rooms",
+    updatePayload: validRoomPayload({ name: "canonical" }),
+    vnum,
   });
   const pubRes = await authRequest(
     app,
@@ -2160,9 +1926,12 @@ test("TEST-OWNER-2: dashboard multi-owner same-vnum keyed by (playerId, vnum)", 
     { method: "POST" },
   );
   expect(pubRes.status).toBe(200);
-  await createAndUpdate("rooms", vnum, otherCookie, {
-    ...validRoomUpdate,
-    name: "MODIFIED",
+  await createAndUpdate({
+    app,
+    cookie: otherCookie,
+    entityType: "rooms",
+    updatePayload: validRoomPayload({ name: "MODIFIED" }),
+    vnum,
   });
   const res = await authRequest(
     app,
@@ -2194,16 +1963,17 @@ test("TEST-OWNER-2: dashboard multi-owner same-vnum keyed by (playerId, vnum)", 
   );
 });
 
-// ===========================================================================
-// TEST-B-M3: dashboard treats null and empty-string as equal
-// ===========================================================================
-
 test("TEST-B-M3: dashboard treats null and empty-string as equal for nullable text fields", async () => {
   const vnum = VNUMS.NULL_NORMALIZE_MOB;
-  await createAndUpdate("mobs", vnum, lowOnlyCookie, {
-    ...validMobUpdate,
-    adjacent_sound: "",
-    local_sound: "",
+  await createAndUpdate({
+    app,
+    cookie: lowOnlyCookie,
+    entityType: "mobs",
+    updatePayload: validMobPayload({
+      adjacent_sound: "",
+      local_sound: "",
+    }),
+    vnum,
   });
   const pubRes = await authRequest(
     app,
@@ -2221,10 +1991,6 @@ test("TEST-B-M3: dashboard treats null and empty-string as equal for nullable te
     expect.arrayContaining([expect.objectContaining({ type: "mob", vnum })]),
   );
 });
-
-// ===========================================================================
-// TEST-AUTH-401: unauthenticated access per route family
-// ===========================================================================
 
 describe("unauthenticated access returns 401", () => {
   const routeFamilies = [

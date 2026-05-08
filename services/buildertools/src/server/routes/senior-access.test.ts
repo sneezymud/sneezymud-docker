@@ -5,7 +5,11 @@ import { app } from "../app.ts";
 import { immortalDb } from "../db.ts";
 import {
   authRequest,
+  bulkDelJson,
+  delJson,
   getAuthCookie,
+  postJson,
+  putJson,
   testUser,
   validObjPayload,
   validRoomPayload,
@@ -83,50 +87,8 @@ afterAll(async () => {
   await immortalDb.execute(sql`DELETE FROM room WHERE vnum IN ${roomVnums}`);
 });
 
-const JSON_HEADERS = { "Content-Type": "application/json" };
-
-function post(
-  path: string,
-  cookie: string,
-  body: Record<string, unknown>,
-): Promise<Response> {
-  return authRequest(app, path, cookie, {
-    body: JSON.stringify(body),
-    headers: JSON_HEADERS,
-    method: "POST",
-  });
-}
-
-function put(
-  path: string,
-  cookie: string,
-  body: Record<string, unknown>,
-): Promise<Response> {
-  return authRequest(app, path, cookie, {
-    body: JSON.stringify(body),
-    headers: JSON_HEADERS,
-    method: "PUT",
-  });
-}
-
 function get(path: string, cookie: string): Promise<Response> {
   return authRequest(app, path, cookie);
-}
-
-function del(path: string, cookie: string): Promise<Response> {
-  return authRequest(app, path, cookie, { method: "DELETE" });
-}
-
-function bulkDel(
-  path: string,
-  cookie: string,
-  vnums: number[],
-): Promise<Response> {
-  return authRequest(app, path, cookie, {
-    body: JSON.stringify({ vnums }),
-    headers: JSON_HEADERS,
-    method: "DELETE",
-  });
 }
 
 const validMobUpdate = {
@@ -181,12 +143,14 @@ const validMobUpdate = {
 
 describe("senior user mob access", () => {
   test("senior user can create mob in own block", async () => {
-    const res = await post("/api/mobs", expandedCookie, { vnum: OWN_MOB });
+    const res = await postJson(app, "/api/mobs", expandedCookie, {
+      vnum: OWN_MOB,
+    });
     expect(res.status).toBe(201);
   });
 
   test("senior user can create mob at vnum outside own block", async () => {
-    const res = await post("/api/mobs", expandedCookie, {
+    const res = await postJson(app, "/api/mobs", expandedCookie, {
       vnum: OUTSIDE_MOB,
     });
     expect(res.status).toBe(201);
@@ -194,9 +158,9 @@ describe("senior user mob access", () => {
 
   test("senior user can create mob at vnum in another builder's block", async () => {
     // Create a mob as testUser at their block first
-    await post("/api/mobs", testCookie, { vnum: OTHER_BLOCK_MOB });
+    await postJson(app, "/api/mobs", testCookie, { vnum: OTHER_BLOCK_MOB });
     // expandedUser (senior) can also create at that vnum under their own owner
-    const res = await post("/api/mobs", expandedCookie, {
+    const res = await postJson(app, "/api/mobs", expandedCookie, {
       vnum: OTHER_BLOCK_MOB,
     });
     expect(res.status).toBe(201);
@@ -213,7 +177,7 @@ describe("senior user mob access", () => {
   });
 
   test("senior user can PUT mob at vnum outside own block", async () => {
-    const res = await put(`/api/mobs/${OUTSIDE_MOB}`, expandedCookie, {
+    const res = await putJson(app, `/api/mobs/${OUTSIDE_MOB}`, expandedCookie, {
       ...validMobUpdate,
       vnum: OUTSIDE_MOB,
     });
@@ -221,22 +185,31 @@ describe("senior user mob access", () => {
   });
 
   test("senior user can PUT their own mob at vnum in another builder's block", async () => {
-    const res = await put(`/api/mobs/${OTHER_BLOCK_MOB}`, expandedCookie, {
-      ...validMobUpdate,
-      vnum: OTHER_BLOCK_MOB,
-    });
+    const res = await putJson(
+      app,
+      `/api/mobs/${OTHER_BLOCK_MOB}`,
+      expandedCookie,
+      {
+        ...validMobUpdate,
+        vnum: OTHER_BLOCK_MOB,
+      },
+    );
     expect(res.status).toBe(200);
   });
 
   test("senior user can DELETE mob at vnum outside own block", async () => {
-    await post("/api/mobs", expandedCookie, { vnum: OUTSIDE_MOB_2 });
-    const res = await del(`/api/mobs/${OUTSIDE_MOB_2}`, expandedCookie);
+    await postJson(app, "/api/mobs", expandedCookie, { vnum: OUTSIDE_MOB_2 });
+    const res = await delJson(
+      app,
+      `/api/mobs/${OUTSIDE_MOB_2}`,
+      expandedCookie,
+    );
     expect(res.status).toBe(200);
   });
 
   test("senior user can bulk delete at vnums outside own block", async () => {
-    await post("/api/mobs", expandedCookie, { vnum: OUTSIDE_MOB_2 });
-    const res = await bulkDel("/api/mobs/bulk", expandedCookie, [
+    await postJson(app, "/api/mobs", expandedCookie, { vnum: OUTSIDE_MOB_2 });
+    const res = await bulkDelJson(app, "/api/mobs/bulk", expandedCookie, [
       OUTSIDE_MOB_2,
     ]);
     expect(res.status).toBe(200);
@@ -269,19 +242,21 @@ describe("senior user mob access", () => {
 
 describe("senior user object access", () => {
   test("senior user can create object in own block", async () => {
-    const res = await post("/api/objects", expandedCookie, { vnum: OWN_OBJ });
+    const res = await postJson(app, "/api/objects", expandedCookie, {
+      vnum: OWN_OBJ,
+    });
     expect(res.status).toBe(201);
   });
 
   test("senior user can create object at vnum outside own block", async () => {
-    const res = await post("/api/objects", expandedCookie, {
+    const res = await postJson(app, "/api/objects", expandedCookie, {
       vnum: OUTSIDE_OBJ,
     });
     expect(res.status).toBe(201);
   });
 
   test("senior user can create object at vnum in another builder's block", async () => {
-    const res = await post("/api/objects", expandedCookie, {
+    const res = await postJson(app, "/api/objects", expandedCookie, {
       vnum: OTHER_BLOCK_OBJ,
     });
     expect(res.status).toBe(201);
@@ -298,28 +273,46 @@ describe("senior user object access", () => {
   });
 
   test("senior user can PUT object at vnum outside own block", async () => {
-    const res = await put(`/api/objects/${OUTSIDE_OBJ}`, expandedCookie, {
-      ...validObjPayload({ vnum: OUTSIDE_OBJ }),
-    });
+    const res = await putJson(
+      app,
+      `/api/objects/${OUTSIDE_OBJ}`,
+      expandedCookie,
+      {
+        ...validObjPayload({ vnum: OUTSIDE_OBJ }),
+      },
+    );
     expect(res.status).toBe(200);
   });
 
   test("senior user can PUT their own object at vnum in another builder's block", async () => {
-    const res = await put(`/api/objects/${OTHER_BLOCK_OBJ}`, expandedCookie, {
-      ...validObjPayload({ vnum: OTHER_BLOCK_OBJ }),
-    });
+    const res = await putJson(
+      app,
+      `/api/objects/${OTHER_BLOCK_OBJ}`,
+      expandedCookie,
+      {
+        ...validObjPayload({ vnum: OTHER_BLOCK_OBJ }),
+      },
+    );
     expect(res.status).toBe(200);
   });
 
   test("senior user can DELETE object at vnum outside own block", async () => {
-    await post("/api/objects", expandedCookie, { vnum: OUTSIDE_OBJ_DEL });
-    const res = await del(`/api/objects/${OUTSIDE_OBJ_DEL}`, expandedCookie);
+    await postJson(app, "/api/objects", expandedCookie, {
+      vnum: OUTSIDE_OBJ_DEL,
+    });
+    const res = await delJson(
+      app,
+      `/api/objects/${OUTSIDE_OBJ_DEL}`,
+      expandedCookie,
+    );
     expect(res.status).toBe(200);
   });
 
   test("senior user can bulk delete objects at vnums outside own block", async () => {
-    await post("/api/objects", expandedCookie, { vnum: OUTSIDE_OBJ_BULK });
-    const res = await bulkDel("/api/objects/bulk", expandedCookie, [
+    await postJson(app, "/api/objects", expandedCookie, {
+      vnum: OUTSIDE_OBJ_BULK,
+    });
+    const res = await bulkDelJson(app, "/api/objects/bulk", expandedCookie, [
       OUTSIDE_OBJ_BULK,
     ]);
     expect(res.status).toBe(200);
@@ -350,19 +343,21 @@ describe("senior user object access", () => {
 
 describe("senior user room access", () => {
   test("senior user can create room in own block", async () => {
-    const res = await post("/api/rooms", expandedCookie, { vnum: OWN_ROOM });
+    const res = await postJson(app, "/api/rooms", expandedCookie, {
+      vnum: OWN_ROOM,
+    });
     expect(res.status).toBe(201);
   });
 
   test("senior user can create room at vnum outside own block", async () => {
-    const res = await post("/api/rooms", expandedCookie, {
+    const res = await postJson(app, "/api/rooms", expandedCookie, {
       vnum: OUTSIDE_ROOM,
     });
     expect(res.status).toBe(201);
   });
 
   test("senior user can create room at vnum in another builder's block", async () => {
-    const res = await post("/api/rooms", expandedCookie, {
+    const res = await postJson(app, "/api/rooms", expandedCookie, {
       vnum: OTHER_BLOCK_ROOM,
     });
     expect(res.status).toBe(201);
@@ -379,28 +374,46 @@ describe("senior user room access", () => {
   });
 
   test("senior user can PUT room at vnum outside own block", async () => {
-    const res = await put(`/api/rooms/${OUTSIDE_ROOM}`, expandedCookie, {
-      ...validRoomPayload({ vnum: OUTSIDE_ROOM }),
-    });
+    const res = await putJson(
+      app,
+      `/api/rooms/${OUTSIDE_ROOM}`,
+      expandedCookie,
+      {
+        ...validRoomPayload({ vnum: OUTSIDE_ROOM }),
+      },
+    );
     expect(res.status).toBe(200);
   });
 
   test("senior user can PUT their own room at vnum in another builder's block", async () => {
-    const res = await put(`/api/rooms/${OTHER_BLOCK_ROOM}`, expandedCookie, {
-      ...validRoomPayload({ vnum: OTHER_BLOCK_ROOM }),
-    });
+    const res = await putJson(
+      app,
+      `/api/rooms/${OTHER_BLOCK_ROOM}`,
+      expandedCookie,
+      {
+        ...validRoomPayload({ vnum: OTHER_BLOCK_ROOM }),
+      },
+    );
     expect(res.status).toBe(200);
   });
 
   test("senior user can DELETE room at vnum outside own block", async () => {
-    await post("/api/rooms", expandedCookie, { vnum: OUTSIDE_ROOM_DEL });
-    const res = await del(`/api/rooms/${OUTSIDE_ROOM_DEL}`, expandedCookie);
+    await postJson(app, "/api/rooms", expandedCookie, {
+      vnum: OUTSIDE_ROOM_DEL,
+    });
+    const res = await delJson(
+      app,
+      `/api/rooms/${OUTSIDE_ROOM_DEL}`,
+      expandedCookie,
+    );
     expect(res.status).toBe(200);
   });
 
   test("senior user can bulk delete rooms at vnums outside own block", async () => {
-    await post("/api/rooms", expandedCookie, { vnum: OUTSIDE_ROOM_BULK });
-    const res = await bulkDel("/api/rooms/bulk", expandedCookie, [
+    await postJson(app, "/api/rooms", expandedCookie, {
+      vnum: OUTSIDE_ROOM_BULK,
+    });
+    const res = await bulkDelJson(app, "/api/rooms/bulk", expandedCookie, [
       OUTSIDE_ROOM_BULK,
     ]);
     expect(res.status).toBe(200);
@@ -431,12 +444,14 @@ describe("senior user room access", () => {
 
 describe("POWER_LOW user (without POWER_NO_LIMITS)", () => {
   test("LOW-only user can create mob at vnum outside own block", async () => {
-    const res = await post("/api/mobs", lowOnlyCookie, { vnum: LOW_ONLY_MOB });
+    const res = await postJson(app, "/api/mobs", lowOnlyCookie, {
+      vnum: LOW_ONLY_MOB,
+    });
     expect(res.status).toBe(201);
   });
 
   test("LOW-only user can create room at vnum outside own block", async () => {
-    const res = await post("/api/rooms", lowOnlyCookie, {
+    const res = await postJson(app, "/api/rooms", lowOnlyCookie, {
       vnum: LOW_ONLY_ROOM,
     });
     expect(res.status).toBe(201);

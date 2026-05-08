@@ -1,11 +1,11 @@
 // src/server/routes/power-gates-rejection.test.ts
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { sql } from "drizzle-orm";
 
 import { app } from "../app.ts";
 import { immortalDb } from "../db.ts";
 import {
   authRequest,
+  cleanupTestVnums,
   getAuthCookie,
   validMobPayload,
   validObjPayload,
@@ -22,21 +22,12 @@ beforeAll(async () => {
   testCookie = await getAuthCookie(app, "testbuilder");
 });
 
-afterAll(async () => {
-  const vnums = sql`(131, 132, 133, 134)`;
-  await immortalDb.execute(sql`DELETE FROM objaffect WHERE vnum IN ${vnums}`);
-  await immortalDb.execute(sql`DELETE FROM objextra WHERE vnum IN ${vnums}`);
-  await immortalDb.execute(sql`DELETE FROM obj WHERE vnum IN ${vnums}`);
-  await immortalDb.execute(sql`DELETE FROM mob_extra WHERE vnum IN ${vnums}`);
-  await immortalDb.execute(sql`DELETE FROM mob_imm WHERE vnum IN ${vnums}`);
-  await immortalDb.execute(
-    sql`DELETE FROM mobresponses WHERE vnum IN ${vnums}`,
-  );
-  await immortalDb.execute(sql`DELETE FROM mob WHERE vnum IN ${vnums}`);
-  await immortalDb.execute(sql`DELETE FROM roomextra WHERE vnum IN ${vnums}`);
-  await immortalDb.execute(sql`DELETE FROM roomexit WHERE vnum IN ${vnums}`);
-  await immortalDb.execute(sql`DELETE FROM room WHERE vnum IN ${vnums}`);
-});
+afterAll(() =>
+  cleanupTestVnums({
+    db: immortalDb,
+    vnums: [131, 132, 133, 134],
+  }),
+);
 
 // -- Mobs: requirePower(POWER.MEDIT) --
 

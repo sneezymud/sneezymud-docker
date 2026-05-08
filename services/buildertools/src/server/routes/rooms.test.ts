@@ -8,10 +8,12 @@ import { immortalDb, sneezyDb } from "../db.ts";
 import { room } from "../schema/immortal.ts";
 import {
   authRequest,
+  createAndUpdate,
   expandedUser,
   getAuthCookie,
   otherUser,
   testUser,
+  validRoomPayload,
 } from "../test-helpers.ts";
 
 let cookie: string;
@@ -31,33 +33,10 @@ afterAll(async () => {
   await immortalDb.execute(sql`DELETE FROM room WHERE vnum IN ${testVnums}`);
   await sneezyDb.execute(sql`DELETE FROM room WHERE vnum IN (140, 5000, 5001)`);
   // Restore testUser's wizdata in case TEST-OWNER-4b changed it
-  await sneezyDb.execute(
+  return sneezyDb.execute(
     sql`UPDATE wizdata SET blockastart = 100, blockaend = 199 WHERE player_id = ${testUser.playerId}`,
   );
 });
-
-const validRoomUpdate = {
-  capacity: 0,
-  description: "",
-  exits: [],
-  extras: [],
-  height: -1,
-  name: "",
-  river_dir: 0,
-  river_speed: 0,
-  room_flag: 0,
-  sector: 0,
-  spec: 0,
-  telelook: 0,
-  teletarg: 0,
-  teletime: 0,
-  x: 0,
-  y: 0,
-  z: 0,
-  zone: 1,
-};
-
-// -- Auth enforcement --
 
 describe("auth enforcement", () => {
   test("unauthenticated request returns 401", async () => {
@@ -75,8 +54,6 @@ describe("auth enforcement", () => {
   });
 });
 
-// -- Invalid vnum parameters --
-
 describe("invalid vnum parameters", () => {
   test("non-numeric vnum returns 400", async () => {
     const res = await authRequest(app, "/api/rooms/abc", cookie);
@@ -92,8 +69,6 @@ describe("invalid vnum parameters", () => {
     expect(body).toHaveProperty("error", "Invalid vnum");
   });
 });
-
-// -- Create --
 
 describe("room creation", () => {
   test("builder can create a room within their blocks", async () => {
@@ -146,8 +121,6 @@ describe("room creation", () => {
   });
 });
 
-// -- Read --
-
 describe("room listing and fetching", () => {
   test("builder can list their rooms", async () => {
     const res = await authRequest(app, "/api/rooms", cookie);
@@ -183,12 +156,9 @@ describe("room listing and fetching", () => {
   });
 });
 
-// -- Update --
-
 describe("room updates", () => {
   test("builder can update a room and exits survive the roundtrip", async () => {
-    const updated = {
-      capacity: 0,
+    const updated = validRoomPayload({
       description: "A test room with updated description",
       exits: [
         {
@@ -214,20 +184,9 @@ describe("room updates", () => {
       ],
       height: -1,
       name: "Updated Test Room",
-      river_dir: 0,
-      river_speed: 0,
       room_flag: 1 << 17,
       sector: 60,
-      spec: 0,
-      telelook: 0,
-      teletarg: 0,
-      teletime: 0,
-      vnum: 100,
-      x: 0,
-      y: 0,
-      z: 0,
-      zone: 1,
-    };
+    });
 
     const putRes = await authRequest(app, "/api/rooms/100", cookie, {
       body: JSON.stringify(updated),
@@ -257,7 +216,7 @@ describe("room updates", () => {
 
   test("updating a nonexistent room within blocks returns 404", async () => {
     const res = await authRequest(app, "/api/rooms/198", cookie, {
-      body: JSON.stringify({ ...validRoomUpdate, vnum: 198 }),
+      body: JSON.stringify(validRoomPayload({ vnum: 198 })),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -278,27 +237,13 @@ describe("room updates", () => {
   test("update replaces child rows instead of appending", async () => {
     // Room 100 already has 1 exit and 1 extra from roundtrip test
     const putRes = await authRequest(app, "/api/rooms/100", cookie, {
-      body: JSON.stringify({
-        capacity: 0,
-        description: "",
-        exits: [],
-        extras: [],
-        height: -1,
-        name: "Stripped Room",
-        river_dir: 0,
-        river_speed: 0,
-        room_flag: 0,
-        sector: 0,
-        spec: 0,
-        telelook: 0,
-        teletarg: 0,
-        teletime: 0,
-        vnum: 100,
-        x: 0,
-        y: 0,
-        z: 0,
-        zone: 1,
-      }),
+      body: JSON.stringify(
+        validRoomPayload({
+          description: "",
+          height: -1,
+          name: "Stripped Room",
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -311,11 +256,8 @@ describe("room updates", () => {
   });
 });
 
-// -- Delete --
-
 describe("room deletion", () => {
   test("builder can delete a room", async () => {
-    // Create a room to delete
     await authRequest(app, "/api/rooms", cookie, {
       body: JSON.stringify({ vnum: 150 }),
       headers: { "Content-Type": "application/json" },
@@ -328,7 +270,6 @@ describe("room deletion", () => {
 
     expect(res.status).toBe(200);
 
-    // Verify it's gone
     const getRes = await authRequest(app, "/api/rooms/150", cookie);
     expect(getRes.status).toBe(404);
   });
@@ -342,8 +283,6 @@ describe("room deletion", () => {
   });
 });
 
-// -- Search --
-
 describe("room search", () => {
   // Self-contained: create a named room so search doesn't depend on update tests
   beforeAll(async () => {
@@ -353,33 +292,20 @@ describe("room search", () => {
       method: "POST",
     });
     await authRequest(app, "/api/rooms/101", cookie, {
-      body: JSON.stringify({
-        capacity: 0,
-        description: "",
-        exits: [],
-        extras: [],
-        height: -1,
-        name: "Searchable Test Room",
-        river_dir: 0,
-        river_speed: 0,
-        room_flag: 0,
-        sector: 0,
-        spec: 0,
-        telelook: 0,
-        teletarg: 0,
-        teletime: 0,
-        vnum: 101,
-        x: 0,
-        y: 0,
-        z: 0,
-        zone: 1,
-      }),
+      body: JSON.stringify(
+        validRoomPayload({
+          description: "",
+          height: -1,
+          name: "Searchable Test Room",
+          vnum: 101,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
 
     // Insert a sneezy room for cross-database search tests
-    await sneezyDb.execute(sql`
+    return sneezyDb.execute(sql`
       INSERT INTO room (vnum, name, x, y, z, description, zone, room_flag, sector, teletime, teletarg, telelook, river_speed, river_dir, capacity, height, spec)
       VALUES (5000, 'Sneezy Production Room', 0, 0, 0, '', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
     `);
@@ -416,7 +342,6 @@ describe("room search", () => {
 
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
-    // Rooms that don't match the query should be absent
     expect(body).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ vnum: 100 })]),
     );
@@ -425,34 +350,20 @@ describe("room search", () => {
   // Search crosses block boundaries intentionally - exit/key pickers need
   // to find rooms in other builders' blocks and the production database.
   test("SQL metacharacters in query are treated literally", async () => {
-    // Create a room with % in the name
     await authRequest(app, "/api/rooms", cookie, {
       body: JSON.stringify({ vnum: 102 }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
     await authRequest(app, "/api/rooms/102", cookie, {
-      body: JSON.stringify({
-        capacity: 0,
-        description: "",
-        exits: [],
-        extras: [],
-        height: -1,
-        name: "100% Haunted Room",
-        river_dir: 0,
-        river_speed: 0,
-        room_flag: 0,
-        sector: 0,
-        spec: 0,
-        telelook: 0,
-        teletarg: 0,
-        teletime: 0,
-        vnum: 102,
-        x: 0,
-        y: 0,
-        z: 0,
-        zone: 1,
-      }),
+      body: JSON.stringify(
+        validRoomPayload({
+          description: "",
+          height: -1,
+          name: "100% Haunted Room",
+          vnum: 102,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -508,16 +419,14 @@ describe("room search", () => {
   });
 });
 
-// -- Name lookup --
-
 describe("room name lookup", () => {
-  beforeAll(async () => {
+  beforeAll(() =>
     // Insert a sneezy room outside the builder's blocks for cross-block lookup
-    await sneezyDb.execute(sql`
+    sneezyDb.execute(sql`
       INSERT IGNORE INTO room (vnum, name, x, y, z, description, zone, room_flag, sector, teletime, teletarg, telelook, river_speed, river_dir, capacity, height, spec)
       VALUES (5001, 'Cross Block Room', 0, 0, 0, '', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-    `);
-  });
+    `),
+  );
 
   // Name lookup intentionally bypasses block access checks - exits reference
   // rooms in other builders' blocks and need to display their names.
@@ -637,8 +546,6 @@ describe("bulk room deletion", () => {
   });
 });
 
-// -- Schema read/write split --
-
 describe("out-of-range data readable from DB", () => {
   test("GET returns room with values outside input constraints", async () => {
     await authRequest(app, "/api/rooms", cookie, {
@@ -660,27 +567,14 @@ describe("out-of-range data readable from DB", () => {
 
   test("PUT rejects values outside input constraints", async () => {
     const res = await authRequest(app, "/api/rooms/155", cookie, {
-      body: JSON.stringify({
-        capacity: 200,
-        description: "",
-        exits: [],
-        extras: [],
-        height: 0,
-        name: "",
-        river_dir: 0,
-        river_speed: 0,
-        room_flag: 0,
-        sector: 0,
-        spec: 0,
-        telelook: 0,
-        teletarg: 0,
-        teletime: 0,
-        vnum: 155,
-        x: 0,
-        y: 0,
-        z: 0,
-        zone: 1,
-      }),
+      body: JSON.stringify(
+        validRoomPayload({
+          capacity: 200,
+          description: "",
+          name: "",
+          vnum: 155,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -700,7 +594,7 @@ describe("schema boundary round-trips", () => {
     });
     for (const room_flag of [-2_147_483_648, 2_147_483_647]) {
       const putRes = await authRequest(app, `/api/rooms/${vnum}`, cookie, {
-        body: JSON.stringify({ ...validRoomUpdate, room_flag, vnum }),
+        body: JSON.stringify(validRoomPayload({ room_flag, vnum })),
         headers: { "Content-Type": "application/json" },
         method: "PUT",
       });
@@ -713,57 +607,42 @@ describe("schema boundary round-trips", () => {
   });
 });
 
-// -- Delete cascades --
-
 describe("delete cascades to child tables", () => {
   test("re-created room has no orphaned exits or extras", async () => {
-    // Create room and populate child rows
     await authRequest(app, "/api/rooms", cookie, {
       body: JSON.stringify({ vnum: 103 }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
     await authRequest(app, "/api/rooms/103", cookie, {
-      body: JSON.stringify({
-        capacity: 0,
-        description: "",
-        exits: [
-          {
-            block: 0,
-            condition_flag: 0,
-            description: "old exit",
-            destination: 100,
-            direction: 0,
-            key_num: -1,
-            lock_difficulty: 0,
-            name: "",
-            type: 0,
-            vnum: 103,
-            weight: 0,
-          },
-        ],
-        extras: [{ description: "old extra", name: "old", vnum: 103 }],
-        height: -1,
-        name: "Cascade Test Room",
-        river_dir: 0,
-        river_speed: 0,
-        room_flag: 0,
-        sector: 0,
-        spec: 0,
-        telelook: 0,
-        teletarg: 0,
-        teletime: 0,
-        vnum: 103,
-        x: 0,
-        y: 0,
-        z: 0,
-        zone: 1,
-      }),
+      body: JSON.stringify(
+        validRoomPayload({
+          description: "",
+          exits: [
+            {
+              block: 0,
+              condition_flag: 0,
+              description: "old exit",
+              destination: 100,
+              direction: 0,
+              key_num: -1,
+              lock_difficulty: 0,
+              name: "",
+              type: 0,
+              vnum: 103,
+              weight: 0,
+            },
+          ],
+          extras: [{ description: "old extra", name: "old", vnum: 103 }],
+          height: -1,
+          name: "Cascade Test Room",
+          vnum: 103,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
 
-    // Delete and re-create
     await authRequest(app, "/api/rooms/103", cookie, { method: "DELETE" });
     await authRequest(app, "/api/rooms", cookie, {
       body: JSON.stringify({ vnum: 103 }),
@@ -778,8 +657,6 @@ describe("delete cascades to child tables", () => {
     expect(body).toHaveProperty("extras", []);
   });
 });
-
-// -- Update with change --
 
 describe("update preserves unchanged fields", () => {
   test("changing description preserves exits", async () => {
@@ -818,28 +695,28 @@ describe("update preserves unchanged fields", () => {
       },
     ];
 
-    // Save with description="old" and 2 exits
     await authRequest(app, "/api/rooms/104", cookie, {
-      body: JSON.stringify({
-        ...validRoomUpdate,
-        description: "old",
-        exits: twoExits,
-        name: "Test Room",
-        vnum: 104,
-      }),
+      body: JSON.stringify(
+        validRoomPayload({
+          description: "old",
+          exits: twoExits,
+          name: "Test Room",
+          vnum: 104,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
 
-    // Save with description="new" and same exits
     const putRes = await authRequest(app, "/api/rooms/104", cookie, {
-      body: JSON.stringify({
-        ...validRoomUpdate,
-        description: "new",
-        exits: twoExits,
-        name: "Test Room",
-        vnum: 104,
-      }),
+      body: JSON.stringify(
+        validRoomPayload({
+          description: "new",
+          exits: twoExits,
+          name: "Test Room",
+          vnum: 104,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -860,8 +737,6 @@ describe("update preserves unchanged fields", () => {
   });
 });
 
-// -- Idempotency --
-
 describe("save idempotency", () => {
   test("saving the same payload twice produces identical data", async () => {
     await authRequest(app, "/api/rooms", cookie, {
@@ -870,8 +745,7 @@ describe("save idempotency", () => {
       method: "POST",
     });
 
-    const payload = {
-      ...validRoomUpdate,
+    const payload = validRoomPayload({
       exits: [
         {
           block: 0,
@@ -889,9 +763,8 @@ describe("save idempotency", () => {
       ],
       name: "Idempotent Room",
       vnum: 105,
-    };
+    });
 
-    // First save
     await authRequest(app, "/api/rooms/105", cookie, {
       body: JSON.stringify(payload),
       headers: { "Content-Type": "application/json" },
@@ -902,7 +775,6 @@ describe("save idempotency", () => {
     const snapshotA: unknown = await getA.json();
     const parsedA = roomSchema.parse(snapshotA);
 
-    // Second save (identical payload)
     await authRequest(app, "/api/rooms/105", cookie, {
       body: JSON.stringify(payload),
       headers: { "Content-Type": "application/json" },
@@ -917,8 +789,6 @@ describe("save idempotency", () => {
     expect(parsedB).toEqual(parsedA);
   });
 });
-
-// -- Schema validation --
 
 describe("response schema validation", () => {
   test("GET room response conforms to roomSchema", async () => {
@@ -937,29 +807,32 @@ describe("response schema validation", () => {
     });
 
     await authRequest(app, "/api/rooms/130", cookie, {
-      body: JSON.stringify({
-        ...validRoomUpdate,
-        description: "A populated room.",
-        exits: [
-          {
-            block: 0,
-            condition_flag: 0,
-            description: "",
-            destination: 100,
-            direction: 0,
-            key_num: -1,
-            lock_difficulty: 0,
-            name: "",
-            type: 0,
-            vnum: 130,
-            weight: 0,
-          },
-        ],
-        extras: [{ description: "A scratched wall.", name: "wall", vnum: 130 }],
-        name: "Populated Test Room",
-        sector: 3,
-        vnum: 130,
-      }),
+      body: JSON.stringify(
+        validRoomPayload({
+          description: "A populated room.",
+          exits: [
+            {
+              block: 0,
+              condition_flag: 0,
+              description: "",
+              destination: 100,
+              direction: 0,
+              key_num: -1,
+              lock_difficulty: 0,
+              name: "",
+              type: 0,
+              vnum: 130,
+              weight: 0,
+            },
+          ],
+          extras: [
+            { description: "A scratched wall.", name: "wall", vnum: 130 },
+          ],
+          name: "Populated Test Room",
+          sector: 3,
+          vnum: 130,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -973,8 +846,6 @@ describe("response schema validation", () => {
     expect(parsed.sector).toBe(3);
   });
 });
-
-// -- Full-field roundtrip --
 
 describe("full-field roundtrip", () => {
   test("every field survives a PUT/GET cycle", async () => {
@@ -1056,7 +927,6 @@ describe("full-field roundtrip", () => {
     const body: unknown = await getRes.json();
     const parsed = roomSchema.parse(body);
 
-    // Parent fields
     expect(parsed.capacity).toBe(fullPayload.capacity);
     expect(parsed.description).toBe(fullPayload.description);
     expect(parsed.height).toBe(fullPayload.height);
@@ -1075,7 +945,6 @@ describe("full-field roundtrip", () => {
     expect(parsed.z).toBe(fullPayload.z);
     expect(parsed.zone).toBe(fullPayload.zone);
 
-    // Exits
     expect(parsed.exits).toHaveLength(2);
     const northExit = parsed.exits.find((e) => e.direction === 0);
     expect(northExit?.block).toBe(1);
@@ -1098,7 +967,6 @@ describe("full-field roundtrip", () => {
     expect(southExit?.type).toBe(0);
     expect(southExit?.weight).toBe(0);
 
-    // Extras
     expect(parsed.extras).toHaveLength(2);
     const runeExtra = parsed.extras.find((e) => e.name === "runes stone");
     expect(runeExtra?.description).toBe("Ancient runes carved into the stone.");
@@ -1109,8 +977,6 @@ describe("full-field roundtrip", () => {
   });
 });
 
-// -- Coordinate derivation --
-
 describe("room coordinate derivation from exit source", () => {
   // Known coords for the source room in every direction test. Each sub-test
   // first updates the source to reference a single exit pointing at its own
@@ -1120,32 +986,36 @@ describe("room coordinate derivation from exit source", () => {
   const SOURCE_VNUM = 108;
   const SOURCE_COORDS = { x: 10, y: 20, z: 5 };
 
-  async function createWithIncomingExit(
-    destination: number,
-    direction: number,
-  ): Promise<{ x: number; y: number; z: number }> {
+  async function createWithIncomingExit({
+    destination,
+    direction,
+  }: {
+    destination: number;
+    direction: number;
+  }) {
     await authRequest(app, `/api/rooms/${SOURCE_VNUM}`, cookie, {
-      body: JSON.stringify({
-        ...validRoomUpdate,
-        description: "source room",
-        exits: [
-          {
-            block: 1,
-            condition_flag: 0,
-            description: "",
-            destination,
-            direction,
-            key_num: -1,
-            lock_difficulty: 0,
-            name: "",
-            type: 0,
-            vnum: SOURCE_VNUM,
-            weight: 0,
-          },
-        ],
-        vnum: SOURCE_VNUM,
-        ...SOURCE_COORDS,
-      }),
+      body: JSON.stringify(
+        validRoomPayload({
+          description: "source room",
+          exits: [
+            {
+              block: 1,
+              condition_flag: 0,
+              description: "",
+              destination,
+              direction,
+              key_num: -1,
+              lock_difficulty: 0,
+              name: "",
+              type: 0,
+              vnum: SOURCE_VNUM,
+              weight: 0,
+            },
+          ],
+          vnum: SOURCE_VNUM,
+          ...SOURCE_COORDS,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -1159,42 +1029,42 @@ describe("room coordinate derivation from exit source", () => {
     return { x: parsed.x, y: parsed.y, z: parsed.z };
   }
 
-  beforeAll(async () => {
+  beforeAll(() =>
     // Create the shared source room once. It gets re-PUT in each test to flip
     // its single exit to the relevant direction, but the row itself persists.
-    await authRequest(app, "/api/rooms", cookie, {
+    authRequest(app, "/api/rooms", cookie, {
       body: JSON.stringify({ vnum: SOURCE_VNUM }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
-    });
-  });
+    }),
+  );
 
   test("new room derives coordinates from incoming exit", async () => {
-    // Set room 104's coordinates to a known value
     await authRequest(app, "/api/rooms/104", cookie, {
-      body: JSON.stringify({
-        ...validRoomUpdate,
-        description: "source room",
-        exits: [
-          {
-            block: 1,
-            condition_flag: 0,
-            description: "",
-            destination: 106,
-            direction: 0, // North
-            key_num: -1,
-            lock_difficulty: 0,
-            name: "",
-            type: 0,
-            vnum: 104,
-            weight: 0,
-          },
-        ],
-        vnum: 104,
-        x: 10,
-        y: 20,
-        z: 5,
-      }),
+      body: JSON.stringify(
+        validRoomPayload({
+          description: "source room",
+          exits: [
+            {
+              block: 1,
+              condition_flag: 0,
+              description: "",
+              destination: 106,
+              direction: 0, // North
+              key_num: -1,
+              lock_difficulty: 0,
+              name: "",
+              type: 0,
+              vnum: 104,
+              weight: 0,
+            },
+          ],
+          vnum: 104,
+          x: 10,
+          y: 20,
+          z: 5,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -1219,7 +1089,10 @@ describe("room coordinate derivation from exit source", () => {
   });
 
   test("direction 4 (up) adds 1 to z", async () => {
-    const coords = await createWithIncomingExit(109, 4);
+    const coords = await createWithIncomingExit({
+      destination: 109,
+      direction: 4,
+    });
     expect(coords).toEqual({
       x: SOURCE_COORDS.x,
       y: SOURCE_COORDS.y,
@@ -1228,7 +1101,10 @@ describe("room coordinate derivation from exit source", () => {
   });
 
   test("direction 5 (down) subtracts 1 from z", async () => {
-    const coords = await createWithIncomingExit(112, 5);
+    const coords = await createWithIncomingExit({
+      destination: 112,
+      direction: 5,
+    });
     expect(coords).toEqual({
       x: SOURCE_COORDS.x,
       y: SOURCE_COORDS.y,
@@ -1237,7 +1113,10 @@ describe("room coordinate derivation from exit source", () => {
   });
 
   test("direction 6 (NE) adds 1 to x and y", async () => {
-    const coords = await createWithIncomingExit(113, 6);
+    const coords = await createWithIncomingExit({
+      destination: 113,
+      direction: 6,
+    });
     expect(coords).toEqual({
       x: SOURCE_COORDS.x + 1,
       y: SOURCE_COORDS.y + 1,
@@ -1246,7 +1125,10 @@ describe("room coordinate derivation from exit source", () => {
   });
 
   test("direction 7 (NW) subtracts 1 from x, adds 1 to y", async () => {
-    const coords = await createWithIncomingExit(114, 7);
+    const coords = await createWithIncomingExit({
+      destination: 114,
+      direction: 7,
+    });
     expect(coords).toEqual({
       x: SOURCE_COORDS.x - 1,
       y: SOURCE_COORDS.y + 1,
@@ -1255,7 +1137,10 @@ describe("room coordinate derivation from exit source", () => {
   });
 
   test("direction 8 (SE) adds 1 to x, subtracts 1 from y", async () => {
-    const coords = await createWithIncomingExit(115, 8);
+    const coords = await createWithIncomingExit({
+      destination: 115,
+      direction: 8,
+    });
     expect(coords).toEqual({
       x: SOURCE_COORDS.x + 1,
       y: SOURCE_COORDS.y - 1,
@@ -1264,7 +1149,10 @@ describe("room coordinate derivation from exit source", () => {
   });
 
   test("direction 9 (SW) subtracts 1 from x and y", async () => {
-    const coords = await createWithIncomingExit(116, 9);
+    const coords = await createWithIncomingExit({
+      destination: 116,
+      direction: 9,
+    });
     expect(coords).toEqual({
       x: SOURCE_COORDS.x - 1,
       y: SOURCE_COORDS.y - 1,
@@ -1284,14 +1172,15 @@ describe("room coordinate derivation from exit source", () => {
       method: "POST",
     });
     await authRequest(app, "/api/rooms/117", cookie, {
-      body: JSON.stringify({
-        ...validRoomUpdate,
-        exits: [],
-        vnum: 117,
-        x: 10,
-        y: 20,
-        z: 5,
-      }),
+      body: JSON.stringify(
+        validRoomPayload({
+          exits: [],
+          vnum: 117,
+          x: 10,
+          y: 20,
+          z: 5,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -1328,8 +1217,6 @@ describe("room coordinate derivation from exit source", () => {
   });
 });
 
-// -- Search pagination --
-
 describe("room search pagination", () => {
   test("search returns at most 20 results", async () => {
     // Insert 25 rooms in the sneezy database with matching names
@@ -1353,35 +1240,31 @@ describe("room search pagination", () => {
     if (!Array.isArray(body)) throw new Error("expected array");
     expect(body.length).toBeLessThanOrEqual(20);
 
-    // Clean up
     for (let i = 0; i < 25; i++) {
       await sneezyDb.execute(sql`DELETE FROM room WHERE vnum = ${6000 + i}`);
     }
   });
 });
 
-// -- Search deduplication --
-
 describe("search deduplication across databases", () => {
   beforeAll(async () => {
-    // Insert a room in sneezy (production) with a distinctive name
     await sneezyDb.execute(sql`
       INSERT INTO room (vnum, name, x, y, z, description, zone, room_flag, sector, teletime, teletarg, telelook, river_speed, river_dir, capacity, height, spec)
       VALUES (140, 'Sneezy Dedup Room', 0, 0, 0, '', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
     `);
 
-    // Create the same vnum in immortal with a different name
     await authRequest(app, "/api/rooms", cookie, {
       body: JSON.stringify({ vnum: 140 }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
-    await authRequest(app, "/api/rooms/140", cookie, {
-      body: JSON.stringify({
-        ...validRoomUpdate,
-        name: "Immortal Dedup Room",
-        vnum: 140,
-      }),
+    return authRequest(app, "/api/rooms/140", cookie, {
+      body: JSON.stringify(
+        validRoomPayload({
+          name: "Immortal Dedup Room",
+          vnum: 140,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -1403,8 +1286,6 @@ describe("search deduplication across databases", () => {
     expect(matches[0]).toHaveProperty("name", "Immortal Dedup Room");
   });
 });
-
-// -- Room creation defaults --
 
 describe("room creation defaults", () => {
   test("newly created room has expected default values", async () => {
@@ -1429,8 +1310,6 @@ describe("room creation defaults", () => {
   });
 });
 
-// -- Block B room creation --
-
 describe("Block B room creation", () => {
   let lowOnlyCookie: string;
 
@@ -1445,7 +1324,7 @@ describe("Block B room creation", () => {
     await immortalDb.execute(
       sql`DELETE FROM roomextra WHERE vnum IN (500, 700)`,
     );
-    await immortalDb.execute(sql`DELETE FROM room WHERE vnum IN (500, 700)`);
+    return immortalDb.execute(sql`DELETE FROM room WHERE vnum IN (500, 700)`);
   });
 
   test("builder can create room in Block B range", async () => {
@@ -1473,29 +1352,6 @@ describe("Block B room creation", () => {
   });
 });
 
-// -- Owner scoping --
-
-/** Create an entity in immortal via API and update it with full data. */
-async function createAndUpdate(
-  vnum: number,
-  authCookie: string,
-  updatePayload: Record<string, unknown>,
-) {
-  const createRes = await authRequest(app, "/api/rooms", authCookie, {
-    body: JSON.stringify({ vnum }),
-    headers: { "Content-Type": "application/json" },
-    method: "POST",
-  });
-  expect(createRes.status).toBe(201);
-
-  const putRes = await authRequest(app, `/api/rooms/${vnum}`, authCookie, {
-    body: JSON.stringify({ ...updatePayload, vnum }),
-    headers: { "Content-Type": "application/json" },
-    method: "PUT",
-  });
-  expect(putRes.status).toBe(200);
-}
-
 describe("owner scoping", () => {
   let expandedCookie: string;
   let otherCookie: string;
@@ -1508,8 +1364,20 @@ describe("owner scoping", () => {
   test("TEST-OWNER-1: GET /api/rooms?owner=mine excludes other owners' entities", async () => {
     const vnumA = 110;
     const vnumB = 111;
-    await createAndUpdate(vnumA, cookie, { ...validRoomUpdate });
-    await createAndUpdate(vnumB, otherCookie, { ...validRoomUpdate });
+    await createAndUpdate({
+      app,
+      cookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload(),
+      vnum: vnumA,
+    });
+    await createAndUpdate({
+      app,
+      cookie: otherCookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload(),
+      vnum: vnumB,
+    });
 
     const res = await authRequest(app, "/api/rooms?owner=mine", cookie);
     expect(res.status).toBe(200);
@@ -1527,9 +1395,12 @@ describe("owner scoping", () => {
 
   test("TEST-OWNER-3: cross-owner GET returns target's draft, not senior's", async () => {
     const vnum = 180;
-    await createAndUpdate(vnum, cookie, {
-      ...validRoomUpdate,
-      name: "test user content",
+    await createAndUpdate({
+      app,
+      cookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({ name: "test user content" }),
+      vnum,
     });
     // expandedUser has no draft at this vnum
     const res = await authRequest(
@@ -1570,7 +1441,6 @@ describe("owner scoping", () => {
     );
     expect(putRes.status).toBe(200);
 
-    // Verify via GET that the change was actually saved
     const verifyRes = await authRequest(
       app,
       `/api/rooms/180?owner=${testUser.playerId}`,
@@ -1596,11 +1466,9 @@ describe("owner scoping", () => {
       `/api/rooms/${vnum}?owner=${testUser.playerId}`,
       expandedCookie,
       {
-        body: JSON.stringify({
-          ...validRoomUpdate,
-          name: "senior renamed room",
-          vnum,
-        }),
+        body: JSON.stringify(
+          validRoomPayload({ name: "senior renamed room", vnum }),
+        ),
         headers: { "Content-Type": "application/json" },
         method: "PUT",
       },
@@ -1615,7 +1483,13 @@ describe("owner scoping", () => {
 
   test("TEST-OWNER-5: cross-owner DELETE removes target's row", async () => {
     const vnum = 181;
-    await createAndUpdate(vnum, cookie, { ...validRoomUpdate });
+    await createAndUpdate({
+      app,
+      cookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload(),
+      vnum,
+    });
     const res = await authRequest(
       app,
       `/api/rooms/${vnum}?owner=${testUser.playerId}`,
@@ -1629,9 +1503,12 @@ describe("owner scoping", () => {
 
   test("TEST-OWNER-4b: block preservation under blocks-mismatch", async () => {
     const vnum = 162;
-    await createAndUpdate(vnum, cookie, {
-      ...validRoomUpdate,
-      name: "original",
+    await createAndUpdate({
+      app,
+      cookie,
+      entityType: "rooms",
+      updatePayload: validRoomPayload({ name: "original" }),
+      vnum,
     });
 
     // Simulate a wizdata shift: move testUser's blockA out from under the vnum
@@ -1639,7 +1516,6 @@ describe("owner scoping", () => {
       sql`UPDATE wizdata SET blockastart = 1000, blockaend = 1099 WHERE player_id = ${testUser.playerId}`,
     );
 
-    // Senior PUTs, changing only the name
     const getRes = await authRequest(
       app,
       `/api/rooms/${vnum}?owner=${testUser.playerId}`,
@@ -1666,7 +1542,6 @@ describe("owner scoping", () => {
     );
     expect(putRes.status).toBe(200);
 
-    // Verify the stored block is still 1
     const [row] = await immortalDb
       .select({ block: room.block, name: room.name })
       .from(room)
@@ -1695,7 +1570,7 @@ describe("owner scoping", () => {
       `/api/rooms/100?owner=${testUser.playerId}`,
       otherCookie,
       {
-        body: JSON.stringify({ ...validRoomUpdate, vnum: 100 }),
+        body: JSON.stringify(validRoomPayload({ vnum: 100 })),
         headers: { "Content-Type": "application/json" },
         method: "PUT",
       },
@@ -1714,8 +1589,6 @@ describe("owner scoping", () => {
   });
 });
 
-// -- Exit field roundtrip --
-
 describe("exit field roundtrip", () => {
   test("all exit fields survive save and reload", async () => {
     const vnum = 183;
@@ -1727,26 +1600,27 @@ describe("exit field roundtrip", () => {
     });
 
     const putRes = await authRequest(app, `/api/rooms/${vnum}`, cookie, {
-      body: JSON.stringify({
-        ...validRoomUpdate,
-        exits: [
-          {
-            // block on exits is ignored by the server - exits inherit the parent room's block
-            block: 1,
-            condition_flag: 42,
-            description: "A heavy iron door.",
-            destination: 181,
-            direction: 0,
-            key_num: 500,
-            lock_difficulty: 75,
-            name: "iron door",
-            type: 1,
-            vnum,
-            weight: 30,
-          },
-        ],
-        vnum,
-      }),
+      body: JSON.stringify(
+        validRoomPayload({
+          exits: [
+            {
+              // block on exits is ignored by the server - exits inherit the parent room's block
+              block: 1,
+              condition_flag: 42,
+              description: "A heavy iron door.",
+              destination: 181,
+              direction: 0,
+              key_num: 500,
+              lock_difficulty: 75,
+              name: "iron door",
+              type: 1,
+              vnum,
+              weight: 30,
+            },
+          ],
+          vnum,
+        }),
+      ),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
@@ -1772,8 +1646,6 @@ describe("exit field roundtrip", () => {
     expect(exit?.weight).toBe(30);
   });
 });
-
-// -- Empty state --
 
 describe("empty state for builder with no rooms", () => {
   let lowCookie: string;
