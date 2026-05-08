@@ -60,12 +60,12 @@ export function applyObjFieldChange(
       const packed =
         specField.source.highBit !== undefined &&
         specField.source.numBits !== undefined
-          ? setBits(
-              currentRawVal,
-              specField.source.highBit,
-              specField.source.numBits,
-              numValue,
-            )
+          ? setBits({
+              highBit: specField.source.highBit,
+              newValue: numValue,
+              numBits: specField.source.numBits,
+              value: currentRawVal,
+            })
           : numValue;
       return diffEdits({ ...prevEdits, [valKey]: packed }, obj);
     }
@@ -88,12 +88,12 @@ export function applyObjFieldChange(
           raw[field.source.val] =
             field.source.highBit !== undefined &&
             field.source.numBits !== undefined
-              ? setBits(
-                  raw[field.source.val],
-                  field.source.highBit,
-                  field.source.numBits,
-                  min,
-                )
+              ? setBits({
+                  highBit: field.source.highBit,
+                  newValue: min,
+                  numBits: field.source.numBits,
+                  value: raw[field.source.val],
+                })
               : min;
         }
       }

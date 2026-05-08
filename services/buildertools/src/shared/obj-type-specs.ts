@@ -12,14 +12,16 @@ import { FACTION_TYPES } from "./enums/faction-types.ts";
 import { POSITION_TYPES } from "./enums/position-types.ts";
 import { RACE_TYPES } from "./enums/race-types.ts";
 
-// ---- Bit-packing utilities ----
 // C++ uses GET_BITS(value, highBit, numBits) / SET_BITS(value, highBit, numBits, newValue).
 // highBit is the topmost bit of the field; numBits is the field width.
 // Example: GET_BITS(val, 7, 8) extracts bits 0-7 (the low byte).
 
 export interface ObjValueField {
   help?: string;
-  input: FieldInput;
+  input:
+    | { entries: EnumEntry[]; type: "enum" }
+    | { max?: number; min?: number; step?: number; type: "number" }
+    | { type: "room" };
   key: string;
   label: string;
   source: {
@@ -33,48 +35,35 @@ export interface ObjTypeSpec {
   fields: ObjValueField[];
 }
 
-// ---- Type spec interfaces ----
-
-interface NumberInput {
-  max?: number;
-  min?: number;
-  step?: number;
-  type: "number";
-}
-
-interface EnumInput {
-  entries: EnumEntry[];
-  type: "enum";
-}
-
-interface RoomInput {
-  type: "room";
-}
-
-type FieldInput = EnumInput | NumberInput | RoomInput;
-
 /** Extract numBits bits ending at highBit from value. */
-export function getBits(
-  value: number,
-  highBit: number,
-  numBits: number,
-): number {
+export function getBits({
+  highBit,
+  numBits,
+  value,
+}: {
+  highBit: number;
+  numBits: number;
+  value: number;
+}) {
   return (value >>> (highBit - numBits + 1)) & ((1 << numBits) - 1);
 }
 
 /** Set numBits bits ending at highBit in value to newValue, returning the updated int. */
-export function setBits(
-  value: number,
-  highBit: number,
-  numBits: number,
-  newValue: number,
-): number {
+export function setBits({
+  highBit,
+  newValue,
+  numBits,
+  value,
+}: {
+  highBit: number;
+  newValue: number;
+  numBits: number;
+  value: number;
+}) {
   const shift = highBit - numBits + 1;
   const mask = ((1 << numBits) - 1) << shift;
   return (value & ~mask) | ((newValue & ((1 << numBits) - 1)) << shift);
 }
-
-// ---- Pattern factories ----
 
 /** TBaseCup family: maxDrinks, curDrinks, liquidType, drinkFlags. */
 function baseCupFields(maxDrinks: number): ObjValueField[] {
@@ -116,7 +105,7 @@ function containerFields(opts: {
   volumeMax: number;
   weightMax: number;
 }): ObjValueField[] {
-  const fields: ObjValueField[] = [
+  return [
     {
       help: `Maximum weight capacity (1-${opts.weightMax}).`,
       input: { max: opts.weightMax, min: 1, type: "number" },
@@ -146,27 +135,25 @@ function containerFields(opts: {
       label: "Trap Damage",
       source: { highBit: 31, numBits: 8, val: 1 },
     },
+    ...(opts.hasKey
+      ? ([
+          {
+            help: "Vnum of the key that unlocks this container. -1 = no key.",
+            input: { min: -1, type: "number" },
+            key: "keyVnum",
+            label: "Key Vnum",
+            source: { val: 2 },
+          },
+        ] satisfies ObjValueField[])
+      : []),
+    {
+      help: `Maximum volume capacity (1-${opts.volumeMax}).`,
+      input: { max: opts.volumeMax, min: 1, type: "number" },
+      key: "maxVolume",
+      label: "Volume Capacity",
+      source: { val: 3 },
+    },
   ];
-
-  if (opts.hasKey) {
-    fields.push({
-      help: "Vnum of the key that unlocks this container. -1 = no key.",
-      input: { min: -1, type: "number" },
-      key: "keyVnum",
-      label: "Key Vnum",
-      source: { val: 2 },
-    });
-  }
-
-  fields.push({
-    help: `Maximum volume capacity (1-${opts.volumeMax}).`,
-    input: { max: opts.volumeMax, min: 1, type: "number" },
-    key: "maxVolume",
-    label: "Volume Capacity",
-    source: { val: 3 },
-  });
-
-  return fields;
 }
 
 /** TMagicItem val0: level[0-7] + learnedness[8-15]. */
@@ -271,12 +258,42 @@ function gunDamageFields(): ObjValueField[] {
   ];
 }
 
-// ---- Full spec registry ----
+/** TGun family: val0 rof, val1 damLvl+damDev (via gunDamageFields), val2 gunFlags, val3 ammoType. */
+function gunTypeFields(opts: {
+  ammoHelp: string;
+  ammoInput: ObjValueField["input"];
+  rofHelp: string;
+  rofMax: number;
+  rofMin: number;
+}) {
+  return [
+    {
+      help: opts.rofHelp,
+      input: { max: opts.rofMax, min: opts.rofMin, type: "number" as const },
+      key: "rof",
+      label: "Rate of Fire",
+      source: { val: 0 as const },
+    },
+    ...gunDamageFields(),
+    {
+      help: "Gun behavior bit flags.",
+      input: { min: 0, type: "number" as const },
+      key: "gunFlags",
+      label: "Gun Flags",
+      source: { val: 2 as const },
+    },
+    {
+      help: opts.ammoHelp,
+      input: opts.ammoInput,
+      key: "ammoType",
+      label: "Ammo Type",
+      source: { val: 3 as const },
+    },
+  ];
+}
 
 const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
-  // ==== No meaningful values (18 types) ====
   0: { fields: [] }, // Undefined
-  // ==== Light (1) - TBaseLight ====
   1: {
     fields: [
       {
@@ -309,7 +326,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
       },
     ],
   },
-  // ==== Scroll (2) - TMagicItem + TScroll ====
   2: {
     fields: [
       ...magicItemVal0(),
@@ -336,11 +352,8 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
       },
     ],
   },
-  // ==== Wand (3) - TMagicItem + TWand ====
-  3: { fields: wandStaffFields() },
-  // ==== Staff (4) - same layout as Wand ====
-  4: { fields: wandStaffFields() },
-  // ==== Weapon (5) - TGenWeapon (extends TBaseWeapon) ====
+  3: { fields: wandStaffFields() }, // Wand
+  4: { fields: wandStaffFields() }, // Staff
   5: {
     fields: [
       ...baseWeaponFields(),
@@ -388,7 +401,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
       },
     ],
   },
-  // ==== Fuel (6) ====
   6: {
     fields: [
       {
@@ -407,7 +419,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
       },
     ],
   },
-  // ==== Opal (7) ====
   7: {
     fields: [
       {
@@ -440,7 +451,7 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
       },
     ],
   },
-  // ==== Treasure (8) - ItemInfo says unused but C++ stores serial number ====
+  // Treasure (8): ItemInfo says unused but C++ stores serial number.
   8: {
     fields: [
       {
@@ -452,7 +463,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
       },
     ],
   },
-  // ==== Armor (9) ====
   9: {
     fields: [
       {
@@ -464,12 +474,10 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
       },
     ],
   },
-  // ==== Potion (10) - TBaseCup ====
-  10: { fields: baseCupFields(2560) },
+  10: { fields: baseCupFields(2560) }, // Potion
   11: { fields: [] }, // Worn
   12: { fields: [] }, // Other
   13: { fields: [] }, // Trash
-  // ==== Trap (14) ====
   14: {
     fields: [
       {
@@ -502,15 +510,14 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
       },
     ],
   },
-  // ==== Container/Chest (15) ====
   15: {
     fields: containerFields({
       hasKey: true,
       volumeMax: 30_000,
       weightMax: 300,
     }),
-  },
-  // ==== Note (16) - ItemInfo says unused but C++ stores values ====
+  }, // Container/Chest
+  // Note (16): ItemInfo says unused but C++ stores values.
   16: {
     fields: [
       {
@@ -536,12 +543,10 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
       },
     ],
   },
-  // ==== Drink Container (17) - TBaseCup ====
-  17: { fields: baseCupFields(2560) },
+  17: { fields: baseCupFields(2560) }, // Drink Container
 
   18: { fields: [] }, // Key
 
-  // ==== Food (19) ====
   19: {
     fields: [
       {
@@ -561,7 +566,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Money (20) ====
   20: {
     fields: [
       {
@@ -585,7 +589,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
 
   22: { fields: [] }, // Boat
 
-  // ==== Audio (23) ====
   23: {
     fields: [
       {
@@ -598,7 +601,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Board (24) ====
   24: {
     fields: [
       {
@@ -611,7 +613,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Bow (25) ====
   25: {
     fields: [
       {
@@ -638,7 +639,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Arrow (26) - TArrow extends TBaseWeapon ====
   26: {
     fields: [
       ...baseWeaponFields(),
@@ -689,7 +689,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Bag (27) ====
   27: {
     fields: containerFields({
       hasKey: true,
@@ -698,7 +697,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     }),
   },
 
-  // ==== Corpse (28) - TBaseCorpse (simple) ====
   28: {
     fields: [
       {
@@ -732,7 +730,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Spell Bag (29) ====
   29: {
     fields: containerFields({
       hasKey: true,
@@ -741,7 +738,7 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     }),
   },
 
-  // ==== Component (30) - val1 is ignored by C++ (skip it) ====
+  // Component (30): val1 is ignored by C++ - intentionally absent from fields.
   30: {
     fields: [
       {
@@ -770,7 +767,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
 
   31: { fields: [] }, // Book
 
-  // ==== Portal (32) - densely packed across all 4 vals ====
   32: {
     fields: [
       // val0: destination[0-23] + charges[24-31]
@@ -829,7 +825,7 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Window (33) - val0 is target room (whole int; negative = opposite direction) ====
+  // Window (33): val0 = target room vnum; negative encodes opposite direction.
   33: {
     fields: [
       {
@@ -844,7 +840,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
 
   34: { fields: [] }, // Tree
 
-  // ==== Tool (35) ====
   35: {
     fields: [
       {
@@ -871,7 +866,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Holy Symbol (36) ====
   36: {
     fields: [
       {
@@ -898,7 +892,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Quiver (37) ====
   37: {
     fields: containerFields({
       hasKey: false,
@@ -911,7 +904,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
 
   39: { fields: [] }, // Statue
 
-  // ==== Bed (40) - val0 packed ====
   40: {
     fields: [
       // val0: maxUsers[0-3] + minPosUse[4-7]
@@ -959,15 +951,14 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
 
   43: { fields: [] }, // Gemstone
 
-  // ==== Martial Weapon (44) - disabled for builders but define for display ====
+  // Martial Weapon (44): disabled for builders; defined here for display only.
   44: { fields: baseWeaponFields() },
 
   45: { fields: [] }, // Jewelry
 
-  // ==== Vial (46) - TBaseCup ====
-  46: { fields: baseCupFields(3000) },
+  46: { fields: baseCupFields(3000) }, // Vial
 
-  // ==== Pool (48) - non-standard TBaseCup layout (val0 unused, val1 has drinks) ====
+  // Pool (48): non-standard TBaseCup layout - val0 unused, val1 has drinks.
   48: {
     fields: [
       {
@@ -994,7 +985,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Keyring (49) ====
   49: {
     fields: containerFields({
       hasKey: false,
@@ -1003,7 +993,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     }),
   },
 
-  // ==== Raw Organic (50) ====
   50: {
     fields: [
       {
@@ -1037,7 +1026,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Flame (51) - TFFlame ====
   51: {
     fields: [
       {
@@ -1057,7 +1045,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Applied Substance (52) ====
   52: {
     fields: [
       {
@@ -1091,7 +1078,7 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Gas (53) - ItemInfo says unused but C++ stores gasType in val0 ====
+  // Gas (53): ItemInfo says unused but C++ stores gasType in val0.
   53: {
     fields: [
       {
@@ -1104,10 +1091,8 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Armor Wand (54) - same layout as Wand ====
-  54: { fields: wandStaffFields() },
+  54: { fields: wandStaffFields() }, // Armor Wand
 
-  // ==== Drug Container (55) ====
   55: {
     fields: [
       {
@@ -1141,7 +1126,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Drug (56) ====
   56: {
     fields: [
       {
@@ -1168,35 +1152,16 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Gun (57) - TGun (overrides TBaseWeapon entirely) ====
   57: {
-    fields: [
-      {
-        help: "Rate of fire (0-10). Shots per round.",
-        input: { max: 10, min: 0, type: "number" },
-        key: "rof",
-        label: "Rate of Fire",
-        source: { val: 0 },
-      },
-      ...gunDamageFields(),
-      {
-        help: "Gun behavior bit flags.",
-        input: { min: 0, type: "number" },
-        key: "gunFlags",
-        label: "Gun Flags",
-        source: { val: 2 },
-      },
-      {
-        help: "Ammo type enum. Determines which ammunition this gun uses.",
-        input: { min: 0, type: "number" },
-        key: "ammoType",
-        label: "Ammo Type",
-        source: { val: 3 },
-      },
-    ],
+    fields: gunTypeFields({
+      ammoHelp: "Ammo type enum. Determines which ammunition this gun uses.",
+      ammoInput: { min: 0, type: "number" },
+      rofHelp: "Rate of fire (0-10). Shots per round.",
+      rofMax: 10,
+      rofMin: 0,
+    }),
   },
 
-  // ==== Ammo (58) ====
   58: {
     fields: [
       {
@@ -1216,7 +1181,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Plant (59) ====
   59: {
     fields: [
       {
@@ -1250,16 +1214,14 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Cookware (60) ====
   60: {
     fields: containerFields({
       hasKey: true,
       volumeMax: 30_000,
       weightMax: 300,
     }),
-  },
+  }, // Cookware
 
-  // ==== Vehicle (61) - val3 packed ====
   61: {
     fields: [
       {
@@ -1303,38 +1265,18 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
 
   62: { fields: [] }, // Casino Chip
 
-  // ==== Poison (63) - TBaseCup ====
-  63: { fields: baseCupFields(2560) },
+  63: { fields: baseCupFields(2560) }, // Poison
 
-  // ==== Handgonne (64) - TGun ====
   64: {
-    fields: [
-      {
-        help: "Rate of fire (fixed at 1 for handgonnes).",
-        input: { max: 1, min: 1, type: "number" },
-        key: "rof",
-        label: "Rate of Fire",
-        source: { val: 0 },
-      },
-      ...gunDamageFields(),
-      {
-        help: "Gun behavior bit flags.",
-        input: { min: 0, type: "number" },
-        key: "gunFlags",
-        label: "Gun Flags",
-        source: { val: 2 },
-      },
-      {
-        help: "Ammo type (fixed: lead shot for handgonnes).",
-        input: { type: "number" },
-        key: "ammoType",
-        label: "Ammo Type",
-        source: { val: 3 },
-      },
-    ],
+    fields: gunTypeFields({
+      ammoHelp: "Ammo type (fixed: lead shot for handgonnes).",
+      ammoInput: { type: "number" },
+      rofHelp: "Rate of fire (fixed at 1 for handgonnes).",
+      rofMax: 1,
+      rofMin: 1,
+    }),
   },
 
-  // ==== Egg (65) - TFood + bit 31 flag ====
   65: {
     fields: [
       // val0: fillHours in bits 0-30, eggTouched in bit 31
@@ -1376,35 +1318,16 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     ],
   },
 
-  // ==== Cannon (66) - TGun ====
   66: {
-    fields: [
-      {
-        help: "Rate of fire (fixed at 1 for cannons).",
-        input: { max: 1, min: 1, type: "number" },
-        key: "rof",
-        label: "Rate of Fire",
-        source: { val: 0 },
-      },
-      ...gunDamageFields(),
-      {
-        help: "Gun behavior bit flags.",
-        input: { min: 0, type: "number" },
-        key: "gunFlags",
-        label: "Gun Flags",
-        source: { val: 2 },
-      },
-      {
-        help: "Ammo type (fixed: cannonball for cannons).",
-        input: { type: "number" },
-        key: "ammoType",
-        label: "Ammo Type",
-        source: { val: 3 },
-      },
-    ],
+    fields: gunTypeFields({
+      ammoHelp: "Ammo type (fixed: cannonball for cannons).",
+      ammoInput: { type: "number" },
+      rofHelp: "Rate of fire (fixed at 1 for cannons).",
+      rofMax: 1,
+      rofMin: 1,
+    }),
   },
 
-  // ==== Container family (TOpenContainer subtypes) ====
   67: {
     fields: containerFields({
       hasKey: false,
@@ -1459,7 +1382,6 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
     }),
   }, // Money Pouch
 
-  // ==== Fruit (76) - TFruit extends TFood ====
   76: {
     fields: [
       {
@@ -1487,13 +1409,11 @@ const OBJ_TYPE_SPECS: Partial<Record<number, ObjTypeSpec>> = {
   },
 };
 
-// ---- Public API ----
-
 /** Highest defined item type number. Used by tests to iterate all types. */
 export const MAX_ITEM_TYPE = 76;
 
 /** Get the type spec for an item type. Returns undefined for unknown types (>76). */
-export function getObjTypeSpec(itemType: number): ObjTypeSpec | undefined {
+export function getObjTypeSpec(itemType: number) {
   return OBJ_TYPE_SPECS[itemType];
 }
 
@@ -1501,14 +1421,17 @@ export function getObjTypeSpec(itemType: number): ObjTypeSpec | undefined {
 export function expandTypeValues(
   spec: ObjTypeSpec,
   rawVals: [number, number, number, number],
-): Record<string, number> {
-  const result: Record<string, number> = {};
-  for (const field of spec.fields) {
-    const raw = rawVals[field.source.val];
-    result[field.key] =
-      field.source.highBit !== undefined && field.source.numBits !== undefined
-        ? getBits(raw, field.source.highBit, field.source.numBits)
+) {
+  const expanded: Record<string, number> = {};
+  for (const {
+    key,
+    source: { highBit, numBits, val },
+  } of spec.fields) {
+    const raw = rawVals[val];
+    expanded[key] =
+      highBit !== undefined && numBits !== undefined
+        ? getBits({ highBit, numBits, value: raw })
         : raw;
   }
-  return result;
+  return expanded;
 }

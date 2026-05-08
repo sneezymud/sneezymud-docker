@@ -21,46 +21,46 @@ function requireSpec(itemType: number) {
 describe("getBits", () => {
   test("can extract an 8-bit field from a packed value", () => {
     // 0x64C8 = weapon val0 with curSharp=200, maxSharp=100
-    expect(getBits(0x64_c8, 7, 8)).toBe(200);
+    expect(getBits({ highBit: 7, numBits: 8, value: 0x64_c8 })).toBe(200);
   });
 
   test("can extract the second byte from a packed value", () => {
-    expect(getBits(0x64_c8, 15, 8)).toBe(100);
+    expect(getBits({ highBit: 15, numBits: 8, value: 0x64_c8 })).toBe(100);
   });
 
   test("can extract a 16-bit field from a packed value", () => {
     // Container val1: flags=5 in bits 0-15, trapType=3 in bits 16-23, trapDam=10 in bits 24-31
     const packed = 5 | (3 << 16) | (10 << 24);
-    expect(getBits(packed, 15, 16)).toBe(5);
+    expect(getBits({ highBit: 15, numBits: 16, value: packed })).toBe(5);
   });
 
   test("can extract a byte from the third position", () => {
     const packed = 5 | (3 << 16) | (10 << 24);
-    expect(getBits(packed, 23, 8)).toBe(3);
+    expect(getBits({ highBit: 23, numBits: 8, value: packed })).toBe(3);
   });
 
   test("can extract a byte from the fourth position", () => {
     const packed = 5 | (3 << 16) | (10 << 24);
-    expect(getBits(packed, 31, 8)).toBe(10);
+    expect(getBits({ highBit: 31, numBits: 8, value: packed })).toBe(10);
   });
 
   test("can extract a single bit at position 31", () => {
     // Egg val0: fillHours=15 in bits 0-30, eggTouched=1 in bit 31
     const packed = 15 | (1 << 31); // -2147483633 as signed
-    expect(getBits(packed, 31, 1)).toBe(1);
+    expect(getBits({ highBit: 31, numBits: 1, value: packed })).toBe(1);
   });
 
   test("can extract a 31-bit field", () => {
     const packed = 15 | (1 << 31);
-    expect(getBits(packed, 30, 31)).toBe(15);
+    expect(getBits({ highBit: 30, numBits: 31, value: packed })).toBe(15);
   });
 
   test("returns zero for cleared bit ranges", () => {
-    expect(getBits(0xff_00, 7, 8)).toBe(0);
+    expect(getBits({ highBit: 7, numBits: 8, value: 0xff_00 })).toBe(0);
   });
 
   test("returns zero for unset bit 31", () => {
-    expect(getBits(0x7f_ff_ff_ff, 31, 1)).toBe(0);
+    expect(getBits({ highBit: 31, numBits: 1, value: 0x7f_ff_ff_ff })).toBe(0);
   });
 });
 
@@ -70,59 +70,89 @@ describe("setBits", () => {
   test("setting low byte preserves high byte", () => {
     // Change curSharp from 200 to 150, keep maxSharp=100
     const original = 0x64_c8; // curSharp=200, maxSharp=100
-    const result = setBits(original, 7, 8, 150);
-    expect(getBits(result, 7, 8)).toBe(150);
-    expect(getBits(result, 15, 8)).toBe(100);
+    const result = setBits({
+      highBit: 7,
+      newValue: 150,
+      numBits: 8,
+      value: original,
+    });
+    expect(getBits({ highBit: 7, numBits: 8, value: result })).toBe(150);
+    expect(getBits({ highBit: 15, numBits: 8, value: result })).toBe(100);
   });
 
   test("setting high byte preserves low byte", () => {
     const original = 0x64_c8;
-    const result = setBits(original, 15, 8, 50);
-    expect(getBits(result, 7, 8)).toBe(200);
-    expect(getBits(result, 15, 8)).toBe(50);
+    const result = setBits({
+      highBit: 15,
+      newValue: 50,
+      numBits: 8,
+      value: original,
+    });
+    expect(getBits({ highBit: 7, numBits: 8, value: result })).toBe(200);
+    expect(getBits({ highBit: 15, numBits: 8, value: result })).toBe(50);
   });
 
   test("setting bit 31 preserves lower bits", () => {
-    const result = setBits(15, 31, 1, 1);
-    expect(getBits(result, 30, 31)).toBe(15);
-    expect(getBits(result, 31, 1)).toBe(1);
+    const result = setBits({ highBit: 31, newValue: 1, numBits: 1, value: 15 });
+    expect(getBits({ highBit: 30, numBits: 31, value: result })).toBe(15);
+    expect(getBits({ highBit: 31, numBits: 1, value: result })).toBe(1);
   });
 
   test("clearing bit 31 preserves lower bits", () => {
     const packed = 15 | (1 << 31);
-    const result = setBits(packed, 31, 1, 0);
+    const result = setBits({
+      highBit: 31,
+      newValue: 0,
+      numBits: 1,
+      value: packed,
+    });
     expect(result).toBe(15);
   });
 
   test("setting middle byte preserves surrounding bytes", () => {
     // Container val1: set trapType (bits 16-23) to 7, keep flags=5 and trapDam=10
     const original = 5 | (3 << 16) | (10 << 24);
-    const result = setBits(original, 23, 8, 7);
-    expect(getBits(result, 15, 16)).toBe(5);
-    expect(getBits(result, 23, 8)).toBe(7);
-    expect(getBits(result, 31, 8)).toBe(10);
+    const result = setBits({
+      highBit: 23,
+      newValue: 7,
+      numBits: 8,
+      value: original,
+    });
+    expect(getBits({ highBit: 15, numBits: 16, value: result })).toBe(5);
+    expect(getBits({ highBit: 23, numBits: 8, value: result })).toBe(7);
+    expect(getBits({ highBit: 31, numBits: 8, value: result })).toBe(10);
   });
 
   test("modified field round-trips through getBits", () => {
     // Arbitrary 4-field packed value
     const val = (42 << 24) | (7 << 16) | (200 << 8) | 15;
-    expect(getBits(val, 7, 8)).toBe(15);
-    expect(getBits(val, 15, 8)).toBe(200);
-    expect(getBits(val, 23, 8)).toBe(7);
-    expect(getBits(val, 31, 8)).toBe(42);
+    expect(getBits({ highBit: 7, numBits: 8, value: val })).toBe(15);
+    expect(getBits({ highBit: 15, numBits: 8, value: val })).toBe(200);
+    expect(getBits({ highBit: 23, numBits: 8, value: val })).toBe(7);
+    expect(getBits({ highBit: 31, numBits: 8, value: val })).toBe(42);
 
     // Modify one field, verify others unchanged
-    const modified = setBits(val, 15, 8, 99);
-    expect(getBits(modified, 7, 8)).toBe(15);
-    expect(getBits(modified, 15, 8)).toBe(99);
-    expect(getBits(modified, 23, 8)).toBe(7);
-    expect(getBits(modified, 31, 8)).toBe(42);
+    const modified = setBits({
+      highBit: 15,
+      newValue: 99,
+      numBits: 8,
+      value: val,
+    });
+    expect(getBits({ highBit: 7, numBits: 8, value: modified })).toBe(15);
+    expect(getBits({ highBit: 15, numBits: 8, value: modified })).toBe(99);
+    expect(getBits({ highBit: 23, numBits: 8, value: modified })).toBe(7);
+    expect(getBits({ highBit: 31, numBits: 8, value: modified })).toBe(42);
   });
 
   test("over-width values are silently truncated to the field width", () => {
     // 300 = 0b100101100 (9 bits) into an 8-bit field: truncated to 0b00101100 = 44
-    const result = setBits(0, 7, 8, 300);
-    expect(getBits(result, 7, 8)).toBe(44);
+    const result = setBits({
+      highBit: 7,
+      newValue: 300,
+      numBits: 8,
+      value: 0,
+    });
+    expect(getBits({ highBit: 7, numBits: 8, value: result })).toBe(44);
   });
 });
 
@@ -340,12 +370,12 @@ function repack(
     const value = expanded[field.key] ?? 0;
     raw[field.source.val] =
       field.source.highBit !== undefined && field.source.numBits !== undefined
-        ? setBits(
-            raw[field.source.val],
-            field.source.highBit,
-            field.source.numBits,
-            value,
-          )
+        ? setBits({
+            highBit: field.source.highBit,
+            newValue: value,
+            numBits: field.source.numBits,
+            value: raw[field.source.val],
+          })
         : value;
   }
   return raw;
@@ -404,12 +434,12 @@ describe("round-trip: expand and repack", () => {
         raw[field.source.val] =
           field.source.highBit !== undefined &&
           field.source.numBits !== undefined
-            ? setBits(
-                raw[field.source.val],
-                field.source.highBit,
-                field.source.numBits,
-                maxVal,
-              )
+            ? setBits({
+                highBit: field.source.highBit,
+                newValue: maxVal,
+                numBits: field.source.numBits,
+                value: raw[field.source.val],
+              })
             : maxVal;
       }
 

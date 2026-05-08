@@ -62,7 +62,7 @@ describe("applyObjFieldChange", () => {
 
     expect(result).toHaveProperty("val0");
     const val0 = result.val0 ?? 0;
-    expect(getBits(val0, 7, 8)).toBe(150);
+    expect(getBits({ highBit: 7, numBits: 8, value: val0 })).toBe(150);
   });
 
   test("editing one packed field preserves adjacent fields in the same slot", () => {
@@ -88,8 +88,8 @@ describe("applyObjFieldChange", () => {
     if (afterCurSharp === null) throw new Error("expected non-null result");
 
     const val0 = afterCurSharp.val0 ?? 0;
-    expect(getBits(val0, 7, 8)).toBe(200);
-    expect(getBits(val0, 15, 8)).toBe(100);
+    expect(getBits({ highBit: 7, numBits: 8, value: val0 })).toBe(200);
+    expect(getBits({ highBit: 15, numBits: 8, value: val0 })).toBe(100);
   });
 
   test("switching item type resets value fields to the new type's defaults", () => {
@@ -224,12 +224,12 @@ describe("applyObjFieldChange", () => {
     // val0 edit survived
     expect(afterVal2Edit).toHaveProperty("val0");
     const val0 = afterVal2Edit.val0 ?? 0;
-    expect(getBits(val0, 15, 8)).toBe(100);
+    expect(getBits({ highBit: 15, numBits: 8, value: val0 })).toBe(100);
 
     // val2 edit also present
     expect(afterVal2Edit).toHaveProperty("val2");
     const val2 = afterVal2Edit.val2 ?? 0;
-    expect(getBits(val2, 7, 8)).toBe(42);
+    expect(getBits({ highBit: 7, numBits: 8, value: val2 })).toBe(42);
   });
 
   test("string value for a spec field is coerced to number for packing", () => {
@@ -247,7 +247,7 @@ describe("applyObjFieldChange", () => {
     if (result === null) throw new Error("expected non-null result");
 
     const val0 = result.val0 ?? 0;
-    expect(getBits(val0, 7, 8)).toBe(150);
+    expect(getBits({ highBit: 7, numBits: 8, value: val0 })).toBe(150);
   });
 
   test("non-numeric string for a spec field coerces to NaN and packs as zero", () => {
