@@ -33,10 +33,7 @@ export function Nav({ className, onNavClick }: NavProps) {
         method: "POST",
         signal: AbortSignal.timeout(5000),
       }),
-    onError: (error) => {
-      // Proceed with client-side logout even if the server call fails
-      console.error("Logout API call failed:", error);
-    },
+    // Always finish logout client-side, even if the server call failed.
     onSettled: () => {
       useSidebarStore.getState().close();
       queryClient.clear();

@@ -113,7 +113,7 @@ export function useRoomEditor(vnumParam: string, owner: number | undefined) {
   function handleFieldChange(key: string, value: number | string) {
     if (!entity) return;
     clearFieldError(key);
-    applyRoomFieldChange(key, value, entity, setEdits);
+    applyRoomFieldChange({ key, room: entity, setEdits, value });
   }
 
   return {
@@ -167,12 +167,17 @@ function roomToFormValues(
 // valid indoor height auto-sets the INDOORS flag, and toggling INDOORS adjusts
 // height to match. Both branches must go through diffEdits to preserve dirty
 // detection.
-function applyRoomFieldChange(
-  key: string,
-  value: number | string,
-  room: Room,
-  setEdits: React.Dispatch<React.SetStateAction<null | Partial<Room>>>,
-) {
+function applyRoomFieldChange({
+  key,
+  room,
+  setEdits,
+  value,
+}: {
+  key: string;
+  room: Room;
+  setEdits: React.Dispatch<React.SetStateAction<null | Partial<Room>>>;
+  value: number | string;
+}) {
   if (key === "height" && typeof value === "number") {
     const indoorsBit = 1 << 3;
     setEdits((prev) => {

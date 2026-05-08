@@ -23,17 +23,17 @@ export function Breadcrumbs({ items }: BreadcrumbsProps) {
   return (
     <Breadcrumb>
       <BreadcrumbList>
-        {items.map((item, index) => (
-          <React.Fragment key={item.to ?? item.label}>
+        {items.map(({ label, to }, index) => (
+          <React.Fragment key={to ?? label}>
             {index > 0 ? <BreadcrumbSeparator /> : null}
 
             <BreadcrumbItem>
-              {item.to ? (
+              {to ? (
                 <BreadcrumbLink asChild>
-                  <Link to={item.to}>{item.label}</Link>
+                  <Link to={to}>{label}</Link>
                 </BreadcrumbLink>
               ) : (
-                <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                <BreadcrumbPage>{label}</BreadcrumbPage>
               )}
             </BreadcrumbItem>
           </React.Fragment>

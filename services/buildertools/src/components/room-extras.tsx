@@ -39,11 +39,15 @@ export function RoomExtras({
     onChange(extras.filter((_, i) => i !== index));
   }
 
-  function update(
-    index: number,
-    field: keyof RoomExtra,
-    value: number | string,
-  ) {
+  function update({
+    field,
+    index,
+    value,
+  }: {
+    field: keyof RoomExtra;
+    index: number;
+    value: number | string;
+  }) {
     onChange(
       extras.map((e, i) => (i === index ? { ...e, [field]: value } : e)),
     );
@@ -107,7 +111,7 @@ export function RoomExtras({
                   isDirty={false}
                   key={field.key}
                   onChange={(key, value) => {
-                    update(index, toExtraKey(key, prefix), value);
+                    update({ field: toExtraKey(key, prefix), index, value });
                   }}
                   value={values[field.key]}
                 />

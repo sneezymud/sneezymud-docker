@@ -32,15 +32,11 @@ import { VnumPicker } from "./vnum-picker.tsx";
 
 type ListViewMode = "card" | "table";
 
-function isListViewMode(value: null | string): value is ListViewMode {
-  return value === "card" || value === "table";
-}
-
 function useListViewMode(): [ListViewMode, (mode: ListViewMode) => void] {
   const [mode, setMode] = useState<ListViewMode>(() => {
     try {
       const stored = localStorage.getItem("bt-list-view");
-      return isListViewMode(stored) ? stored : "table";
+      return stored === "card" || stored === "table" ? stored : "table";
     } catch {
       return "table";
     }
@@ -64,7 +60,7 @@ const COLUMN_WIDTHS: Record<string, string> = {
   vnum: "w-24",
 };
 
-interface EntityListItem {
+export interface EntityListItem {
   metadata?: string;
   name: string;
   owner?: string;
@@ -111,7 +107,7 @@ export function EntityList({
 
   const showOwner = ownerFilter === "all";
   const selectable = canEdit && !showOwner && Boolean(onDeleteSelected);
-  const columns = buildColumns(selectable, secondaryLabel, showOwner);
+  const columns = buildColumns({ secondaryLabel, selectable, showOwner });
 
   const {
     canNextPage,
@@ -137,12 +133,12 @@ export function EntityList({
     // Compound key prevents row-collision in "All" view where two owners can
     // have the same vnum. Bulk-delete is hidden in All view, so selectedVnums
     // is only populated from rows the user owns (fixed playerId).
-    getRowId: (row) => `${row.playerId}:${row.vnum}`,
+    getRowId: rowId,
   });
 
-  const selectedVnums = entities
-    .filter(({ playerId, vnum }) => selectedIds[`${playerId}:${vnum}`])
-    .map(({ vnum }) => vnum);
+  const selectedVnums = entities.flatMap((entity) =>
+    selectedIds[rowId(entity)] ? [entity.vnum] : [],
+  );
   const canCreate = Boolean(onCreateVnum && vnumBlocks);
   const searching = search !== "";
 
@@ -233,6 +229,10 @@ export function EntityList({
   );
 }
 
+function rowId({ playerId, vnum }: EntityListItem) {
+  return `${playerId}:${vnum}`;
+}
+
 function ListPageTitle({ title }: { title: string }) {
   return (
     <div className="mb-4 flex items-center">
@@ -304,7 +304,7 @@ function ListToolbar({
         <VnumPicker
           allowAnyVnum={allowAnyVnum}
           createPending={createPending}
-          existingVnums={new Set(existingVnums.map((e) => e.vnum))}
+          existingVnums={new Set(existingVnums.map(({ vnum }) => vnum))}
           onCreate={onCreateVnum}
           onOpenChange={setShowCreate}
           open={showCreate}
@@ -336,6 +336,22 @@ function ResultsCount({
   );
 }
 
+function entityLinkProps({
+  basePath,
+  currentUserId,
+  entity,
+}: {
+  basePath: string;
+  currentUserId: number;
+  entity: EntityListItem;
+}) {
+  const cOwner = canonicalOwner(entity.playerId, currentUserId);
+  return {
+    searchProp: cOwner === undefined ? {} : { search: { owner: cOwner } },
+    to: `${basePath}/${entity.vnum}`,
+  };
+}
+
 function EntityRow({
   basePath,
   currentUserId,
@@ -355,9 +371,11 @@ function EntityRow({
   selectable: boolean;
   showOwner: boolean;
 }) {
-  const to = `${basePath}/${entity.vnum}`;
-  const cOwner = canonicalOwner(entity.playerId, currentUserId);
-  const searchProp = cOwner === undefined ? {} : { search: { owner: cOwner } };
+  const { searchProp, to } = entityLinkProps({
+    basePath,
+    currentUserId,
+    entity,
+  });
   return (
     <TableRow
       aria-label={`${entity.name || "(unnamed)"} (vnum ${entity.vnum})`}
@@ -439,10 +457,13 @@ function SelectAllCheckbox({
   selectedIds: Record<string, boolean>;
   toggleAllPageSelected: (checked: boolean) => void;
 }) {
+  function isRowSelected(entity: EntityListItem) {
+    return selectedIds[rowId(entity)];
+  }
   const checked =
-    rows.length > 0 && rows.every((r) => selectedIds[`${r.playerId}:${r.vnum}`])
+    rows.length > 0 && rows.every(isRowSelected)
       ? true
-      : rows.some((r) => selectedIds[`${r.playerId}:${r.vnum}`])
+      : rows.some(isRowSelected)
         ? "indeterminate"
         : false;
   return (
@@ -566,12 +587,10 @@ function DesktopTable({
             basePath={basePath}
             currentUserId={currentUserId}
             entity={entity}
-            isSelected={
-              selectedIds[`${entity.playerId}:${entity.vnum}`] === true
-            }
-            key={`${entity.playerId}:${entity.vnum}`}
+            isSelected={selectedIds[rowId(entity)] === true}
+            key={rowId(entity)}
             onToggleSelected={(checked) => {
-              toggleSelected(`${entity.playerId}:${entity.vnum}`, checked);
+              toggleSelected(rowId(entity), checked);
             }}
             secondaryLabel={secondaryLabel}
             selectable={selectable}
@@ -618,9 +637,11 @@ function EntityCardRow({
   selectable: boolean;
   showOwner: boolean;
 }) {
-  const to = `${basePath}/${entity.vnum}`;
-  const cOwner = canonicalOwner(entity.playerId, currentUserId);
-  const searchProp = cOwner === undefined ? {} : { search: { owner: cOwner } };
+  const { searchProp, to } = entityLinkProps({
+    basePath,
+    currentUserId,
+    entity,
+  });
   return (
     <div className="flex items-center gap-3 py-2.5">
       {selectable ? (
@@ -707,12 +728,10 @@ function MobileCardList({
             basePath={basePath}
             currentUserId={currentUserId}
             entity={entity}
-            isSelected={
-              selectedIds[`${entity.playerId}:${entity.vnum}`] === true
-            }
-            key={`${entity.playerId}:${entity.vnum}`}
+            isSelected={selectedIds[rowId(entity)] === true}
+            key={rowId(entity)}
             onToggleSelected={(checked) => {
-              toggleSelected(`${entity.playerId}:${entity.vnum}`, checked);
+              toggleSelected(rowId(entity), checked);
             }}
             selectable={selectable}
             showOwner={showOwner}
@@ -734,11 +753,15 @@ function MobileCardList({
   );
 }
 
-function buildColumns(
-  selectable: boolean,
-  secondaryLabel?: string,
-  showOwner?: boolean,
-): Array<Column<EntityListItem>> {
+function buildColumns({
+  secondaryLabel,
+  selectable,
+  showOwner,
+}: {
+  secondaryLabel?: string | undefined;
+  selectable: boolean;
+  showOwner?: boolean | undefined;
+}) {
   const columns: Array<Column<EntityListItem>> = [];
 
   if (selectable) {
@@ -790,13 +813,16 @@ function DeleteSelectionBar({
   );
 }
 
-function matchEntity(item: EntityListItem, search: string): boolean {
+function matchEntity(
+  { metadata, name, owner, secondary, vnum }: EntityListItem,
+  search: string,
+) {
   const s = search.toLowerCase();
   return (
-    item.name.toLowerCase().includes(s) ||
-    String(item.vnum).includes(search) ||
-    (item.secondary?.toLowerCase().includes(s) ?? false) ||
-    (item.metadata?.toLowerCase().includes(s) ?? false) ||
-    (item.owner?.toLowerCase().includes(s) ?? false)
+    name.toLowerCase().includes(s) ||
+    String(vnum).includes(search) ||
+    (secondary?.toLowerCase().includes(s) ?? false) ||
+    (metadata?.toLowerCase().includes(s) ?? false) ||
+    (owner?.toLowerCase().includes(s) ?? false)
   );
 }

@@ -128,6 +128,9 @@ export function SubTable<T extends Record<string, number | string>>({
 
             {columns.map(({ key, label: colLabel, ...col }) => {
               const cellId = `${label}-${index}-${key}`;
+              function handleCellChange(value: number | string) {
+                updateCell(index, key, value);
+              }
               return (
                 <div
                   className="flex flex-col gap-1.5"
@@ -143,18 +146,14 @@ export function SubTable<T extends Record<string, number | string>>({
                           updateRow(index, updates);
                         },
                       },
-                      onChange: (value) => {
-                        updateCell(index, key, value);
-                      },
+                      onChange: handleCellChange,
                       row,
                     })
                   ) : (
                     <CellInput
                       entries={col.type === "enum" ? col.entries : undefined}
                       id={cellId}
-                      onChange={(value) => {
-                        updateCell(index, key, value);
-                      }}
+                      onChange={handleCellChange}
                       type={col.type}
                       value={row[key] ?? ""}
                     />

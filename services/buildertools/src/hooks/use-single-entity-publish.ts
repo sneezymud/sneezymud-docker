@@ -12,14 +12,6 @@ import { apiFetch, ApiResponseError } from "@/shared/api-client.ts";
 import { okResponseSchema } from "@/shared/schemas/common.ts";
 import { toastError } from "@/shared/toast.ts";
 
-interface Args {
-  diffQuery: UseQueryResult;
-  // Phase D populates this. Phase C always passes undefined.
-  ownerPlayerId?: number | undefined;
-  type: DashboardEntity["type"];
-  vnum: number;
-}
-
 const URL_SEGMENT: Record<DashboardEntity["type"], string> = {
   mob: "mobs",
   "mob-response": "mob-responses",
@@ -32,7 +24,13 @@ export function useSingleEntityPublish({
   ownerPlayerId,
   type,
   vnum,
-}: Args) {
+}: {
+  diffQuery: UseQueryResult;
+  // Phase D populates this. Phase C always passes undefined.
+  ownerPlayerId?: number | undefined;
+  type: DashboardEntity["type"];
+  vnum: number;
+}) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {

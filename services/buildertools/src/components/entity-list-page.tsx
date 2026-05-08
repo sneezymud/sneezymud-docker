@@ -1,5 +1,5 @@
 import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
-import { EntityList } from "@/components/entity-list.tsx";
+import { EntityList, type EntityListItem } from "@/components/entity-list.tsx";
 import { OwnerToggle } from "@/components/owner-toggle.tsx";
 import { QueryStatus } from "@/components/query-status.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
@@ -9,15 +9,6 @@ import {
   type RawItemFor,
   useEntityListPage,
 } from "@/hooks/use-entity-list-page.ts";
-
-interface EntityListItem {
-  metadata?: string;
-  name: string;
-  owner?: string;
-  playerId: number;
-  secondary?: string;
-  vnum: number;
-}
 
 export function EntityListPage<T extends ListEntityType>({
   from,
