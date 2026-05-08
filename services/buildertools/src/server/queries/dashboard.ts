@@ -1,3 +1,5 @@
+import type { MySqlColumn, MySqlTable } from "drizzle-orm/mysql-core";
+
 import { and, eq, inArray } from "drizzle-orm";
 
 import { immortalDb, sneezyDb } from "../db.ts";
@@ -28,13 +30,9 @@ import {
 import { deriveMobLetterAndPos } from "./mob-derived.ts";
 import { ownerEq, type OwnerScope } from "./owner-scope.ts";
 
-// ---------------------------------------------------------------------------
-// Field name lists for explicit field-by-field comparison.
 // vnum is excluded (it's the join key). Owner/meta columns (player_id, block)
 // are excluded (immortal-only). Derived columns (letter, pos for mob) are
 // handled separately.
-// ---------------------------------------------------------------------------
-
 const ROOM_FIELDS = [
   "capacity",
   "description",
@@ -145,11 +143,7 @@ const OBJEXTRA_FIELDS = ["description"] as const;
 
 const MOB_RESPONSE_FIELDS = ["response"] as const;
 
-// ---------------------------------------------------------------------------
-// Comparison helpers
-// ---------------------------------------------------------------------------
-
-export interface DashboardEntity {
+interface DashboardEntity {
   name: string;
   playerId: number;
   status: "modified" | "new";
@@ -157,10 +151,7 @@ export interface DashboardEntity {
   vnum: number;
 }
 
-export async function getDashboardEntities(
-  scope: OwnerScope,
-): Promise<DashboardEntity[]> {
-  // Fetch all vnums + names + player_ids from immortal in parallel.
+export async function getDashboardEntities(scope: OwnerScope) {
   // Mob responses join to immMob for the display name.
   const [immRooms, immMobs, immObjs, immMobResps] = await Promise.all([
     immortalDb
@@ -204,60 +195,34 @@ export async function getDashboardEntities(
       .where(ownerEq(immMobresponses.player_id, scope)),
   ]);
 
-  // Collect all vnums per type so we can batch-query sneezy
-  const roomVnums = immRooms.map((r) => r.vnum);
-  const mobVnums = immMobs.map((m) => m.vnum);
-  const objVnums = immObjs.map((o) => o.vnum);
-  const mobRespVnums = immMobResps.map((r) => r.vnum);
-
-  // Fetch matching production vnums (just the vnum column for existence check)
-  const [snzRoomVnums, snzMobVnums, snzObjVnums, snzMobRespVnums] =
+  const [prodRoomSet, prodMobSet, prodObjSet, prodMobRespSet] =
     await Promise.all([
-      roomVnums.length > 0
-        ? sneezyDb
-            .select({ vnum: snzRoom.vnum })
-            .from(snzRoom)
-            .where(inArray(snzRoom.vnum, roomVnums))
-        : [],
-      mobVnums.length > 0
-        ? sneezyDb
-            .select({ vnum: snzMob.vnum })
-            .from(snzMob)
-            .where(inArray(snzMob.vnum, mobVnums))
-        : [],
-      objVnums.length > 0
-        ? sneezyDb
-            .select({ vnum: snzObj.vnum })
-            .from(snzObj)
-            .where(inArray(snzObj.vnum, objVnums))
-        : [],
-      mobRespVnums.length > 0
-        ? sneezyDb
-            .select({ vnum: snzMobresponses.vnum })
-            .from(snzMobresponses)
-            .where(inArray(snzMobresponses.vnum, mobRespVnums))
-        : [],
+      getProdVnumSet({
+        immRows: immRooms,
+        snzTable: snzRoom,
+        snzVnumColumn: snzRoom.vnum,
+      }),
+      getProdVnumSet({
+        immRows: immMobs,
+        snzTable: snzMob,
+        snzVnumColumn: snzMob.vnum,
+      }),
+      getProdVnumSet({
+        immRows: immObjs,
+        snzTable: snzObj,
+        snzVnumColumn: snzObj.vnum,
+      }),
+      getProdVnumSet({
+        immRows: immMobResps,
+        snzTable: snzMobresponses,
+        snzVnumColumn: snzMobresponses.vnum,
+      }),
     ]);
 
-  const prodRoomSet = new Set(snzRoomVnums.map((r) => r.vnum));
-  const prodMobSet = new Set(snzMobVnums.map((m) => m.vnum));
-  const prodObjSet = new Set(snzObjVnums.map((o) => o.vnum));
-  const prodMobRespSet = new Set(snzMobRespVnums.map((r) => r.vnum));
-
-  // For entities that exist in both, do a field-level comparison to find
-  // actually modified ones. Fetch full rows from both DBs.
-  const roomPairs = immRooms
-    .filter(({ vnum }) => prodRoomSet.has(vnum))
-    .map(({ player_id, vnum }) => ({ player_id, vnum }));
-  const mobPairs = immMobs
-    .filter(({ vnum }) => prodMobSet.has(vnum))
-    .map(({ player_id, vnum }) => ({ player_id, vnum }));
-  const objPairs = immObjs
-    .filter(({ vnum }) => prodObjSet.has(vnum))
-    .map(({ player_id, vnum }) => ({ player_id, vnum }));
-  const mobRespPairs = immMobResps
-    .filter(({ vnum }) => prodMobRespSet.has(vnum))
-    .map(({ player_id, vnum }) => ({ player_id, vnum }));
+  const roomPairs = pickExistingPairs(immRooms, prodRoomSet);
+  const mobPairs = pickExistingPairs(immMobs, prodMobSet);
+  const objPairs = pickExistingPairs(immObjs, prodObjSet);
+  const mobRespPairs = pickExistingPairs(immMobResps, prodMobRespSet);
 
   const [modifiedRooms, modifiedMobs, modifiedObjs, modifiedMobResps] =
     await Promise.all([
@@ -267,92 +232,32 @@ export async function getDashboardEntities(
       findModifiedMobResponses(mobRespPairs, scope),
     ]);
 
-  const entities: DashboardEntity[] = [];
-
-  for (const { name, player_id, vnum } of immRooms) {
-    const key = `${player_id}:${vnum}`;
-    if (!prodRoomSet.has(vnum)) {
-      entities.push({
-        name: name || "(unnamed)",
-        playerId: player_id,
-        status: "new",
-        type: "room",
-        vnum,
-      });
-    } else if (modifiedRooms.has(key)) {
-      entities.push({
-        name: name || "(unnamed)",
-        playerId: player_id,
-        status: "modified",
-        type: "room",
-        vnum,
-      });
-    }
-  }
-
-  for (const { name, player_id, vnum } of immMobs) {
-    const key = `${player_id}:${vnum}`;
-    if (!prodMobSet.has(vnum)) {
-      entities.push({
-        name: name || "(unnamed)",
-        playerId: player_id,
-        status: "new",
-        type: "mob",
-        vnum,
-      });
-    } else if (modifiedMobs.has(key)) {
-      entities.push({
-        name: name || "(unnamed)",
-        playerId: player_id,
-        status: "modified",
-        type: "mob",
-        vnum,
-      });
-    }
-  }
-
-  for (const { name, player_id, vnum } of immObjs) {
-    const key = `${player_id}:${vnum}`;
-    if (!prodObjSet.has(vnum)) {
-      entities.push({
-        name: name || "(unnamed)",
-        playerId: player_id,
-        status: "new",
-        type: "object",
-        vnum,
-      });
-    } else if (modifiedObjs.has(key)) {
-      entities.push({
-        name: name || "(unnamed)",
-        playerId: player_id,
-        status: "modified",
-        type: "object",
-        vnum,
-      });
-    }
-  }
-
-  for (const { name: rawName, player_id, vnum } of immMobResps) {
-    const key = `${player_id}:${vnum}`;
-    const name = rawName ?? "(unnamed)";
-    if (!prodMobRespSet.has(vnum)) {
-      entities.push({
-        name,
-        playerId: player_id,
-        status: "new",
-        type: "mob-response",
-        vnum,
-      });
-    } else if (modifiedMobResps.has(key)) {
-      entities.push({
-        name,
-        playerId: player_id,
-        status: "modified",
-        type: "mob-response",
-        vnum,
-      });
-    }
-  }
+  const entities: DashboardEntity[] = [
+    ...buildEntities({
+      modifiedSet: modifiedRooms,
+      prodSet: prodRoomSet,
+      rows: immRooms,
+      type: "room",
+    }),
+    ...buildEntities({
+      modifiedSet: modifiedMobs,
+      prodSet: prodMobSet,
+      rows: immMobs,
+      type: "mob",
+    }),
+    ...buildEntities({
+      modifiedSet: modifiedObjs,
+      prodSet: prodObjSet,
+      rows: immObjs,
+      type: "object",
+    }),
+    ...buildEntities({
+      modifiedSet: modifiedMobResps,
+      prodSet: prodMobRespSet,
+      rows: immMobResps,
+      type: "mob-response",
+    }),
+  ];
 
   entities.sort((a, b) => {
     if (a.type !== b.type) return a.type.localeCompare(b.type);
@@ -362,16 +267,72 @@ export async function getDashboardEntities(
   return entities;
 }
 
-// ---------------------------------------------------------------------------
-// Public types and API
-// ---------------------------------------------------------------------------
+function pickExistingPairs(
+  immRows: ReadonlyArray<{ player_id: number; vnum: number }>,
+  prodSet: Set<number>,
+) {
+  return immRows.flatMap(({ player_id, vnum }) =>
+    prodSet.has(vnum) ? [{ player_id, vnum }] : [],
+  );
+}
+
+async function getProdVnumSet({
+  immRows,
+  snzTable,
+  snzVnumColumn,
+}: {
+  immRows: ReadonlyArray<{ vnum: number }>;
+  snzTable: MySqlTable;
+  snzVnumColumn: MySqlColumn & { _: { data: number; notNull: true } };
+}) {
+  const vnums = immRows.map((r) => r.vnum);
+  if (vnums.length === 0) return new Set<number>();
+  const result = await sneezyDb
+    .select({ vnum: snzVnumColumn })
+    .from(snzTable)
+    .where(inArray(snzVnumColumn, vnums));
+  return new Set(result.map((r) => r.vnum));
+}
+
+function buildEntities({
+  modifiedSet,
+  prodSet,
+  rows,
+  type,
+}: {
+  modifiedSet: Set<string>;
+  prodSet: Set<number>;
+  rows: ReadonlyArray<{ name: null | string; player_id: number; vnum: number }>;
+  type: DashboardEntity["type"];
+}): DashboardEntity[] {
+  return rows.flatMap(({ name, player_id, vnum }) => {
+    const status = prodSet.has(vnum)
+      ? modifiedSet.has(`${player_id}:${vnum}`)
+        ? "modified"
+        : null
+      : "new";
+    if (status === null) return [];
+    // Treat null (LEFT JOIN miss) and empty string both as "no name" so
+    // the dashboard never renders a blank label. The inner `??` strips
+    // nullishness so the outer `||` checks only for empty string.
+    return [
+      {
+        name: (name ?? "") || "(unnamed)",
+        playerId: player_id,
+        status,
+        type,
+        vnum,
+      },
+    ];
+  });
+}
 
 /**
  * Normalizes nullable text values so that null and "" compare as equal.
  * The C++ game server treats these interchangeably, so a round-trip through
  * publish can flip one to the other without a meaningful content change.
  */
-function normalizeNullable(val: unknown): unknown {
+function normalizeNullable(val: unknown) {
   if (val === null || val === undefined || val === "") return null;
   return val;
 }
@@ -386,7 +347,7 @@ function fieldsEqual<T extends Record<string, unknown>>(
   a: T,
   b: T,
   fields: ReadonlyArray<keyof T & string>,
-): boolean {
+) {
   for (const f of fields) {
     // weight uses epsilon because DOUBLE(6,2) storage round-trips with float-precision noise
     if (f === "weight") {
@@ -405,12 +366,17 @@ function fieldsEqual<T extends Record<string, unknown>>(
  * keyFn. Returns true only if both sets have the same keys and all matched
  * pairs are field-equal.
  */
-function childrenEqual<T extends Record<string, unknown>>(
-  immRows: T[],
-  snzRows: T[],
-  keyFn: (row: T) => string,
-  fields: ReadonlyArray<keyof T & string>,
-): boolean {
+function childrenEqual<T extends Record<string, unknown>>({
+  fields,
+  immRows,
+  keyFn,
+  snzRows,
+}: {
+  fields: ReadonlyArray<keyof T & string>;
+  immRows: T[];
+  keyFn: (row: T) => string;
+  snzRows: T[];
+}) {
   if (immRows.length !== snzRows.length) return false;
   const snzMap = new Map(snzRows.map((r) => [keyFn(r), r]));
   for (const immRow of immRows) {
@@ -421,43 +387,21 @@ function childrenEqual<T extends Record<string, unknown>>(
   return true;
 }
 
-// ---------------------------------------------------------------------------
-// Per-type modified detection
-// ---------------------------------------------------------------------------
-
-function groupByVnum<T extends { vnum: number }>(rows: T[]): Map<number, T[]> {
-  const map = new Map<number, T[]>();
-  for (const row of rows) {
-    const { vnum } = row;
-    const existing = map.get(vnum);
-    if (existing) {
-      existing.push(row);
-    } else {
-      map.set(vnum, [row]);
-    }
-  }
-  return map;
+function groupByVnum<T extends { vnum: number }>(rows: T[]) {
+  return Map.groupBy(rows, (r) => r.vnum);
 }
 
 function groupByVnumAndPlayer<T extends { player_id: number; vnum: number }>(
   rows: T[],
-): Map<string, T[]> {
-  const out = new Map<string, T[]>();
-  for (const row of rows) {
-    const { player_id, vnum } = row;
-    const key = `${player_id}:${vnum}`;
-    const bucket = out.get(key);
-    if (bucket) bucket.push(row);
-    else out.set(key, [row]);
-  }
-  return out;
+) {
+  return Map.groupBy(rows, ({ player_id, vnum }) => `${player_id}:${vnum}`);
 }
 
 async function findModifiedRooms(
   pairs: Array<{ player_id: number; vnum: number }>,
   scope: OwnerScope,
-): Promise<Set<string>> {
-  if (pairs.length === 0) return new Set();
+) {
+  if (pairs.length === 0) return new Set<string>();
 
   const vnums = pairs.map((p) => p.vnum);
 
@@ -522,12 +466,12 @@ async function findModifiedRooms(
     const immExitsForKey = immExitsByKey.get(key) ?? [];
     const snzExitsForVnum = snzExitsByVnum.get(vnum) ?? [];
     if (
-      !childrenEqual(
-        immExitsForKey,
-        snzExitsForVnum,
-        (r) => String(r.direction),
-        ROOMEXIT_FIELDS,
-      )
+      !childrenEqual({
+        fields: ROOMEXIT_FIELDS,
+        immRows: immExitsForKey,
+        keyFn: (r) => String(r.direction),
+        snzRows: snzExitsForVnum,
+      })
     ) {
       modified.add(key);
       continue;
@@ -536,12 +480,12 @@ async function findModifiedRooms(
     const immExtrasForKey = immExtrasByKey.get(key) ?? [];
     const snzExtrasForVnum = snzExtrasByVnum.get(vnum) ?? [];
     if (
-      !childrenEqual(
-        immExtrasForKey,
-        snzExtrasForVnum,
-        (r) => r.name,
-        ROOMEXTRA_FIELDS,
-      )
+      !childrenEqual({
+        fields: ROOMEXTRA_FIELDS,
+        immRows: immExtrasForKey,
+        keyFn: (r) => r.name,
+        snzRows: snzExtrasForVnum,
+      })
     ) {
       modified.add(key);
     }
@@ -553,8 +497,8 @@ async function findModifiedRooms(
 async function findModifiedMobs(
   pairs: Array<{ player_id: number; vnum: number }>,
   scope: OwnerScope,
-): Promise<Set<string>> {
-  if (pairs.length === 0) return new Set();
+) {
+  if (pairs.length === 0) return new Set<string>();
 
   const vnums = pairs.map((p) => p.vnum);
 
@@ -619,12 +563,12 @@ async function findModifiedMobs(
     const immExtrasForKey = immExtrasByKey.get(key) ?? [];
     const snzExtrasForVnum = snzExtrasByVnum.get(vnum) ?? [];
     if (
-      !childrenEqual(
-        immExtrasForKey,
-        snzExtrasForVnum,
-        (r) => r.keyword,
-        MOBEXTRA_FIELDS,
-      )
+      !childrenEqual({
+        fields: MOBEXTRA_FIELDS,
+        immRows: immExtrasForKey,
+        keyFn: (r) => r.keyword,
+        snzRows: snzExtrasForVnum,
+      })
     ) {
       modified.add(key);
       continue;
@@ -633,12 +577,12 @@ async function findModifiedMobs(
     const immImmsForKey = immImmsByKey.get(key) ?? [];
     const snzImmsForVnum = snzImmsByVnum.get(vnum) ?? [];
     if (
-      !childrenEqual(
-        immImmsForKey,
-        snzImmsForVnum,
-        (r) => String(r.type),
-        MOBIMM_FIELDS,
-      )
+      !childrenEqual({
+        fields: MOBIMM_FIELDS,
+        immRows: immImmsForKey,
+        keyFn: (r) => String(r.type),
+        snzRows: snzImmsForVnum,
+      })
     ) {
       modified.add(key);
     }
@@ -647,15 +591,11 @@ async function findModifiedMobs(
   return modified;
 }
 
-// ---------------------------------------------------------------------------
-// Utility
-// ---------------------------------------------------------------------------
-
 async function findModifiedObjects(
   pairs: Array<{ player_id: number; vnum: number }>,
   scope: OwnerScope,
-): Promise<Set<string>> {
-  if (pairs.length === 0) return new Set();
+) {
+  if (pairs.length === 0) return new Set<string>();
 
   const vnums = pairs.map((p) => p.vnum);
 
@@ -721,12 +661,12 @@ async function findModifiedObjects(
     const immAffectsForKey = immAffectsByKey.get(key) ?? [];
     const snzAffectsForVnum = snzAffectsByVnum.get(vnum) ?? [];
     if (
-      !childrenEqual(
-        immAffectsForKey,
-        snzAffectsForVnum,
-        ({ mod1, mod2, type }) => `${type}|${mod1}|${mod2}`,
-        [],
-      )
+      !childrenEqual({
+        fields: [],
+        immRows: immAffectsForKey,
+        keyFn: ({ mod1, mod2, type }) => `${type}|${mod1}|${mod2}`,
+        snzRows: snzAffectsForVnum,
+      })
     ) {
       modified.add(key);
       continue;
@@ -735,12 +675,12 @@ async function findModifiedObjects(
     const immExtrasForKey = immExtrasByKey.get(key) ?? [];
     const snzExtrasForVnum = snzExtrasByVnum.get(vnum) ?? [];
     if (
-      !childrenEqual(
-        immExtrasForKey,
-        snzExtrasForVnum,
-        (r) => r.name,
-        OBJEXTRA_FIELDS,
-      )
+      !childrenEqual({
+        fields: OBJEXTRA_FIELDS,
+        immRows: immExtrasForKey,
+        keyFn: (r) => r.name,
+        snzRows: snzExtrasForVnum,
+      })
     ) {
       modified.add(key);
     }
@@ -752,8 +692,8 @@ async function findModifiedObjects(
 async function findModifiedMobResponses(
   pairs: Array<{ player_id: number; vnum: number }>,
   scope: OwnerScope,
-): Promise<Set<string>> {
-  if (pairs.length === 0) return new Set();
+) {
+  if (pairs.length === 0) return new Set<string>();
 
   const vnums = pairs.map((p) => p.vnum);
 
