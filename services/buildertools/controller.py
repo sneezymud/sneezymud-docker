@@ -129,6 +129,7 @@ def jsonifyRooms(rooms, exits):
 # This function runs 10 DB queries, not counting begin/commit. Yummy.
 def sendRoomsToDb(fromSvg):
     name = getPlayerName(request.authorization.username)
+    player_id = getPlayerId(name)
     rooms = fromSvg['rooms']
     exits = fromSvg['exits']
     ownedVnums = getOwnedVnums(name)
@@ -163,7 +164,7 @@ def sendRoomsToDb(fromSvg):
     for sourceRoom in newExits:
         for direction in newExits[sourceRoom]:
             ex = Roomexit.create(
-                    owner=name,
+                    player_id=player_id,
                     vnum=sourceRoom,
                     direction=direction,
                     destination=newExits[sourceRoom][direction]['tgt'],
