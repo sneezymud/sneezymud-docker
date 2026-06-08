@@ -3,6 +3,7 @@ from main import db
 import legacycrypt as crypt
 
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.dialects.mysql import BIGINT
 
 class ImmortalModel(db.Model):
     __abstract__ = True
@@ -39,6 +40,10 @@ def getPlayerName(accountName):
             .filter(Account.name == accountName)
             .first())
     return player.name if player else None
+
+def getPlayerId(playerName):
+    player = Player.query.filter_by(name=playerName).first()
+    return player.id if player else None
 
 def getWizdata(playerName):
     return (Wizdata.query
@@ -94,7 +99,7 @@ def getThingsOf(type, name):
 
     newVnums = desiredVnums.difference(existingVnums)
     for v in newVnums:
-        r = type.create(v, name)
+        r = type.create(v, wizdata.player_id)
         things.add(r)
         db.session.add(r)
     db.session.commit()
@@ -157,7 +162,8 @@ class Wizdata(SneezyModel):
         return "<Id: {}>".format(self.player_id)
 
 class Room(ImmortalModel):
-    vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
+    player_id = db.Column(BIGINT(unsigned=True), nullable=False, primary_key=True)
+    vnum = db.Column(db.Integer, nullable=False, primary_key=True)
     x = db.Column(db.Integer)
     y = db.Column(db.Integer)
     z = db.Column(db.Integer)
@@ -175,13 +181,12 @@ class Room(ImmortalModel):
     height = db.Column(db.Integer)
     spec = db.Column(db.Integer)
     block = db.Column(db.Integer)
-    owner = db.Column(db.String(127))
 
     def __repr__(self):
         return "<Name: {}>".format(self.name)
 
-    def create(vnum, owner):
-        return Room(vnum=vnum, x=0, y=0, z=0, name="", description="", zone=1, room_flag=0, sector=0, teletime=0, teletarg=0, telelook=0, river_speed=0, river_dir=0, capacity=0, height=0, spec=0, owner=owner)
+    def create(vnum, player_id):
+        return Room(vnum=vnum, x=0, y=0, z=0, name="", description="", zone=1, room_flag=0, sector=0, teletime=0, teletarg=0, telelook=0, river_speed=0, river_dir=0, capacity=0, height=0, spec=0, player_id=player_id)
 
     def getMy(name):
         return getThingsOf(Room, name)
@@ -190,6 +195,7 @@ class Room(ImmortalModel):
         return checkVnum(vnum, name)
 
 class Roomexit(ImmortalModel):
+    player_id = db.Column(BIGINT(unsigned=True), nullable=False, primary_key=True)
     vnum = db.Column(db.Integer, nullable=False, primary_key=True)
     direction = db.Column(db.Integer, nullable=False, primary_key=True)
     name = db.Column(db.String(127))
@@ -200,7 +206,6 @@ class Roomexit(ImmortalModel):
     weight = db.Column(db.Integer)
     key_num = db.Column(db.Integer)
     destination = db.Column(db.Integer)
-    owner = db.Column(db.String(127))
     block = db.Column(db.Integer)
 
     def __repr__(self):
@@ -213,8 +218,8 @@ class Roomexit(ImmortalModel):
             db.session.delete(e)
         db.session.commit()
 
-    def create(vnum, owner, direction=0, destination=0, block=1):
-        return Roomexit(vnum=vnum, direction=direction, name="", description="", type=0, condition_flag=0, lock_difficulty=0, weight=0, key_num=0, destination=destination, owner=owner, block=block)
+    def create(vnum, player_id, direction=0, destination=0, block=1):
+        return Roomexit(vnum=vnum, direction=direction, name="", description="", type=0, condition_flag=0, lock_difficulty=0, weight=0, key_num=0, destination=destination, player_id=player_id, block=block)
 
     def getMy(name):
         myRooms = Room.getMy(name)
@@ -244,7 +249,8 @@ class Player(SneezyModel):
         return "<Name: {}>".format(self.name)
 
 class Obj(ImmortalModel):
-    vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
+    player_id = db.Column(BIGINT(unsigned=True), nullable=False, primary_key=True)
+    vnum = db.Column(db.Integer, nullable=False, primary_key=True)
     name = db.Column(db.String(127))
     short_desc = db.Column(db.String(127))
     long_desc = db.Column(db.String(255))
@@ -266,12 +272,11 @@ class Obj(ImmortalModel):
     decay = db.Column(db.Integer)
     volume = db.Column(db.Integer)
     material = db.Column(db.Integer)
-    owner = db.Column(db.String(32))
     # objextra = db.relationship('objextra', backref='obj', lazy=True)
     # objaffect = db.relationship('objaffect', backref='obj', lazy=True)
 
-    def create(vnum, owner):
-        return Obj(vnum=vnum, name="", short_desc="", long_desc="", action_desc="", type=0, action_flag=0, wear_flag=0, val0=0, val1=0, val2=0, val3=0, weight=0, price=0, can_be_seen=0, spec_proc=0, max_exist=9999, max_struct=0, cur_struct=0, decay=0, volume=0, material=0, owner=owner)
+    def create(vnum, player_id):
+        return Obj(vnum=vnum, name="", short_desc="", long_desc="", action_desc="", type=0, action_flag=0, wear_flag=0, val0=0, val1=0, val2=0, val3=0, weight=0, price=0, can_be_seen=0, spec_proc=0, max_exist=9999, max_struct=0, cur_struct=0, decay=0, volume=0, material=0, player_id=player_id)
 
     def __repr__(self):
         return "<Name: {}>".format(self.name)
@@ -303,10 +308,11 @@ class Mob(ImmortalModel):
     def getMy(name):
         return getThingsOf(Mob, name)
 
-    def create(vnum, owner):
-        return Mob(vnum=vnum, name="", short_desc="", long_desc="", description="", actions=0, affects=0, faction=0, fact_perc=0, letter="", attacks=0, mob_class=0, level=0, tohit=0, ac=0, hpbonus=0, damage_level=0, damage_precision=0, gold=0, race=0, weight=0, height=0, str=0, bra=0, con=0, dex=0, agi=0, intel=0, wis=0, foc=0, per=0, cha=0, kar=0, spe=0, pos=0, def_position=0, sex=0, spec_proc=0, skin=0, vision=0, can_be_seen=0, max_exist=0, local_sound="", adjacent_sound="", owner=owner)
+    def create(vnum, player_id):
+        return Mob(vnum=vnum, name="", short_desc="", long_desc="", description="", actions=0, affects=0, faction=0, fact_perc=0, letter="", attacks=0, mob_class=0, level=0, tohit=0, ac=0, hpbonus=0, damage_level=0, damage_precision=0, gold=0, race=0, weight=0, height=0, str=0, bra=0, con=0, dex=0, agi=0, intel=0, wis=0, foc=0, per=0, cha=0, kar=0, spe=0, pos=0, def_position=0, sex=0, spec_proc=0, skin=0, vision=0, can_be_seen=0, max_exist=0, local_sound="", adjacent_sound="", player_id=player_id)
 
-    vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
+    player_id = db.Column(BIGINT(unsigned=True), nullable=False, primary_key=True)
+    vnum = db.Column(db.Integer, nullable=False, primary_key=True)
     name = db.Column(db.String(127))
     short_desc = db.Column(db.String(127))
     long_desc = db.Column(db.String(255))
@@ -350,27 +356,28 @@ class Mob(ImmortalModel):
     max_exist = db.Column(db.Integer)
     local_sound = db.Column(db.String(255))
     adjacent_sound = db.Column(db.String(255))
-    owner = db.Column(db.String(255))
 
     def canAccess(vnum, name):
         return checkVnum(vnum, name)
 
 
 class Mob_extra(ImmortalModel):
-    vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
-    keyword = db.Column(db.String(32))
+    player_id = db.Column(BIGINT(unsigned=True), nullable=False, primary_key=True)
+    vnum = db.Column(db.Integer, nullable=False, primary_key=True)
+    keyword = db.Column(db.String(32), nullable=False, primary_key=True)
     description = db.Column(db.String(255))
 
 
 class Mob_imm(ImmortalModel):
-    vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
-    type = db.Column(db.Integer)
+    player_id = db.Column(BIGINT(unsigned=True), nullable=False, primary_key=True)
+    vnum = db.Column(db.Integer, nullable=False, primary_key=True)
+    type = db.Column(db.Integer, nullable=False, primary_key=True)
     amt = db.Column(db.Integer)
 
 
 class Mobresponses(ImmortalModel):
-    vnum = db.Column(db.Integer, unique=True, nullable=False, primary_key=True)
-    owner = db.Column(db.Text)
+    player_id = db.Column(BIGINT(unsigned=True), nullable=False, primary_key=True)
+    vnum = db.Column(db.Integer, nullable=False, primary_key=True)
     response = db.Column(db.Text)
 
     def __repr__(self):
@@ -382,8 +389,8 @@ class Mobresponses(ImmortalModel):
     def canAccess(vnum, name):
         return checkVnum(vnum, name)
 
-    def create(vnum, owner):
-        return Mobresponses(vnum=vnum, response="", owner=owner)
+    def create(vnum, player_id):
+        return Mobresponses(vnum=vnum, response="", player_id=player_id)
 
     # parse this:
     # say {"hello";

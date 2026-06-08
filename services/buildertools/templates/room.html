@@ -3,7 +3,7 @@
 
 <div class="grid">
   {% for field in form %}
-    {% if field.type != 'CSRFTokenField' and field.name != 'owner' %}
+    {% if field.type != 'CSRFTokenField' and field.name != 'player_id' %}
       {{ field.label() }}
       {{ field() }}
     {% endif %}

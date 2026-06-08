@@ -1,7 +1,7 @@
 import auth
 import json
 from pprint import pprint
-from model import Player, Wizdata, Account, Room, Zone, Obj, Mob, Mobresponses, getOwnedVnums, getBlockForVnum, Roomexit, getPlayerName
+from model import Player, Wizdata, Account, Room, Zone, Obj, Mob, Mobresponses, getOwnedVnums, getBlockForVnum, Roomexit, getPlayerName, getPlayerId
 from main import app, db
 
 from flask import render_template, request, flash
@@ -94,9 +94,11 @@ def edit(vnum, Thing, template, name, backlink, extraData=None):
     if not Thing.canAccess(vnum, name):
         return render_template("badaccess.html")
 
+    player_id = getPlayerId(name)
+
     thing = Thing.query.filter_by(vnum=vnum).first()
     if thing is None:
-        thing = Thing.create(vnum, name)
+        thing = Thing.create(vnum, player_id)
         db.session.add(thing)
 
     Form = model_form(Thing, base_class=FlaskForm, db_session=db.session)
@@ -104,7 +106,7 @@ def edit(vnum, Thing, template, name, backlink, extraData=None):
 
     if form.validate_on_submit():
         form.populate_obj(thing)
-        thing.owner = getPlayerName(request.authorization.username)
+        thing.player_id = player_id
         db.session.commit()
         flash("Saved!")
 
