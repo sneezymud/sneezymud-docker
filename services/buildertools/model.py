@@ -398,8 +398,8 @@ class Mobresponses(ImmortalModel):
     # 	tovict <c>$n says, <z>"Hello %n, do you need help <c>getting started<z>?";
     # 	}
     # ... into a dict of trigger -> argument -> [actions1, actions2..]
-    def parseTriggersFromMobResponse(vnum):
-        mobresponse = Mobresponses.query.filter_by(vnum=vnum).first()
+    def parseTriggersFromMobResponse(vnum, player_id):
+        mobresponse = Mobresponses.query.filter_by(vnum=vnum, player_id=player_id).first()
         if mobresponse is None:
             return {}
 

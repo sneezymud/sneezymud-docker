@@ -84,7 +84,7 @@ def mob(vnum):
 @auth.requires_auth
 def mobresponse(vnum):
     name = getPlayerName(request.authorization.username)
-    responses = Mobresponses.parseTriggersFromMobResponse(vnum)
+    responses = Mobresponses.parseTriggersFromMobResponse(vnum, getPlayerId(name))
     extraData = {"responses": responses, "responsesJson": json.dumps(responses)}
 
     return edit(vnum, Mobresponses, 'mobresponse.html', name, backlink='mob/{vnum}'.format(vnum=vnum), extraData=extraData)
@@ -96,7 +96,7 @@ def edit(vnum, Thing, template, name, backlink, extraData=None):
 
     player_id = getPlayerId(name)
 
-    thing = Thing.query.filter_by(vnum=vnum).first()
+    thing = Thing.query.filter_by(vnum=vnum, player_id=player_id).first()
     if thing is None:
         thing = Thing.create(vnum, player_id)
         db.session.add(thing)
